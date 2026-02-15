@@ -12,9 +12,8 @@ def run_wizard(domain=None, password=None):
     alphabet = string.ascii_letters + string.digits
     secret_key = ''.join(secrets.choice(alphabet) for i in range(32))
     
-    # 2. Gestion des entrées (Arguments ou Manuel)
-    # Si lancé par deploy.sh, on prend les arguments. Sinon, on demande.
-    final_domain = domain if domain else input("🌐 Entrez le domaine/IP : ")
+    # 2. Gestion des entrées
+    final_domain = domain if domain else input("🌐 Entrez le domaine/IP (ex: k-guard.mon-vps.com ou 192.168.1.50) : ")
     final_password = password if password else input("🔑 Entrez le mot de passe admin : ")
     
     if not final_password:
@@ -27,12 +26,12 @@ def run_wizard(domain=None, password=None):
     env_path = "backend/.env"
     example_path = "backend/.env.example"
     
-    # On prépare le contenu à injecter
+    # CORRECTION SYNTAXE ICI
     new_data = {
         "USER_DOMAIN=": f"USER_DOMAIN={final_domain}\n",
         "SECRET_KEY=": f"SECRET_KEY={secret_key}\n",
-        "ADMIN_PASSWORD_HASH=": f"ADMIN_PASSWORD_HASH={password_hash}\n"
-        "ALLOWED_ORIGINS="= f"ALLOWED_ORIGINS=http://{final_domain},https://{final_domain}\n"
+        "ADMIN_PASSWORD_HASH=": f"ADMIN_PASSWORD_HASH={password_hash}\n",
+        "ALLOWED_ORIGINS=": f"ALLOWED_ORIGINS=http://{final_domain},https://{final_domain}\n"
     }
 
     if os.path.exists(example_path):
@@ -41,7 +40,6 @@ def run_wizard(domain=None, password=None):
         
         with open(env_path, "w") as f:
             for line in lines:
-                # Si la ligne correspond à une de nos clés, on injecte la valeur
                 matched = False
                 for key, value in new_data.items():
                     if line.startswith(key):
@@ -59,7 +57,6 @@ def run_wizard(domain=None, password=None):
         print(f"⚠️ {example_path} absent. Création d'un .env minimal.")
 
 if __name__ == "__main__":
-    # Si des arguments sont passés par le shell (deploy.sh)
     if len(sys.argv) > 2:
         run_wizard(sys.argv[1], sys.argv[2])
     else:

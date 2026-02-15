@@ -55,6 +55,11 @@ async def list_all_deployments(user: dict = Depends(verify_token)):
         print(f"❌ Discovery Error: {str(e)}")
         return []
 
+# --- GET METRICS ---
+@router.get("/metrics/{namespace}")
+async def get_metrics(namespace: str, user: dict = Depends(verify_token)):
+    return get_pod_metrics(namespace)
+
 # --- GET STATUS ---
 @router.get("/status")
 async def get_cluster_status(user: dict = Depends(verify_token)):
@@ -102,8 +107,3 @@ async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_to
         return {"logs": logs}
     except Exception as e:
         return {"logs": f"ERROR: {str(e)}"}
-
-# --- GET METRICS ---user: dict = Depends(verify_token)
-@router.get("/metrics/{namespace}")
-async def get_metrics(namespace: str, user: dict = Depends(verify_token)):
-    return get_pod_metrics(namespace)

@@ -1,30 +1,35 @@
 from fastapi import HTTPException
-from database import v1, apps_client
-from kubernetes import client
+from database import v1, apps_client, custom_client # <--- On importe custom_client
 
 def parse_cpu(cpu_raw):
     """Convertit les nanocores (n) ou millicores (m) en millicores (entier)"""
-    if cpu_raw.endswith('n'):
-        return int(cpu_raw.replace('n', '')) // 1000000
-    if cpu_raw.endswith('m'):
-        return int(cpu_raw.replace('m', ''))
-    return int(cpu_raw)
+    cpu_str = str(cpu_raw) # Sécurité si c'est déjà un int
+    if cpu_str.endswith('n'):
+        return int(cpu_str.replace('n', '')) // 1000000
+    if cpu_str.endswith('m'):
+        return int(cpu_str.replace('m', ''))
+    return int(cpu_str)
 
 def parse_memory(mem_raw):
     """Convertit Ki, Mi, Gi en MegaBytes (MiB)"""
-    if mem_raw.endswith('Ki'):
-        return int(mem_raw.replace('Ki', '')) // 1024
-    if mem_raw.endswith('Mi'):
-        return int(mem_raw.replace('Mi', ''))
-    if mem_raw.endswith('Gi'):
-        return int(mem_raw.replace('Gi', '')) * 1024
-    return int(mem_raw) // 1024
+    mem_str = str(mem_raw)
+    if mem_str.endswith('Ki'):
+        return int(mem_str.replace('Ki', '')) // 1024
+    if mem_str.endswith('Mi'):
+        return int(mem_str.replace('Mi', ''))
+    if mem_str.endswith('Gi'):
+        return int(mem_str.replace('Gi', '')) * 1024
+    # Si c'est juste des bytes
+    return int(mem_str) // (1024 * 1024)
 
 def get_pod_metrics(namespace: str = "default"):
-    """Récupère les métriques CPU/RAM réelles via metrics.k8s.io"""
+    """Récupère les métriques CPU/RAM via metrics.k8s.io"""
+    if not custom_client:
+        print("⚠️ K8s Custom Client non initialisé")
+        return []
+
     try:
-        custom_api = client.CustomObjectsApi()
-        metrics = custom_api.list_namespaced_custom_object(
+        metrics = custom_client.list_namespaced_custom_object(
             group="metrics.k8s.io",
             version="v1beta1",
             namespace=namespace,
@@ -34,7 +39,10 @@ def get_pod_metrics(namespace: str = "default"):
         parsed_metrics = []
         for item in metrics.get("items", []):
             name = item["metadata"]["name"]
-            # On prend la conso du premier conteneur
+            # Protection si le pod n'a pas encore de métriques
+            if not item.get("containers"):
+                continue
+
             usage = item["containers"][0]["usage"]
             
             parsed_metrics.append({
@@ -44,20 +52,20 @@ def get_pod_metrics(namespace: str = "default"):
             })
         return parsed_metrics
     except Exception as e:
-        print(f"❌ Erreur Metrics (Le Metrics-Server est-il installé ?): {str(e)}")
+        # On ne crash pas l'app si metrics-server n'est pas là
+        print(f"ℹ️ Info Metrics: {str(e)}") 
         return []
 
 async def scale_down_deployment(namespace: str, pod_name: str):
-    """Remédiation : Réduit le nombre de réplicas à 1 (ou 0 pour stopper)"""
+    # ... (Le reste de ta fonction scale_down était correct)
     try:
-        # Essayer de trouver le déploiement parent via les owner_references
         pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
         if not pod.metadata.owner_references:
-            raise Exception("Pod sans parent (ReplicaSet/Deployment)")
+            raise Exception("Pod sans parent")
             
-        # On remonte du Pod -> ReplicaSet -> Deployment
         rs_name = pod.metadata.owner_references[0].name
-        deployment_name = "-".join(rs_name.split("-")[:-1]) # Plus robuste
+        # Logique robuste pour trouver le deployment depuis le ReplicaSet
+        deployment_name = rs_name.rsplit('-', 1)[0]
         
         body = {"spec": {"replicas": 1}}
         apps_client.patch_namespaced_deployment_scale(
@@ -65,7 +73,7 @@ async def scale_down_deployment(namespace: str, pod_name: str):
             namespace=namespace,
             body=body
         )
-        return {"status": "success", "message": f"Remédiation lancée : {deployment_name} stabilisé à 1 replica."}
+        return {"status": "success", "message": f"Remédiation : {deployment_name} réduit à 1 replica."}
     except Exception as e:
         print(f"❌ Scale Down Fail: {e}")
-        raise HTTPException(status_code=500, detail=f"Échec de la remédiation : {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))

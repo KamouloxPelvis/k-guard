@@ -1,29 +1,35 @@
-apiVersion: networking.k8s.io/v1
-kind: Ingress
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: kguard-stripper
+  namespace: k-guard
+spec:
+  stripPrefix:
+    prefixes:
+      - /api
+
+---
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
 metadata:
   name: k-guard-ingress
   namespace: k-guard
-  annotations:
-    kubernetes.io/ingress.class: nginx
-    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
 spec:
-  ingressClassName: nginx
-  rules:
-  - http: 
-      paths:
-      - path: /k-guard/api
-        pathType: Prefix
-        backend:
-          service:
-            name: k-guard-service
-            port:
-              number: 8000
-      - path: /k-guard
-        pathType: Prefix
-        backend:
-          service:
-            name: k-guard-service
-            port:
-              number: 80
+  entryPoints:
+    - web
+  routes:
+  # Route 1 : L'API (Prioritaire)
+  - match: PathPrefix(`/api`)
+    kind: Rule
+    services:
+    - name: k-guard-service
+      port: 8000
+    middlewares:
+    - name: kguard-stripper
+
+  # Route 2 : Le Frontend (Catch-all)
+  - match: PathPrefix(`/`)
+    kind: Rule
+    services:
+    - name: k-guard-frontend-service
+      port: 80

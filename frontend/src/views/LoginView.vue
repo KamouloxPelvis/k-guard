@@ -19,11 +19,8 @@ const handleLogin = async (): Promise<void> => {
         params.append('username', pseudo.value);
         params.append('password', password.value);
 
-        // On utilise 'api' et non 'axios'. 
-        // Si ton baseURL dans api.ts est http://113.30.191.17/k-guard
-        // alors l'appel vers '/api/token' donnera la bonne URL.
         const { data } = await api.post<{ access_token: string }>(
-            '/api/token',    
+            '/token',    
             params
         );
         

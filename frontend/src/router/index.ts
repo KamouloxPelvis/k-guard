@@ -3,20 +3,19 @@ import Dashboard from '../views/Dashboard.vue'
 import HealthView from '../views/HealthView.vue'
 import SecurityView from '../views/SecurityView.vue'
 
-
 const routes = [
   {
     path: '/',
-    component: Dashboard, // Le Dashboard sert de base (Layout)
+    component: Dashboard, 
     meta: { requiresAuth: true },
     children: [
       {
-        path: '', // Route par défaut (/)
+        path: '', 
         name: 'Health',
         component: HealthView,
       },
       {
-        path: 'security', // Route (/security)
+        path: 'security', 
         name: 'Security',
         component: SecurityView,
       }
@@ -28,13 +27,13 @@ const routes = [
     component: () => import('../views/LoginView.vue')
   },
   {
-  path: '/:pathMatch(.*)*',
-  redirect: '/'
+    path: '/:pathMatch(.*)*',
+    redirect: '/'
   }
 ]
 
 const router = createRouter({
-  history: createWebHistory('/k-guard/'),
+  history: createWebHistory('/'), 
   routes
 })
 

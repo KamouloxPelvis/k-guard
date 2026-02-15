@@ -2,6 +2,10 @@
 
 # 🛡️ K-Guard : Opérateur de Maintenance & Sécurité automatisé pour clusters Kubernetes
 
+⚠️ WARNING / SECURITY DISCLAIMER :
+
+*Cet outil est un projet de recherche et d'apprentissage (Proof of Concept) développé pour un usage en environnement de développement contrôlé. En raison de l'accès direct au socket Docker et aux privilèges RBAC, l'utilisation de K-Guard dans un environnement de production non sécurisé peut exposer votre cluster à des risques d'escalade de privilèges. Ne déployez pas cet outil sur un réseau exposé sans une configuration stricte des Network Policies et une authentification renforcée.*
+
 K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observabilité et à l'audit de sécurité automatisé pour clusters K3s. Conçu pour offrir une visibilité en temps réel sur l'état de santé des Pods et leur surface d'attaque, K-Guard intègre des fonctions de remédiation immédiates : redémarrage de services, délestage dynamique des réplicas en cas de saturation CPU/RAM, et signalement de mise à jour des images conteneurisées suite à la détection de vulnérabilités critiques.
 
 
@@ -35,14 +39,25 @@ Sécurité : Trivy Engine.
 
 Infrastructure : Cluster K3s sur VPS Ubuntu.
 
+Audit Local : Montage du socket Docker (/var/run/docker.sock) dans le conteneur backend pour permettre à Trivy d'analyser les images présentes sur l'hôte en temps réel, sans transfert de données vers l'extérieur.
+
+## 🎯 Vision SRE & Sécurité
+
+Réduction de la surface d'attaque : Utilisation d'images de base Alpine et Slim pour minimiser les vulnérabilités système.
+
+Infrastructure as Code : Déploiement 100% automatisé via manifests YAML, garantissant une reproductibilité totale du cluster.
+
+Sécurité RBAC : Utilisation de ServiceAccounts dédiés avec des permissions limitées (Least Privilege principle).
+
 ## 🛠️ Configuration & Installation (Plug & Play)
 
 ![Installation](frontend/public/screenshots/installation.png)
 
 K-Guard utilise un assistant d'installation intelligent qui gère la génération des clés de sécurité et le déploiement Kubernetes :
 
-### 1. Pré-requis
-Assurez-vous d'avoir installé sur votre VPS :
+### 1. Pré-requis & Auto-check
+
+K-Guard inclut un script de pré-vol (check_env.py) qui valide vos permissions Docker et K3s avant toute installation. Assurez-vous tout de même d'avoir installé sur votre VPS :
 
 K3s (curl -sfL https://get.k3s.io | sh -)
 
@@ -74,61 +89,79 @@ Build Local : Construit les images Docker et les injecte directement dans le mot
 
 Kubernetes Orchestration : Déploie automatiquement les manifests (RBAC, Services, Ingress, Deployment).
 
+Zéro-Config Ingress : Configure automatiquement le routage via Traefik/Nginx Ingress et gère nativement le servirage statique des modules Vue.js pour éviter les erreurs de type MIME.
+
+*N'hésitez pas à lire mon article sur mon blog : https://blog.devopsnotes.org/articles/k-guard-orchestration-sre-et-audit-de-scurit-sur-k3s*
+
 [English Version Below]
 
 <a name="english-version"></a>
 🇺🇸 English Version
 
-# 🛡️ K-Guard: Automated Maintenance & Security Operator for Kubernetes
+# 🛡️ K-Guard: Automated Maintenance & Security Operator for Kubernetes Clusters
 
-K-Guard is an SRE dashboard designed for observability and automated security auditing within K3s clusters. It provides real-time visibility into Pod health and attack surfaces, featuring immediate remediation tools: service restarts, dynamic replica scaling, and critical vulnerability alerts.
+# ⚠️ SECURITY DISCLAIMER & WARNING
+
+*This tool is a Research and Learning project (Proof of Concept) developed for use in controlled development environments. Due to direct access to the Docker socket and specific RBAC privileges, deploying K-Guard in an unsecured production environment may expose your cluster to significant risks, including privilege escalation. Do not deploy this tool on an exposed network without strict Network Policies, robust authentication, and a full understanding of the underlying security implications.*
+
+K-Guard is an SRE (Site Reliability Engineering) dashboard dedicated to observability and automated security auditing for K3s clusters. Designed to provide real-time visibility into Pod health and attack surfaces, K-Guard integrates immediate remediation features: service restarts, dynamic replica scaling during CPU/RAM saturation, and update alerts for containerized images following the detection of critical vulnerabilities
 
 
 ## 🚀 Key Features
 
-Health Monitoring: Dynamic CPU/RAM tracking with intelligent severity thresholds.
+Health Monitoring: Dynamic visualization of CPU/RAM load with intelligent criticality thresholds
 
 ![Dashboard](frontend/public/screenshots/health_view.png)
 
-Security Audit: Native Trivy integration for automated CVE scanning.
+Security Audit: Native Trivy integration for automated CVE scanning of container images.
 
 ![Update Required View](frontend/public/screenshots/demo_view.png)
 
 Dynamic Status: Automatic risk level interpretation (SECURE, WATCH OUT, UPDATE REQUIRED).
 
-Ops Management: Real-time log streaming and Pod lifecycle management through a secure UI.
+Operational Management: Real-time log streaming and Pod lifecycle management (restarts) through a secure interface.
 
-![Dashboard](frontend/public/screenshots/log.png.png)
+![Dashboard](frontend/public/screenshots/log.png)
 
-💡 Demo Mode Hack: By holding Shift while clicking "Launch Scan", K-Guard forces an audit on a legacy image (nginx:1.18) to demonstrate vulnerability detection.
+💡 Demo Mode Scan Tip: By holding Shift while clicking "Launch Scan", K-Guard forces an audit on a legacy image (nginx:1.18) to demonstrate vulnerability detection.
 
 ![Security View](frontend/public/screenshots/security_view.png)
 
 🛠️ Tech Stack
 
-Frontend: Vue 3, TypeScript, Tailwind CSS (Immersive "Cyber" UI).
+Frontend: Vue 3, TypeScript, Tailwind CSS (Immersive "Cyber" Design).
 
 Backend: FastAPI (Python), Kubernetes Python Client (RBAC aware).
 
-Security: Trivy Vulnerability Scanner.
+Security: Trivy Engine.
 
-Infrastructure: K3s Cluster running on an Ubuntu VPS.
+Infrastructure: K3s Cluster on Ubuntu VPS.
 
-## 🛠️ Setup & Deployment (Install & Play)
+Local Audit: Docker socket mounting (/var/run/docker.sock) into the backend container, allowing Trivy to analyze on-host images in real-time without external data transfer.
 
-K-Guard features a Smart Setup Assistant that automates security key generation and Kubernetes orchestration.
+🎯 SRE & Security Vision
+
+Attack Surface Reduction: Use of Alpine and Slim base images to minimize system vulnerabilities.
+
+Infrastructure as Code: 100% automated deployment via YAML manifests, ensuring total cluster reproducibility.
+
+RBAC Security: Dedicated ServiceAccounts with scoped permissions following the Least Privilege principle.
+
+## 🛠️ Configuration & Installation (Plug & Play)
+
+K-Guard features a Smart Setup Assistant that automates security key generation and Kubernetes orchestration:
 
 ![Installation](frontend/public/screenshots/installation.png)
 
-### 1. Prerequisites
+### 1. Prerequisites & Auto-check
 
-Ensure your VPS has:
+K-Guard includes a pre-flight script (check_env.py) that validates your Docker and K3s permissions before installation. Ensure your VPS has:
 
-K3s installed and running.
+K3s: curl -sfL https://get.k3s.io | sh -
 
-Docker Engine for local builds.
+Docker: sudo apt install docker.io -y
 
-Python 3 installed.
+Python 3 & Pip
 
 ### 2. Quick Start
 
@@ -146,14 +179,14 @@ sudo ./scripts/deploy.sh
 
 ### 3. Automated Workflow
 
-Interactive Wizard: Prompts for your domain/IP and sets up your admin password.
+Interactive Wizard: Prompts for your domain/IP and generates a secure admin password.
 
-Auto-Security: Generates a unique SECRET_KEY and hashes your password using Bcrypt.
+Auto-Hardening: Generates a unique SECRET_KEY and hashes your password using Bcrypt.
 
-Local Build & Inject: Builds Docker images locally and imports them directly into the K3s container runtime (Air-gapped friendly).
+Local Build & Inject: Builds Docker images and imports them directly into the K3s container runtime (Air-gapped friendly, no external registry required).
 
-K8s Orchestration: Automatically applies all manifests (RBAC, Services, Ingress, Deployment).
+Kubernetes Orchestration: Automatically deploys manifests (RBAC, Services, Ingress, Deployment).
 
-Project Blog Article: https://blog.devopsnotes.org/...
+Zero-Config Ingress: Automates routing via Traefik/Nginx Ingress and natively handles static serving for Vue.js modules to prevent MIME type errors.
 
 Kamal Guidadou 2026

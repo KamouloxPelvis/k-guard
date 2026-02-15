@@ -3,17 +3,18 @@ from fastapi.middleware.cors import CORSMiddleware
 from dotenv import load_dotenv
 import os
 
+# Import de tes modules existants
 import auth
 from routers import k3s, scan, remediation 
 
 load_dotenv()
 
+# On SUPPRIME root_path pour ne pas avoir de conflit avec le rewrite Nginx
 app = FastAPI(
-    title="🛡️ K-Guard API",
-    root_path="/k-guard"
+    title="🛡️ K-Guard API"
 )
 
-# CORS Dynamique
+# --- CONFIGURATION CORS ---
 raw_origins = os.getenv("ALLOWED_ORIGINS", "")
 origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
 origins += ["http://localhost:5173", "http://127.0.0.1:5173"]
@@ -26,14 +27,16 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-api_router = APIRouter(prefix="/api")
-api_router.include_router(auth.router)         
-api_router.include_router(k3s.router)          
-api_router.include_router(scan.router)
-api_router.include_router(remediation.router)  
+# --- ROUTAGE ---
+# On utilise un router SANS préfixe supplémentaire pour que 
+# les routes dans tes fichiers (k3s.router, etc.) soient directement accessibles.
+# Nginx se charge déjà de supprimer le "/k-guard/api"
+app.include_router(auth.router)         
+app.include_router(k3s.router)          
+app.include_router(scan.router)
+app.include_router(remediation.router)  
 
-app.include_router(api_router)
-
+# --- ROUTES DE SANTÉ (DIRECTES) ---
 @app.get("/health")
 async def health_check():
     return {"status": "ok", "service": "k-guard-backend"}

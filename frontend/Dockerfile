@@ -3,15 +3,13 @@ FROM node:lts-alpine AS build-stage
 
 WORKDIR /app
 
-# On ne garde python/make/g++ que si tes paquets npm en ont vraiment besoin
+# On garde l'essentiel pour la compilation
 RUN apk add --no-cache python3 make g++
 
 COPY package*.json ./
 RUN npm install
 
-# Injection de l'URL API (Crucial pour que le front trouve le back via /k-guard/api)
-ARG VITE_API_URL
-ENV VITE_API_URL=$VITE_API_URL
+# Plus besoin d'ARG ou d'ENV pour l'URL API ici !
 ENV NODE_ENV=production
 
 COPY . .
@@ -20,13 +18,13 @@ RUN npm run build
 # --- ÉTAPE 2 : PRODUCTION ---
 FROM nginx:stable-alpine AS production-stage
 
-# Nettoyage pour éviter les conflits avec les fichiers par défaut d'Nginx
+# Nettoyage
 RUN rm -rf /usr/share/nginx/html/*
 
-# On copie le build final vers la racine (servie via 'alias' dans nginx.conf)
+# Copie du build
 COPY --from=build-stage /app/dist /usr/share/nginx/html
 
-# Injection de ta config Nginx avec la directive 'alias'
+# Ta config Nginx personnalisée
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 EXPOSE 80

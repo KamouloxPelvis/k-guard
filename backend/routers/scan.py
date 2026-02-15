@@ -3,7 +3,6 @@ from pydantic import BaseModel
 from auth import verify_token
 from security_manager import run_trivy_scan
 
-# Nouveau nom de router et préfixe corrigé
 router = APIRouter(prefix="/scan", tags=["Security Scan"])
 
 class ScanRequest(BaseModel):

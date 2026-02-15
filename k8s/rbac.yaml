@@ -12,12 +12,19 @@ kind: ClusterRole
 metadata:
   name: k-guard-cluster-role
 rules:
+  # 1. CORE API (Pods, Nodes, Namespaces, Events)
   - apiGroups: [""]
-    resources: ["pods", "pods/log", "namespaces", "nodes"]
+    # AJOUT DE "events" pour la route /patch-logs
+    resources: ["pods", "pods/log", "namespaces", "nodes", "events"]
     verbs: ["get", "list", "watch", "delete"]
+    
+  # 2. APPS API (Deployments)
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    verbs: ["get", "list"]
+    # AJOUT DE "patch" et "update" pour la route /patch-image et /remediate
+    verbs: ["get", "list", "patch", "update"]
+    
+  # 3. METRICS API
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods"]
     verbs: ["get", "list"]
