@@ -21,6 +21,10 @@ spec:
           hostPath:
             path: /var/run/docker.sock
             type: Socket
+        # --- NOUVEAU VOLUME POUR LE CACHE ---
+        - name: trivy-cache
+          persistentVolumeClaim:
+            claimName: trivy-cache-pvc
 
       containers:
       # --- 1. BACKEND (FastAPI + Trivy) ---
@@ -34,6 +38,9 @@ spec:
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-socket
+        # --- MONTAGE DU CACHE (A adapter selon ton Dockerfile) ---
+          - mountPath: /root/.cache/trivy 
+            name: trivy-cache
 
         envFrom:
           - secretRef:
@@ -44,18 +51,18 @@ spec:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 20
+          initialDelaySeconds: 45
           periodSeconds: 30      
-          failureThreshold: 3
+          failureThreshold: 5
 
         # Limites de ressources
         resources:
           limits:
-            cpu: "1000m"     
-            memory: "1536Mi" 
+            cpu: "1.5"        # On lui donne 1 coeur et demi pour le scan
+            memory: "2Gi"     # On monte à 2Go car Trivy est gourmand en DB
           requests:
-            cpu: "300m"
-            memory: "768Mi"
+            cpu: "500m"       # On assure un minimum de puissance pour l'API
+            memory: "1Gi"     # On garantit 1Go pour être serein au repos
 
       # --- 2. FRONTEND (Vue.js + Nginx) ---
       - name: frontend
