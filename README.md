@@ -1,6 +1,7 @@
-🇺🇸 [English Version below](#english-version)
+🇺🇸 [English Version](#english)
 
-# 🛡️ K-Guard v1.0 : Opérateur de Maintenance & Sécurité automatisé pour clusters Kubernetes
+
+# 🛡️ K-Guard v1.5 : Opérateur de Maintenance & Sécurité automatisé pour clusters Kubernetes
 
 ## ⚠️ WARNING / SECURITY DISCLAIMER :
 
@@ -8,6 +9,15 @@
 
 K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observabilité et à l'audit de sécurité automatisé pour clusters Kubernetes (optimisé pour k3s). Conçu pour offrir une visibilité en temps réel sur l'état de santé des Pods et leur surface d'attaque, K-Guard intègre des fonctions de remédiation immédiates : redémarrage de services, délestage dynamique des réplicas en cas de saturation CPU/RAM, et signalement de mise à jour des images conteneurisées suite à la détection de vulnérabilités critiques.
 
+## 📍 Sommaire
+- [🚀 Fonctionnalités](#features)
+- [🛠️ Stack Technique](#stack)
+- [🎯 Sécurité et RBAC](#rbac)
+- [🛠️ Configuration & Installation](#install)
+- [🆙 Mise à jour v1.5 (Changelog)](#changelog)
+- [👤 Contact](#contact)
+
+<div id="features"></div>
 
 ## 🚀 Fonctionnalités Clés
 
@@ -29,6 +39,8 @@ K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observa
 
 ![Security View](frontend/public/screenshots/security_view.png)
 
+<div id="stack"></div>
+
 ## 🛠️ Stack Technique
 
 * **Frontend** : Vue 3, TypeScript, Tailwind CSS (Design "Cyber" immersif).
@@ -41,7 +53,9 @@ K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observa
 
 * **Audit Local** : Montage du socket Docker (/var/run/docker.sock) dans le conteneur backend pour permettre à Trivy d'analyser les images présentes sur l'hôte en temps réel, sans transfert de données vers l'extérieur.
 
-## 🎯 Vision SRE & Sécurité
+<div id="rbac"></div>
+
+## 🎯 Sécurité et RBAC
 
 * **Réduction de la surface d'attaque** : Utilisation d'images de base Alpine et Slim pour minimiser les vulnérabilités système.
 
@@ -49,11 +63,13 @@ K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observa
 
 * **Sécurité RBAC** : Utilisation de ServiceAccounts dédiés avec des permissions limitées (Least Privilege principle).
 
-## 🛠️ Configuration & Installation (Plug & Play)
+<div id="install"></div>
+
+## 🛠️ Configuration & Installation
 
 ![Installation](frontend/public/screenshots/installation.png)
 
-### 1. Compatibilité & Pré-requis Stockage
+### Compatibilité & Pré-requis Stockage
 
 Avant de lancer l'installation, vérifiez la conformité de votre infrastructure :
 
@@ -68,7 +84,7 @@ Avant de lancer l'installation, vérifiez la conformité de votre infrastructure
 
 K-Guard utilise un assistant d'installation intelligent qui gère la génération des clés de sécurité et le déploiement Kubernetes :
 
-### 2. Auto-check & Dépendances Système
+### Auto-check & Dépendances Système
 
 K-Guard inclut un script de pré-vol (check_env.py) qui valide vos permissions Docker et K3s avant toute installation. Assurez-vous tout de même d'avoir installé sur votre VPS :
 
@@ -78,7 +94,7 @@ K-Guard inclut un script de pré-vol (check_env.py) qui valide vos permissions D
 
 * Python 3 & Pip
 
-### 2. Installation Rapide
+### 1. Installation Rapide
 
 ```Bash
 # Cloner le projet
@@ -92,7 +108,7 @@ chmod +x scripts/deploy.sh
 sudo ./scripts/deploy.sh
 ```
 
-### 3. Accès à l'Interface (Post-Installation)
+### 2. Accès à l'Interface (Post-Installation)
 
 Une fois le déploiement terminé, l'application est verrouillée pour votre sécurité. Pour y accéder via votre navigateur :
 
@@ -124,21 +140,58 @@ Rendez-vous sur https://k-guard.local.
 
 *N'hésitez pas à lire mon article sur mon blog : https://blog.devopsnotes.org/articles/k-guard-orchestration-sre-et-audit-de-scurit-sur-k3s*
 
+------------------------------
+<div id="changelog"></div>
 
----------------------
+## 🆙 Mise à jour Version 1.5 - 16/02/2026
 
-Kamal Guidadou 2026
-https://devopsnotes.org
-https://blog.devopsnotes.org
+Mise à jour majeure : Hardening Sécurité & SRE
+
+Cette version marque la transition de K-Guard vers une architecture "Production-Ready", articulée autour du principe du moindre privilège et de l'orchestration native Kubernetes.
+
+### 🛡️ Hardening Backend (Exécution Non-Root) :
+
+Migration complète du backend FastAPI vers un utilisateur non-privilégié (pseudo, UID 1000).
+
+Mise en place d'une Architecture de Stockage Agnostique : les répertoires de cache (/data/trivy-cache) sont désormais découplés du répertoire personnel de l'utilisateur, garantissant une portabilité totale du déploiement.
+
+### 🔄 Remédiation Cloud-Native (Zero-Downtime) :
+
+Suppression de la méthode de "redémarrage sauvage" par suppression de Pod.
+
+Implémentation du Strategic Merge Patch : les redémarrages sont désormais déclenchés via des annotations de métadonnées, permettant à Kubernetes d'exécuter un Rolling Update propre sans interruption de service.
+
+### 🔑 Optimisation RBAC (Moindre Privilège) :
+
+Durcissement des permissions Kubernetes en supprimant le verbe delete du ClusterRole.
+
+Ciblage précis des droits patch et update uniquement sur les Deployments pour supporter la fonctionnalité Smart Patch.
+
+### 🔌 Intégration Infrastructure Sécurisée :
+
+Accès au socket Docker sécurisé via l'utilisation de supplementalGroups dans le SecurityContext du Pod.
+
+Mise en conformité du Frontend (Nginx) pour une exécution non-root sur le port 8080.
+
+### 🌐 Internationalisation :
+
+Traduction intégrale de la documentation en anglais pour une accessibilité accrue à la communauté SRE.
+
+-------------------------
+
+<div id="contact"></div>
+
+Kamal Guidadou - 2026 -
+Portfolio : https://devopsnotes.org
+Blog technique & communautaire : https://blog.devopsnotes.org
 
 
                         ------------------------------------------------------------------
 
-
-<a name="english-version"></a>
+<div id="english"></div>
 🇺🇸 English Version
 
-# 🛡️ K-Guard v1.0 : Automated Maintenance & Security Operator for Kubernetes Clusters
+# 🛡️ K-Guard v1.5 : Automated Maintenance & Security Operator for Kubernetes Clusters
 
 ## ⚠️ SECURITY DISCLAIMER & WARNING
 
@@ -146,6 +199,15 @@ https://blog.devopsnotes.org
 
 K-Guard is an SRE (Site Reliability Engineering) dashboard dedicated to observability and automated security auditing for Kubernetes clusters (optimized for k3s). Designed to provide real-time visibility into Pod health and attack surfaces, K-Guard integrates immediate remediation features: service restarts, dynamic replica scaling during CPU/RAM saturation, and update alerts for containerized images following the detection of critical vulnerabilities
 
+## 📍 Summary
+- [🚀 Key Features](#features)
+- [🛠️ Technical Stack](#stack)
+- [🎯 RBAC & Security](#rbac)
+- [🛠️ Configuration & Installation](#install)
+- [🆙 Upgrade v1.5 (Changelog)](#changelog)
+- [👤 Contact](#contact)
+
+<div id="features"></div>
 
 ## 🚀 Key Features
 
@@ -167,7 +229,9 @@ K-Guard is an SRE (Site Reliability Engineering) dashboard dedicated to observab
 
 ![Security View](frontend/public/screenshots/security_view.png)
 
-🛠️ Tech Stack
+<div id="contact"></div>
+
+## 🛠️ Technical Stack
 
 * **Frontend**: Vue 3, TypeScript, Tailwind CSS (Immersive "Cyber" Design).
 
@@ -186,6 +250,8 @@ K-Guard is an SRE (Site Reliability Engineering) dashboard dedicated to observab
 * **Infrastructure as Code**: 100% automated deployment via YAML manifests, ensuring total cluster reproducibility.
 
 * **RBAC Security**: Dedicated ServiceAccounts with scoped permissions following the Least Privilege principle.
+
+<div id="install"></div>
 
 ## 🛠️ Configuration & Installation (Plug & Play)
 
@@ -206,7 +272,7 @@ K-Guard features a Smart Setup Assistant that automates security key generation 
 
 ![Installation](frontend/public/screenshots/installation.png)
 
-### 1. Prerequisites & Auto-check
+### Prerequisites & Auto-check
 
 K-Guard includes a pre-flight script (check_env.py) that validates your Docker and K3s permissions before installation. Ensure your VPS has:
 
@@ -216,7 +282,7 @@ K-Guard includes a pre-flight script (check_env.py) that validates your Docker a
 
 * Python 3 & Pip
 
-### 2. Quick Start
+### 1. Quick Start 
 
 ```Bash
 # Clone the repository
@@ -230,10 +296,11 @@ chmod +x scripts/deploy.sh
 sudo ./scripts/deploy.sh
 ```
 
-### 3. Accessing the Interface (Post-Installation)
+### 2. Accessing the Interface (Post-Installation)
+
 Once the deployment is complete, the application is locked down for your security. To access it via your web browser:
 
-Step 1: Configure Local DNS Resolution
+**Step 1**: Configure Local DNS Resolution
 Map your server's IP address to the local domain in your hosts file.
 
 *Linux/MacOS*: /etc/hosts
@@ -244,8 +311,10 @@ Add the following line (replace [YOUR_VPS_IP] with your actual server IP):
 
 Plaintext
 [YOUR_VPS_IP]  k-guard.local
+
 **Example: 114.35.18.15  k-guard.local**
-Step 2: Secure Connection
+
+**Step 2**: Secure Connection
 Navigate to: https://k-guard.local
 
 🔒 Security Note: Thanks to Nginx hardening (TLS 1.3), your session is fully encrypted and protected by the ACLs (Access Control Lists) defined during deployment. Access is restricted to authorized private networks only.
@@ -262,9 +331,49 @@ Navigate to: https://k-guard.local
 
 * **Zero-Config Ingress**: Automates routing via Traefik/Nginx Ingress and natively handles static serving for Vue.js modules to prevent MIME type errors.
 
+----------------------------
+<div id="changelog"></div>
 
----------------------
 
-Kamal Guidadou 2026
-https://devopsnotes.org
-https://blog.devopsnotes.org
+## 🆙 Upgrade Version 1.5 - 16/02/2026
+
+### Major Security & SRE Hardening Release
+
+This update marks a significant shift from Proof of Concept to a Production-Ready architecture, focusing on the "Least Privilege" principle and Kubernetes native orchestration.
+
+
+### 🛡️ Backend Hardening (Non-Root Execution):
+
+Migrated the entire FastAPI backend to run under a non-privileged user (pseudo, UID 1000).
+
+Implemented an Agnostic Storage Architecture: specialized cache directories (/data/trivy-cache) are now decoupled from the container's internal user home, ensuring total portability across different environments.
+
+### 🔄 Cloud-Native Remediation (Zero-Downtime):
+
+Deprecated the "destructive" pod deletion method.
+
+Implemented Strategic Merge Patching: restarts are now triggered via metadata annotations, allowing Kubernetes to perform a clean Rolling Update without service interruption.
+
+### 🔑 RBAC Least Privilege Optimization:
+
+Tightened Kubernetes permissions by removing the delete verb from the ClusterRole.
+
+Enabled patch and update capabilities specifically for Deployments to support the Smart Patch feature.
+
+### 🔌 Secure Infrastructure Integration:
+
+Optimized Docker socket access using supplementalGroups in the Pod Security Context, allowing secure local scans without compromising host permissions.
+
+Updated the Frontend to run on port 8080 (Non-Root Nginx compliance).
+
+### 🌐 Internationalization:
+
+Full English localization of the documentation for broader SRE community accessibility.
+
+-------------------------------
+
+<div id="contact"></div>
+
+Kamal Guidadou - 2026 -
+Portfolio : https://devopsnotes.org
+Technical & Community Blog : https://blog.devopsnotes.org
