@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { useRouter } from 'vue-router';
 import api from '@/services/api'; 
 
-const pseudo = ref<string>('');
+const username = ref<string>('');
 const password = ref<string>('');
 const error = ref<string>('');
 const loading = ref<boolean>(false);
@@ -16,7 +16,7 @@ const handleLogin = async (): Promise<void> => {
     try {
         // OAuth2 en FastAPI attend ce format spécifique
         const params = new URLSearchParams();
-        params.append('username', pseudo.value);
+        params.append('username', username.value);
         params.append('password', password.value);
 
         const { data } = await api.post<{ access_token: string }>(
@@ -26,7 +26,7 @@ const handleLogin = async (): Promise<void> => {
         
         if (data.access_token) {
             localStorage.setItem('user_token', data.access_token);
-            localStorage.setItem('admin_pseudo', pseudo.value); 
+            localStorage.setItem('admin_username', username.value); 
             
             await router.push('/');
         }
@@ -50,7 +50,7 @@ const handleLogin = async (): Promise<void> => {
       <form @submit.prevent="handleLogin" class="login-form">
         <div class="input-group">
           <input 
-            v-model="pseudo" 
+            v-model="username" 
             type="text" 
             placeholder="USERNAME" 
             required 

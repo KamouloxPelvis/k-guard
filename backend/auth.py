@@ -12,7 +12,7 @@ load_dotenv()
 SECRET_KEY = os.getenv("SECRET_KEY", "une-cle-tres-secrete-par-defaut")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 600
-ADMIN_PSEUDO = os.getenv("ADMIN_PSEUDO")
+ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_HASH = os.getenv("ADMIN_PASSWORD_HASH")
 
 security_scheme = HTTPBearer()
@@ -46,8 +46,8 @@ async def verify_token(credentials: HTTPAuthorizationCredentials = Security(secu
 @router.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
     """Route d'authentification (OAuth2 Password Flow)"""
-    # Vérification Pseudo + Hash Bcrypt
-    if form_data.username != ADMIN_PSEUDO or not verify_password(form_data.password, ADMIN_HASH):
+    # Vérification Username + Hash Bcrypt
+    if form_data.username != ADMIN_USERNAME or not verify_password(form_data.password, ADMIN_HASH):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Accès refusé : Identifiants incorrects",

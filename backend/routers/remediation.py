@@ -3,6 +3,7 @@ from auth import verify_token
 from database import v1, apps_client
 from metrics_manager import scale_down_deployment
 from pydantic import BaseModel
+import datetime
 
 router = APIRouter(prefix="/remediation", tags=["Management"])
 
@@ -11,13 +12,27 @@ class PatchImagePayload(BaseModel):
     deployment: str
     new_image: str
 
-@router.delete("/restart/{namespace}/{pod_name}")
-async def restart_pod(namespace: str, pod_name: str, user: dict = Depends(verify_token)):
-    """Supprime un pod pour forcer K3s à le recréer (Rolling Restart sauvage)"""
+import datetime
+
+@router.post("/restart/{namespace}/{deployment_name}")
+async def restart_deployment(namespace: str, deployment_name: str, user: dict = Depends(verify_token)):
+    """Déclenche un Rolling Restart propre via une annotation (Méthode SRE)"""
     try:
-        # On ajoute la suppression immédiate
-        v1.delete_namespaced_pod(name=pod_name, namespace=namespace, grace_period_seconds=0)
-        return {"status": "success", "message": f"Pod {pod_name} supprimé. K3s va le recréer immédiatement."}
+        # On ajoute une annotation avec l'heure pour forcer le restart
+        now = datetime.datetime.now().isoformat()
+        body = {
+            "spec": {
+                "template": {
+                    "metadata": {
+                        "annotations": {
+                            "kubectl.kubernetes.io/restartedAt": now
+                        }
+                    }
+                }
+            }
+        }
+        apps_client.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=body)
+        return {"status": "success", "message": f"Rolling restart lancé pour {deployment_name}"}
     except Exception as e:
         return {"status": "error", "message": str(e)}
 

@@ -1,0 +1,46 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k-guard-default-deny
+  namespace: k-guard
+spec:
+  podSelector: {} # S'applique à TOUS les pods du namespace
+  policyTypes:
+  - Ingress
+  - Egress
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: k-guard-allow-rules
+  namespace: k-guard
+spec:
+  podSelector:
+    matchLabels:
+      app: k-guard # Cible k-guard
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+    # 1. Autoriser Nginx (Edge) à contacter le backend via NodePort/Service
+    - from:
+      - ipBlock:
+          cidr: 0.0.0.0/0 # On restreint via les ACL Nginx, mais ici on autorise le flux entrant
+      ports:
+      - protocol: TCP
+        port: 8080 # Port de ton API FastAPI
+  egress:
+    # 2. Autoriser la communication avec l'API Server de Kubernetes (Indispensable pour K-Guard)
+    - to:
+      - ipBlock:
+          cidr: 0.0.0.0/0 # Idéalement, restreindre à l'IP du service 'kubernetes' dans le namespace default
+      ports:
+      - protocol: TCP
+        port: 443
+    # 3. Autoriser les requêtes DNS (UDP/TCP 53) pour la résolution interne
+    - to:
+      - ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53

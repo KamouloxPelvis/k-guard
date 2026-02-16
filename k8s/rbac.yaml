@@ -6,27 +6,29 @@ metadata:
   namespace: k-guard
 
 ---
-# 2. On passe en ClusterRole pour voir tous les namespaces
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: k-guard-cluster-role
 rules:
-  # 1. CORE API (Pods, Nodes, Namespaces, Events)
+  # 1. OBSERVABILITÉ : Lecture seule globale
   - apiGroups: [""]
-    # AJOUT DE "events" pour la route /patch-logs
-    resources: ["pods", "pods/log", "namespaces", "nodes", "events"]
-    verbs: ["get", "list", "watch", "delete"]
-    
-  # 2. APPS API (Deployments)
+    resources: ["namespaces", "nodes", "events", "services"]
+    verbs: ["get", "list", "watch"]
+
+  # 2. GESTION DES PODS : Lecture + Suppression (pour ton restart_pod)
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+
+  # 3. SMART PATCH & REMÉDIATION : Deployments
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    # AJOUT DE "patch" et "update" pour la route /patch-image et /remediate
-    verbs: ["get", "list", "patch", "update"]
-    
-  # 3. METRICS API
+    verbs: ["get", "list", "patch"] # 👈 'patch' suffit pour ton body JSON
+
+  # 4. MÉTRIQUES : Dashboard Health
   - apiGroups: ["metrics.k8s.io"]
-    resources: ["pods"]
+    resources: ["pods", "nodes"]
     verbs: ["get", "list"]
 
 ---

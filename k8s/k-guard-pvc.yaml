@@ -6,6 +6,8 @@ metadata:
 spec:
   accessModes:
     - ReadWriteOnce
+  # 💡 ICI : On ne spécifie PAS de storageClassName.
+  # Le cluster utilisera sa classe par défaut (local-path sur K3s, gp2 sur AWS, etc.)
   resources:
     requests:
       storage: 5Gi

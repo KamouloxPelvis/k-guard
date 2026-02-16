@@ -25,8 +25,8 @@ def verify_system_readiness():
     else:
         with open(env_path, 'r') as f:
             content = f.read()
-            if "ADMIN_PSEUDO" not in content:
-                errors.append("Variable ADMIN_PSEUDO manquante dans le .env")
+            if "ADMIN_USERNAME" not in content:
+                errors.append("Variable ADMIN_USERNAME manquante dans le .env")
 
     if errors:
         print("\n❌ K-Guard Pre-flight Check FAILED :")

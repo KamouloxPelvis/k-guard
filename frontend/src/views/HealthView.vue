@@ -119,16 +119,26 @@
   };
 
   const restartPod = async (event: Event, pod: PodStatus) => {
-    event.stopPropagation(); 
-    if (!confirm(`CAUTION: Restart ${pod.pod_name}?`)) return;
-    try {
-      // On utilise le nouveau router 'remediation'
-      await api.delete(`/remediation/restart/${pod.namespace}/${pod.pod_name}`);
-      fetchClusterData(); 
-    } catch (error) { 
-      alert("Action failed."); 
-    }
-  };
+  event.stopPropagation(); 
+  
+  // Message plus "SRE" pour l'utilisateur
+  if (!confirm(`CAUTION: Trigger Rolling Update for ${pod.name}?`)) return;
+
+  try {
+    // 1. On passe en POST (action de création d'un restart)
+    // 2. On utilise pod.name (le nom du deployment) au lieu de pod.pod_name
+    await api.post(`/remediation/restart/${pod.namespace}/${pod.name}`);
+    
+    // Notification de succès "Cyber"
+    console.log(`[K-GUARD] Rolling restart initiated for deployment: ${pod.name}`);
+    
+    // Rafraîchissement immédiat des données
+    fetchClusterData(); 
+  } catch (error) { 
+    console.error("Restart failed", error);
+    alert("Action failed: Could not patch deployment."); 
+  }
+};
 
   const remediateLoad = async (event: Event, pod: PodStatus) => {
     event.stopPropagation();
