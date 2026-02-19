@@ -43,7 +43,6 @@ const handleLogin = async (): Promise<void> => {
   <div class="login-wrapper">
     <div class="login-card">
       <img src="/logo_small.png" alt="K-Guard Logo" class="logo"/>
-      
       <h1 class="title font-valorant">K-GUARD</h1>
       <p class="subtitle">SYSTEM ACCESS</p>
 

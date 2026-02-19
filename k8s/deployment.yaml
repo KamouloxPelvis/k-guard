@@ -5,6 +5,8 @@ metadata:
   namespace: k-guard
 spec:
   replicas: 1
+  strategy:
+    type: Recreate
   selector:
     matchLabels:
       app: k-guard
@@ -14,12 +16,11 @@ spec:
         app: k-guard
     spec:
       serviceAccountName: k-guard-sa
+      automountServiceAccountToken: true
 
       securityContext:
-        runAsUser: 1000
-        runAsGroup: 1000
         fsGroup: 1000
-        supplementalGroups: [988]
+        supplementalGroups: [988] 
 
       volumes:
         - name: docker-socket
@@ -29,12 +30,20 @@ spec:
         - name: trivy-cache
           persistentVolumeClaim:
             claimName: trivy-cache-pvc
+        # Espaces d'écriture temporaires pour Nginx
+        - name: nginx-cache
+          emptyDir: {}
+        - name: nginx-run
+          emptyDir: {}
 
       containers:
       # --- 1. BACKEND (FastAPI + Trivy) ---
       - name: backend
         image: k-guard-backend:latest
+        imagePullPolicy: IfNotPresent
         securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
@@ -43,36 +52,39 @@ spec:
             name: docker-socket
           - mountPath: /data/trivy-cache
             name: trivy-cache
-
         envFrom:
           - secretRef:
               name: k-guard-secrets
-
-        # Check de santé (Liveness)
         livenessProbe:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 45
+          initialDelaySeconds: 60
           periodSeconds: 30      
           failureThreshold: 5
-
-        # Limites de ressources
         resources:
           limits:
-            cpu: "1.5"        # On lui donne 1 coeur et demi pour le scan
-            memory: "2Gi"     # On monte à 2Go car Trivy est gourmand en DB
+            cpu: "1.5"
+            memory: "2Gi"
           requests:
-            cpu: "500m"       # On assure un minimum de puissance pour l'API
-            memory: "1Gi"     # On garantit 1Go pour être serein au repos
+            cpu: "500m"
+            memory: "1Gi"
 
       # --- 2. FRONTEND (Vue.js + Nginx) ---
       - name: frontend
         image: k-guard-frontend:latest
-        ports:
-        - containerPort: 8080 
+        imagePullPolicy: IfNotPresent
         securityContext:
+          runAsUser: 101 # UID par défaut de Nginx pour éviter les conflits
           allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true # On passe en lecture seule pour la Cyber !
+        ports:
+        - containerPort: 80
+        volumeMounts:
+          - mountPath: /var/cache/nginx
+            name: nginx-cache
+          - mountPath: /var/run
+            name: nginx-run
         resources:
           limits:
             cpu: "200m"     

@@ -3,27 +3,36 @@ import bcrypt
 from datetime import datetime, timedelta, timezone
 from jose import JWTError, jwt
 from fastapi import APIRouter, HTTPException, Depends, status, Security
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials, OAuth2PasswordRequestForm, OAuth2PasswordBearer
 from dotenv import load_dotenv
 
+# Chargement des variables d'environnement (.env ou K3s Secrets)
 load_dotenv()
 
-# Configuration Sécurité - Récupérées via k-guard-secrets dans K3s
+# --- CONFIGURATION SÉCURITÉ ---
 SECRET_KEY = os.getenv("SECRET_KEY", "une-cle-tres-secrete-par-defaut")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 600
 ADMIN_USERNAME = os.getenv("ADMIN_USERNAME")
 ADMIN_HASH = os.getenv("ADMIN_PASSWORD_HASH")
 
+# Schéma pour l'intercepteur Axios (Frontend)
 security_scheme = HTTPBearer()
-# Pas de préfixe ici, géré par le router central
+
+# Schéma pour la documentation Swagger (Interactif)
+# On utilise "api/token" car le préfixe global /api est géré par main.py
+oauth2_scheme = OAuth2PasswordBearer(tokenUrl="api/token")
+
 router = APIRouter(tags=["Authentication"])
 
+# --- LOGIQUE DE VÉRIFICATION ---
+
 def verify_password(plain_password: str, hashed_password: str):
+    """Vérifie le mot de passe en comparant le clair et le hash Bcrypt"""
     if not hashed_password:
         return False
     try:
-        # Bcrypt nécessite des bytes pour les deux arguments
+        # Bcrypt nécessite des bytes
         return bcrypt.checkpw(
             plain_password.encode('utf-8'),
             hashed_password.encode('utf-8')
@@ -33,20 +42,34 @@ def verify_password(plain_password: str, hashed_password: str):
         return False
 
 async def verify_token(credentials: HTTPAuthorizationCredentials = Security(security_scheme)):
-    """Dépendance utilisée pour protéger les routes"""
+    """
+    Dépendance de sécurité utilisée pour protéger les routes.
+    Vérifie la validité du JWT présent dans le header Authorization.
+    """
     token = credentials.credentials
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         return payload
     except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expiré")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Token expiré"
+        )
     except (JWTError, Exception):
-        raise HTTPException(status_code=401, detail="Erreur de signature ou token invalide")
-    
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, 
+            detail="Erreur de signature ou token invalide"
+        )
+
+# --- ROUTES ---
+
 @router.post("/token")
 async def login(form_data: OAuth2PasswordRequestForm = Depends()):
-    """Route d'authentification (OAuth2 Password Flow)"""
-    # Vérification Username + Hash Bcrypt
+    """
+    Route d'authentification (Flux OAuth2 Password).
+    Génère un JWT si les identifiants sont corrects.
+    """
+    # 1. Vérification de l'utilisateur et du hash
     if form_data.username != ADMIN_USERNAME or not verify_password(form_data.password, ADMIN_HASH):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -54,9 +77,20 @@ async def login(form_data: OAuth2PasswordRequestForm = Depends()):
             headers={"WWW-Authenticate": "Bearer"},
         )
     
-    # Génération du JWT
+    # 2. Calcul de l'expiration
     expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode = {"sub": form_data.username, "exp": expire}
+    
+    # 3. Création du Payload
+    to_encode = {
+        "sub": form_data.username, 
+        "exp": expire,
+        "iat": datetime.now(timezone.utc)
+    }
+    
+    # 4. Encodage du JWT
     access_token = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {
+        "access_token": access_token, 
+        "token_type": "bearer"
+    }

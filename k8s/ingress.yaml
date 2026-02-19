@@ -1,15 +1,4 @@
 apiVersion: traefik.io/v1alpha1
-kind: Middleware
-metadata:
-  name: kguard-stripper
-  namespace: k-guard
-spec:
-  stripPrefix:
-    prefixes:
-      - /api
-
----
-apiVersion: traefik.io/v1alpha1
 kind: IngressRoute
 metadata:
   name: k-guard-ingress
@@ -18,18 +7,13 @@ spec:
   entryPoints:
     - web
   routes:
-  # Route 1 : L'API (Prioritaire)
-  - match: PathPrefix(`/api`)
-    kind: Rule
+  - kind: Rule
+    match: Host(`k-guard.local`) && PathPrefix(`/api`)
     services:
-    - name: k-guard-service
+    - name: k-guard-backend-service # Le service ClusterIP port 8000
       port: 8000
-    middlewares:
-    - name: kguard-stripper
-
-  # Route 2 : Le Frontend (Catch-all)
-  - match: PathPrefix(`/`)
-    kind: Rule
+  - kind: Rule
+    match: Host(`k-guard.local`) && PathPrefix(`/`)
     services:
-    - name: k-guard-frontend-service
+    - name: k-guard-frontend-service # Le service ClusterIP Port 80
       port: 80

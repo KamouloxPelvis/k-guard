@@ -1,23 +1,27 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
-from dotenv import load_dotenv
+from datetime import datetime
 import os
+import database
 
-# Import de tes modules existants
-import auth
-from routers import k3s, scan, remediation 
+# Imports des routeurs (via le package routers)
+from routers import auth, k3s, scan, remediation
 
-load_dotenv()
+app = FastAPI(title="🛡️ K-Guard API", version="1.5.0")
 
-# On SUPPRIME root_path pour ne pas avoir de conflit avec le rewrite Nginx
-app = FastAPI(
-    title="🛡️ K-Guard API"
-)
+# --- CONFIGURATION ---
+API_PREFIX = "/api"
+
+api_router = APIRouter()
 
 # --- CONFIGURATION CORS ---
-raw_origins = os.getenv("ALLOWED_ORIGINS", "")
-origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
-origins += ["http://localhost:5173", "http://127.0.0.1:5173"]
+raw_origins = os.getenv(
+    "ALLOWED_ORIGINS", 
+    "http://localhost:32726,http://127.0.0.1:32726"
+)
+
+# On transforme la chaîne "url1,url2" en une vraie liste Python ["url1", "url2"]
+origins = [origin.strip() for origin in raw_origins.split(",")]
 
 app.add_middleware(
     CORSMiddleware,
@@ -27,20 +31,25 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# --- ROUTAGE ---
-# On utilise un router SANS préfixe supplémentaire pour que 
-# les routes dans tes fichiers (k3s.router, etc.) soient directement accessibles.
-# Nginx se charge déjà de supprimer le "/k-guard/api"
-app.include_router(auth.router)         
-app.include_router(k3s.router)          
-app.include_router(scan.router)
-app.include_router(remediation.router)  
-
-# --- ROUTES DE SANTÉ (DIRECTES) ---
+# ✅ Route de santé ROOT (Pour les Probes Kubernetes)
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "k-guard-backend"}
+async def liveness_probe():
+    return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
+
+
+# --- INCLUSION DES ROUTEURS ---
+api_router.include_router(auth.router)         
+api_router.include_router(k3s.router)          
+api_router.include_router(scan.router)
+api_router.include_router(remediation.router)
+
+app.include_router(api_router, prefix=API_PREFIX)
+
+# ✅ Route de santé API (Pour le Frontend)
+@api_router.get("/health")
+async def api_health():
+    return {"status": "online"}
 
 @app.get("/")
 async def root():
-    return {"message": "🛡️ K-Guard API is Online"}
+    return {"message": "🛡️ K-Guard API is running. Access via /api"}

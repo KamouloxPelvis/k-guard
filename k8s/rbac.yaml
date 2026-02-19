@@ -4,7 +4,7 @@ kind: ServiceAccount
 metadata:
   name: k-guard-sa
   namespace: k-guard
-
+  
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
@@ -16,23 +16,29 @@ rules:
     resources: ["namespaces", "nodes", "events", "services"]
     verbs: ["get", "list", "watch"]
 
-  # 2. GESTION DES PODS : Lecture + Suppression (pour ton restart_pod)
+  # 2. GESTION DES PODS : Lecture seule + Logs
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
     verbs: ["get", "list", "watch"]
 
-  # 3. SMART PATCH & REMÉDIATION : Deployments
+  # 3. ACTION DE REMÉDIATION : Autorise spécifiquement le delete et patch
+  # On sépare les ressources sensibles
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["delete"] # Nécessaire pour ton restart_pod
+
+  # 4. SMART PATCH : Deployments
   - apiGroups: ["apps"]
     resources: ["deployments"]
-    verbs: ["get", "list", "patch"] # 👈 'patch' suffit pour ton body JSON
+    verbs: ["get", "list", "patch"] 
 
-  # 4. MÉTRIQUES : Dashboard Health
+  # 5. MÉTRIQUES : Dashboard Health
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods", "nodes"]
     verbs: ["get", "list"]
 
 ---
-# 3. On lie au niveau du cluster
+# 3. Liaison (Binding)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

@@ -67,7 +67,7 @@ K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observa
 
 ## 🛠️ Configuration & Installation
 
-![Installation](frontend/public/screenshots/installation.png)
+![Installation](frontend/public/screenshots/install.png)
 
 ### Compatibilité & Pré-requis Stockage
 

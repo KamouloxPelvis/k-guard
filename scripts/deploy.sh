@@ -4,6 +4,8 @@
 # 🛡️  K-GUARD CYBER-WIZARD (GUM + STABLE FUSION)
 # Author: Kamal | Visit: https://devopsnotes.org
 # ==============================================================================
+export TERM=xterm-256color
+export DEBIAN_FRONTEND=noninteractive
 
 # 0. Initialisation & Check Privilèges
 # On définit proprement la racine du projet pour les chemins relatifs

@@ -12,7 +12,7 @@
   
   const systemData = ref<SystemInfo | null>(null);
   const systemLatency = ref<number>(0);
-  const pseudo = ref<string>(localStorage.getItem('admin_pseudo') || 'Admin');
+  const username = ref<string>(localStorage.getItem('admin_username') || 'Admin');
   const isMenuOpen = ref(false);
   const route = useRoute();
   const router = useRouter();
@@ -23,7 +23,7 @@
     const start = Date.now();
     try {
       // On tape sur la route health
-      const response = await api.get('/k3s/health');
+      const response = await api.get('/health');
       if (response.status === 200) {
         systemLatency.value = Date.now() - start;
       }
@@ -44,7 +44,7 @@
 
   const handleLogout = () => {
     localStorage.removeItem('user_token');
-    localStorage.removeItem('admin_pseudo'); 
+    localStorage.removeItem('admin_username'); 
     router.push({ name: 'Login' });
   };
 
@@ -127,7 +127,7 @@
             <p class="text-[10px] text-slate-500 uppercase tracking-widest flex items-center gap-2">
               <span class="w-1.5 h-1.5 bg-green-500 rounded-full animate-pulse"></span>
               Authenticated as 
-              <span class="text-[#f05a28] font-bold">{{ pseudo }}</span>
+              <span class="text-[#f05a28] font-bold">{{ username }}</span>
             </p>
         </div>
         <div class="text-[10px] text-slate-600 font-mono break-all leading-tight uppercase"> Kubernetes & OS Distribution versions : <br />
