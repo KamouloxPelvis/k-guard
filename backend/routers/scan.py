@@ -1,10 +1,67 @@
-import os
-from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel
+import sqlite3
+import json
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from .auth import verify_token
+from database import DB_PATH, update_scan_status
 from security_manager import run_trivy_scan
+from pydantic import BaseModel
 
 router = APIRouter(prefix="/scan", tags=["Security Scan"])
+
+class ScanRequest(BaseModel):
+    image: str
+
+# 1. Route de lancement (Non-bloquante)
+@router.post("/scan")
+async def launch_security_scan(payload: ScanRequest, background_tasks: BackgroundTasks, user: dict = Depends(verify_token)):
+    """Lance le scan Trivy en tâche de fond pour éviter les timeouts 502/504."""
+    background_tasks.add_task(run_and_store_scan, payload.image)
+    return {
+        "status": "processing", 
+        "message": f"Scan de {payload.image} en cours d'exécution..."
+    }
+
+# 2. Route de récupération des résultats (Polling)
+@router.get("/results/{image_name:path}")
+async def get_scan_results(image_name: str, user: dict = Depends(verify_token)):
+    """Récupère le dernier rapport stocké en base pour une image spécifique."""
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        conn.row_factory = sqlite3.Row
+        cursor = conn.cursor()
+        
+        cursor.execute(
+            "SELECT status, report, created_at FROM security_scans WHERE image = ? ORDER BY created_at DESC LIMIT 1",
+            (image_name,)
+        )
+        row = cursor.fetchone()
+        conn.close()
+
+        if not row:
+            return {"status": "not_found", "message": "Aucun scan en base pour cette image."}
+
+        # Conversion du texte JSON de la DB en objet Python
+        report_data = json.loads(row["report"]) if row["report"] else None
+
+        return {
+            "status": row["status"],
+            "image": image_name,
+            "created_at": row["created_at"],
+            "data": report_data
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur d'accès DB: {str(e)}")
+
+# 3. Fonction de traitement en arrière-plan
+def run_and_store_scan(image: str):
+    try:
+        # Appel du binaire Trivy via ton security_manager
+        report = run_trivy_scan(image)
+        # On sauvegarde le succès dans SQLite via database.py
+        update_scan_status(image, "completed", report)
+    except Exception as e:
+        # En cas de crash du binaire ou de timeout
+        update_scan_status(image, "error", {"error": str(e)})
 
 @router.get("/debug-storage")
 async def debug_storage(user: dict = Depends(verify_token)):
@@ -28,18 +85,3 @@ async def debug_storage(user: dict = Depends(verify_token)):
         }
     except Exception as e:
         return {"error": str(e)}
-
-class ScanRequest(BaseModel):
-    image: str
-
-@router.post("/scan")
-async def security_scan(payload: ScanRequest, user: dict = Depends(verify_token)):
-    """
-    Lance un audit Trivy sur une image spécifique.
-    Nécessite le montage du docker.sock dans le déploiement K3s.
-    """
-    try:
-        # payload.image est maintenant validé par Pydantic
-        return run_trivy_scan(payload.image)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur lors du scan : {str(e)}")

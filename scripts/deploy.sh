@@ -5,6 +5,7 @@
 # Author: Kamal | Visit: https://devopsnotes.org
 # ==============================================================================
 export TERM=xterm-256color
+export GUM_OPTS="--color=16"
 export DEBIAN_FRONTEND=noninteractive
 
 # 0. Initialisation & Check Privilèges
@@ -39,7 +40,7 @@ clear
 gum style \
     --foreground 212 --border-foreground 212 --border double \
     --align center --width 60 --margin "1 2" --padding "0 1" \
-    "🛡️  K-GUARD " "K3S MONITOR & SECURITY OPERATOR" "Target: http://$TARGET_URL"
+    "🛡️  K-GUARD " "KUBERNETES MONITOR & SECURITY OPERATOR" "Target: http://$TARGET_URL"
 
 # 1. CLEANING (Smart Clean)
 if kubectl get namespace k-guard >/dev/null 2>&1; then
@@ -53,19 +54,25 @@ gum style --foreground 82 "  ✓ Environment ready"
 
 # 2. BUILDING
 gum style --foreground 212 "🏗️  Starting Binary Builds..."
+# Ajout de < /dev/null pour isoler le processus
 gum spin --spinner pulse --title "Compiling Backend Engine (+Trivy)..." -- \
-    docker build --no-cache -t k-guard-backend:latest ./backend
+    docker build --no-cache -t k-guard-backend:latest ./backend < /dev/null
 gum spin --spinner pulse --title "Compiling Frontend Interface..." -- \
-    docker build --no-cache -t k-guard-frontend:latest ./frontend
+    docker build --no-cache -t k-guard-frontend:latest ./frontend < /dev/null
+
+stty -echo && stty echo
 gum style --foreground 82 "  ✓ Images generated"
 
 # 3. IMPORTING
 gum style --foreground 212 "📦 Injecting into K3s Registry..."
-docker save k-guard-backend:latest -o backend.tar
-docker save k-guard-frontend:latest -o frontend.tar
+docker save k-guard-backend:latest -o backend.tar < /dev/null
+docker save k-guard-frontend:latest -o frontend.tar < /dev/null
+
 gum spin --spinner line --title "Importing layers to K3s..." -- \
-    bash -c "k3s ctr images import backend.tar && k3s ctr images import frontend.tar"
+    bash -c "k3s ctr images import backend.tar && k3s ctr images import frontend.tar" < /dev/null
+
 rm -f backend.tar frontend.tar
+stty echo
 gum style --foreground 82 "  ✓ Registry updated"
 
 # 4. ORCHESTRATION

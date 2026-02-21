@@ -2,13 +2,17 @@ from fastapi import HTTPException
 from database import v1, apps_client, custom_client # <--- On importe custom_client
 
 def parse_cpu(cpu_raw):
-    """Convertit les nanocores (n) ou millicores (m) en millicores (entier)"""
-    cpu_str = str(cpu_raw) # Sécurité si c'est déjà un int
-    if cpu_str.endswith('n'):
-        return int(cpu_str.replace('n', '')) // 1000000
-    if cpu_str.endswith('m'):
-        return int(cpu_str.replace('m', ''))
-    return int(cpu_str)
+    cpu_str = str(cpu_raw)
+    try:
+        if cpu_str.endswith('n'):
+            return int(cpu_str.replace('n', '')) // 1000000
+        if cpu_str.endswith('u'): # Ajout des microcores, fréquents en K3s
+            return int(cpu_str.replace('u', '')) // 1000
+        if cpu_str.endswith('m'):
+            return int(cpu_str.replace('m', ''))
+        return int(float(cpu_str)) # Gère les nombres à virgule
+    except:
+        return 0
 
 def parse_memory(mem_raw):
     """Convertit Ki, Mi, Gi en MegaBytes (MiB)"""
@@ -22,38 +26,51 @@ def parse_memory(mem_raw):
     # Si c'est juste des bytes
     return int(mem_str) // (1024 * 1024)
 
-def get_pod_metrics(namespace: str = "default"):
-    """Récupère les métriques CPU/RAM via metrics.k8s.io"""
+def get_pod_metrics(namespace: str = None): # On passe à None par défaut
     if not custom_client:
-        print("⚠️ K8s Custom Client non initialisé")
         return []
 
     try:
-        metrics = custom_client.list_namespaced_custom_object(
-            group="metrics.k8s.io",
-            version="v1beta1",
-            namespace=namespace,
-            plural="pods"
-        )
+        # Si namespace est None, on récupère TOUT le cluster (plus utile pour un Dashboard)
+        if namespace:
+            metrics = custom_client.list_namespaced_custom_object(
+                group="metrics.k8s.io", version="v1beta1",
+                namespace=namespace, plural="pods"
+            )
+        else:
+            metrics = custom_client.list_cluster_custom_object(
+                group="metrics.k8s.io", version="v1beta1", plural="pods"
+            )
         
         parsed_metrics = []
         for item in metrics.get("items", []):
-            name = item["metadata"]["name"]
-            # Protection si le pod n'a pas encore de métriques
-            if not item.get("containers"):
+            containers = item.get("containers", [])
+            if not containers:
+                continue
+            
+            # On prend le premier conteneur, mais avec sécurité
+            usage = containers[0].get("usage", {})
+            if not usage:
                 continue
 
-            usage = item["containers"][0]["usage"]
+            # Somme des métriques de tous les conteneurs du pod
+            total_cpu = 0
+            total_mem = 0
+            for container in item["containers"]:
+                usage = container["usage"]
+                total_cpu += parse_cpu(usage["cpu"])
+                total_mem += parse_memory(usage["memory"])
             
             parsed_metrics.append({
                 "pod_name": name,
-                "cpuUsage": parse_cpu(usage["cpu"]),
-                "memoryUsage": parse_memory(usage["memory"])
+                "namespace": ns, # Ajout du NS pour le Front
+                "cpuUsage": total_cpu,
+                "memoryUsage": total_mem
             })
+        print(f"DEBUG: Found {len(parsed_metrics)} pods with metrics")
         return parsed_metrics
     except Exception as e:
-        # On ne crash pas l'app si metrics-server n'est pas là
-        print(f"ℹ️ Info Metrics: {str(e)}") 
+        print(f"ℹ️ Metrics-Server indisponible ou erreur: {str(e)}") 
         return []
 
 async def scale_down_deployment(namespace: str, pod_name: str):

@@ -120,6 +120,17 @@
             <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">Trivy Image Scan</span>
           </div>
         </router-link>
+        
+        <router-link to="/settings" 
+          @click="isMenuOpen = false"
+          class="nav-link"
+          :class="route.path === '/settings' ? 'nav-active' : 'nav-inactive'">
+          <span class="text-xl">⚙️</span>
+          <div class="flex flex-col md:hidden lg:flex">
+            <span class="text-[11px] font-bold uppercase tracking-widest">Settings</span>
+            <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">Infra & Debug</span>
+          </div>
+        </router-link>
       </nav>
 
       <div class="hidden lg:block p-6 border-t border-slate-800/50 bg-[#0a0b0e]">

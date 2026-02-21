@@ -1,6 +1,6 @@
 <script setup lang="ts">
   import { ref, onMounted, onUnmounted } from 'vue';
-  import api from '@/services/api'; // On utilise l'instance api et non axios
+  import api from '@/services/api';
 
   // --- Interfaces ---
   interface PodStatus {
@@ -65,22 +65,30 @@
   };
 
   const fetchClusterData = async () => {
-    if (isInitialLoad.value) loading.value = true;
-    try {
-      const { data } = await api.get('/k3s/health');
+  if (isInitialLoad.value) loading.value = true;
+  try {
+    // 1. On tape sur la bonne route qui renvoie la LISTE des pods
+    const { data } = await api.get('/k3s/cluster-status');
+    
+    // 2. Sécurité : On s'assure que data est bien un Array avant de mapper
+    if (Array.isArray(data)) {
       apps.value = data;
+      
       // On récupère les métriques pour chaque namespace unique trouvé
       const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
       namespaces.forEach(ns => fetchMetrics(ns as string));
-    } catch (error: any) {
-      // Les erreurs 401 sont normalement gérées par l'intercepteur api.ts
-      // mais on garde une sécurité ici si besoin
-      console.error("Cluster data fetch error", error);
-    } finally {
-      loading.value = false;
-      isInitialLoad.value = false;
+    } else {
+      console.warn("⚠️ Expected Array from cluster-status, got:", typeof data);
+      apps.value = [];
     }
-  };
+  } catch (error: any) {
+    console.error("Cluster data fetch error", error);
+    apps.value = [];
+  } finally {
+    loading.value = false;
+    isInitialLoad.value = false;
+  }
+};
 
   // --- Logique métier (Backend déjà converti en Millicores et MiB) ---
   
@@ -152,7 +160,7 @@
   };
 
   const getStatusClass = (status: string) => {
-    const s = status.toUpperCase();
+    const s = (status || 'UNKNOWN').toUpperCase();
     return (s === 'SECURE' || s === 'RUNNING') 
       ? 'text-green-500 bg-green-500/10 border-green-500/20' 
       : (s === 'STABILIZING' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-red-500 bg-red-500/10 border-red-500/20');

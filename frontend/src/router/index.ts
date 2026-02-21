@@ -2,6 +2,7 @@ import { createRouter, createWebHistory } from 'vue-router'
 import Dashboard from '../views/Dashboard.vue'
 import HealthView from '../views/HealthView.vue'
 import SecurityView from '../views/SecurityView.vue'
+import Settings from '../views/Settings.vue'
 
 const routes = [
   {
@@ -18,7 +19,12 @@ const routes = [
         path: 'security', 
         name: 'Security',
         component: SecurityView,
-      }
+      },
+      {
+        path: 'settings',
+        name: 'Settings',
+        component: Settings,
+      },
     ]
   },
   {

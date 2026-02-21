@@ -10,6 +10,11 @@ from metrics_manager import get_pod_metrics
 
 router = APIRouter(prefix="/k3s", tags=["K3s Monitoring"])
 
+# Ajouter cette route dans k3s.py
+@router.get("/health")
+async def k3s_module_health(user: dict = Depends(verify_token)):
+    return {"status": "ok", "service": "k3s-manager"}
+
 @router.get("/cluster-status")
 async def get_cluster_health(user: dict = Depends(verify_token)):
     return get_k3s_status()
@@ -50,7 +55,13 @@ async def list_all_deployments(user: dict = Depends(verify_token)):
 
 @router.get("/metrics/{namespace}")
 async def get_metrics(namespace: str, user: dict = Depends(verify_token)):
-    return get_pod_metrics(namespace)
+    try:
+        data = get_pod_metrics(namespace)
+        # On force le retour d'une liste si get_pod_metrics renvoie None ou autre
+        return data if isinstance(data, list) else []
+    except Exception as e:
+        print(f"🚨 Metrics Error: {e}")
+        return [] # Le front pourra faire .map() sur une liste vide sans crasher
 
 @router.get("/status")
 async def get_cluster_status(user: dict = Depends(verify_token)):
@@ -66,13 +77,19 @@ async def get_cluster_status(user: dict = Depends(verify_token)):
         uptime_delta = datetime.utcnow().replace(tzinfo=None) - creation_time.replace(tzinfo=None)
         
         return {
-            "cluster_version": version_info.git_version,
-            "vps_os": f"{node_info.os_image} ({node_info.kernel_version})",
+            "cluster_version": getattr(version_info, 'git_version', "Unknown"),
+            "vps_os": f"{getattr(node_info, 'os_image', 'OS Inconnu')}",
             "uptime": f"{uptime_delta.days} days",
             "status": "Ready" if any(c.type == 'Ready' and c.status == 'True' for c in node.status.conditions) else "NotReady"
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        # Très important : renvoyer un objet avec les mêmes clés pour que le Front ne crash pas
+        return {
+            "cluster_version": "N/A",
+            "vps_os": "Error checking OS",
+            "uptime": "0 days",
+            "status": "Error"
+        }
 
 @router.get("/logs/{namespace}/{pod_name}")
 async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_token)):
@@ -93,3 +110,29 @@ async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_to
         return {"logs": logs}
     except Exception as e:
         return {"logs": f"ERROR: {str(e)}"}
+
+@router.get("/debug/storage")
+async def debug_storage(user: dict = Depends(verify_token)):
+    """Route de diagnostic SRE pour le stockage"""
+    try:
+        stats = get_storage_stats()
+        # On vérifie aussi si la DB SQLite est accessible
+        db_exists = os.path.exists("kguard.db")
+        
+        return {
+            "status": "success",
+            "disks": stats,
+            "database_present": db_exists,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+    except Exception as e:
+        return {"status": "error", "message": str(e)}
+        
+@router.post("/debug/purge-cache")
+async def action_purge_cache(user: dict = Depends(verify_token)):
+    """Route d'action pour libérer de l'espace sur le PVC"""
+    success = purge_trivy_cache()
+    if success:
+        return {"status": "success", "message": "Cache Trivy purgé avec succès."}
+    else:
+        raise HTTPException(status_code=500, detail="Échec de la purge du cache.")

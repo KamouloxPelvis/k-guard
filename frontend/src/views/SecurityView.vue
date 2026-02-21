@@ -51,20 +51,28 @@
 
   // --- 2. LANCEMENT DU SCAN TRIVY ---
   const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
-    loadingApp.value = appId;
-    try {
-      let imageToScan = defaultImage;
-      if (event?.shiftKey) imageToScan = "nginx:1.18"; 
+  loadingApp.value = appId;
+  try {
+    let imageToScan = defaultImage;
+    if (event?.shiftKey) imageToScan = "nginx:1.18"; 
 
-      // On utilise l'instance api vers notre nouveau router 'scan'
-      const { data } = await api.post('/scan/scan', { image: imageToScan });
-      
-      if (data.status === 'success') {
-        scanResults.value[appId] = data;
+    await api.post('/scan/scan', { image: imageToScan });
+    
+    // On lance un intervalle pour vérifier le résultat en DB
+    const checkInterval = setInterval(async () => {
+      const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
+      if (data.status === 'completed') {
+        scanResults.value[appId] = data.data; // On stocke le rapport
+        clearInterval(checkInterval);
+        loadingApp.value = null;
+      } else if (data.status === 'error') {
+        clearInterval(checkInterval);
+        loadingApp.value = null;
+        alert("Scan failed");
       }
+    }, 5000); // On check toutes les 5 secondes
+
     } catch (error) {
-      console.error("❌ Scan Error:", error);
-    } finally {
       loadingApp.value = null;
     }
   };

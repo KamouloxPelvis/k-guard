@@ -4,23 +4,16 @@ from datetime import datetime
 import os
 import database
 
-# Imports des routeurs (via le package routers)
+# Imports des routeurs
 from routers import auth, k3s, scan, remediation
 
 app = FastAPI(title="🛡️ K-Guard API", version="1.5.0")
-
-# --- CONFIGURATION ---
-API_PREFIX = "/api"
-
-api_router = APIRouter()
 
 # --- CONFIGURATION CORS ---
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
     "http://localhost:32726,http://127.0.0.1:32726"
 )
-
-# On transforme la chaîne "url1,url2" en une vraie liste Python ["url1", "url2"]
 origins = [origin.strip() for origin in raw_origins.split(",")]
 
 app.add_middleware(
@@ -31,25 +24,32 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Route de santé ROOT (Pour les Probes Kubernetes)
-@app.get("/health")
+# --- 0. Initialisation de la base de données Scans ---
+@app.on_event("startup")
+async def startup_event():
+    database.init_db()
+
+# --- 1. ROUTES INFRA (Hors API Prefix) ---
+@app.get("/", tags=["Root"])
+async def root():
+    return {"message": "🛡️ K-Guard API is running. Access via /api"}
+
+@app.get("/health", tags=["Infra"])
 async def liveness_probe():
+    """Liveness pour K3s (Probe)"""
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
 
-# --- INCLUSION DES ROUTEURS ---
-api_router.include_router(auth.router)         
-api_router.include_router(k3s.router)          
-api_router.include_router(scan.router)
-api_router.include_router(remediation.router)
+# --- 2. INCLUSION DES ROUTEURS ---
+app.include_router(auth.router, prefix="/api")         
+app.include_router(k3s.router, prefix="/api")          
+app.include_router(scan.router, prefix="/api")
+app.include_router(remediation.router, prefix="/api")
 
-app.include_router(api_router, prefix=API_PREFIX)
 
-# ✅ Route de santé API (Pour le Frontend)
-@api_router.get("/health")
-async def api_health():
-    return {"status": "online"}
-
-@app.get("/")
-async def root():
-    return {"message": "🛡️ K-Guard API is running. Access via /api"}
+# --- 3. ROUTES API GLOBALES (Post-Inclusion) ---
+# Spécifique au Frontend, passe par Nginx via /api/health
+@app.get("/api/health", tags=["Status"])
+async def api_heartbeat():
+    """Heartbeat pour le Frontend Vue.js"""
+    return {"status": "online", "message": "K-Guard API is reachable"}

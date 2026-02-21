@@ -17,7 +17,7 @@ export default defineConfig(() => {
     },
 
     server: {
-      port: 5173,
+      port: 30002,
       proxy: {
         // Proxy de développement (pour 'npm run dev' local)
         '/api': {

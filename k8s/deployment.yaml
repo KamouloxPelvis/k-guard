@@ -47,6 +47,7 @@ spec:
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
+          # hostPort SUPPRIMÉ : C'est le Service NodePort (30002) qui gère ça maintenant
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-socket
@@ -61,7 +62,13 @@ spec:
             port: 8000
           initialDelaySeconds: 60
           periodSeconds: 30      
-          failureThreshold: 5
+          failureThreshold: 10
+        readinessProbe:
+          httpGet:
+            path: /api/health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
         resources:
           limits:
             cpu: "1.5"
@@ -75,11 +82,12 @@ spec:
         image: k-guard-frontend:latest
         imagePullPolicy: IfNotPresent
         securityContext:
-          runAsUser: 101 # UID par défaut de Nginx pour éviter les conflits
+          runAsUser: 101
           allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true # On passe en lecture seule pour la Cyber !
+          readOnlyRootFilesystem: true
         ports:
         - containerPort: 80
+          # hostPort SUPPRIMÉ : C'est le Service NodePort (30081) qui gère ça maintenant
         volumeMounts:
           - mountPath: /var/cache/nginx
             name: nginx-cache
