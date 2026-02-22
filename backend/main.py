@@ -1,8 +1,8 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from datetime import datetime
-import os
 import database
+import os
 
 # Imports des routeurs
 from routers import auth, k3s, scan, remediation
