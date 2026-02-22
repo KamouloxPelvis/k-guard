@@ -15,7 +15,7 @@ import (
 
 // --- CONFIGURATION & STYLES ---
 var (
-	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28")).Bold(true).BorderStyle(lipgloss.DoubleBorder()).Padding(0, 1)
+	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28")).Bold(true).BorderStyle(lipgloss.DoubleBorder()).Padding(0, 1).Width(29)
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -55,10 +55,19 @@ func setupCredentials() error {
 	return os.WriteFile("../backend/.env", []byte(envContent), 0600)
 }
 
-// 3. Orchestration K8s
+// 3. Orchestration K8s : Utilisation du dossier k8s spécifique
 func deployK8s() error {
+	// Création du namespace (on ignore l'erreur si déjà existant)
 	_ = exec.Command("kubectl", "create", "namespace", "k-guard").Run()
-	return nil 
+
+	// Application des manifests
+	cmd := exec.Command("kubectl", "apply", "-f", "../k8s/", "-n", "k-guard")
+
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Échec du déploiement K8s : %v\n%s", err, string(output))
+	}
+	return nil
 }
 
 // --- BUBBLE TEA ENGINE ---
