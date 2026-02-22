@@ -23,11 +23,17 @@ deploy_to_k3s:
   stage: deploy
   image: alpine:latest
   before_script:
-    # On installe openssh ET curl pour les notifications après
+    # 1. On installe openssh ET curl pour les notifications après
     - apk add --no-cache openssh-client curl
     - eval $(ssh-agent -s)
-    # Protection : On s'assure qu'il y a un saut de ligne à la fin de la clé
-    - echo "$CI_CD_SSH_KEY" | tr -d '\r' | ssh-add - || (echo "$CI_CD_SSH_KEY" | tr -d '\r' | sed '$a\' | ssh-add -)
+    
+    # 2. On nettoie et on ajoute la clé avec un saut de ligne forcé (règle l'erreur libcrypto)
+    - echo "$CI_CD_SSH_KEY" | tr -d '\r' > temp_key
+    - chmod 600 temp_key
+    - ssh-add temp_key
+    - rm temp_key
+
+    # 3. Setup de la confiance SSH
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - ssh-keyscan $VPS_IP >> ~/.ssh/known_hosts
@@ -35,7 +41,6 @@ deploy_to_k3s:
 
   script:
     - echo "🚀 Mise à jour du cluster k3s sur $VPS_IP..."
-    # Utilise bien les variables définies dans GitLab (VPS_USER et VPS_IP)
     - ssh $VPS_USER@$VPS_IP "kubectl rollout restart deployment kguard-deployment -n k-guard"
     - ssh $VPS_USER@$VPS_IP "kubectl rollout status deployment kguard-deployment -n k-guard --timeout=60s"
 
@@ -43,13 +48,10 @@ deploy_to_k3s:
     - |
       if [ "$CI_JOB_STATUS" == "success" ]; then
         curl -X POST -H "Content-Type: application/json" \
-        -d "{\"content\": \"🛡️ **K-GUARD** (k3s) : Déploiement réussi par **$GITLAB_USER_NAME** ! \nStatut: ✅ Orchestration terminée.\"}" \
+        -d "{\"content\": \"🛡️ **K-GUARD** (k3s) : Déploiement réussi par **$GITLAB_USER_NAME** ! ✅\"}" \
         $DISCORD_WEBHOOK_URL
       else
         curl -X POST -H "Content-Type: application/json" \
-        -d "{\"content\": \"⚠️ **K-GUARD** (k3s) : Échec critique du déploiement ! \nLogs : $CI_PROJECT_URL/-/jobs/$CI_JOB_ID\"}" \
+        -d "{\"content\": \"⚠️ **K-GUARD** (k3s) : Échec critique du déploiement ! ❌\"}" \
         $DISCORD_WEBHOOK_URL
       fi
-  
-  only:
-    - main
