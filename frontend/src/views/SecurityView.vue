@@ -70,7 +70,7 @@
         loadingApp.value = null;
         alert("Scan failed");
       }
-    }, 5000); // On check toutes les 5 secondes
+    }, 10000); // On check toutes les 5 secondes
 
     } catch (error) {
       loadingApp.value = null;
@@ -139,7 +139,18 @@
     </header>
 
     <div class="mb-8 p-4 border border-blue-500/20 bg-blue-500/5 text-xs text-slate-400 italic">
-      Tip: Shift + Left Click forces a scan on an obsolete Nginx 1.18 image to simulate vulnerability detection. (Stress Test Mode)    </div>
+      Tip: Shift + Left Click forces a scan on an obsolete Nginx 1.18 image to simulate vulnerability detection. (Stress Test Mode)    
+    </div>
+    
+    <transition name="fade">
+      <div v-if="loadingApp" class="mb-8 p-4 border border-blue-500/30 bg-blue-500/10 flex items-center gap-4">
+        <div class="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+        <p class="text-[10px] text-blue-300 uppercase tracking-widest font-bold">
+          🛰️ K-Guard Analysis in progress... <br/>
+          <span class="text-[9px] text-slate-500 italic uppercase">Vulnerability database synchronization may take a few minutes for large images.</span>
+        </p>
+      </div>
+    </transition>
 
     <Teleport to="body">
       <div v-if="showVulnerabilityModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-md">

@@ -1,11 +1,12 @@
+import os
 from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from kubernetes import client
 
 # Imports internes
 from .auth import verify_token
-from database import v1, apps_client
-from k3s_manager import get_k3s_status, get_cluster_deployments
+from database import v1, apps_client, DB_PATH
+from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats
 from metrics_manager import get_pod_metrics
 
 router = APIRouter(prefix="/k3s", tags=["K3s Monitoring"])
@@ -117,7 +118,7 @@ async def debug_storage(user: dict = Depends(verify_token)):
     try:
         stats = get_storage_stats()
         # On vérifie aussi si la DB SQLite est accessible
-        db_exists = os.path.exists("kguard.db")
+        db_exists = os.path.exists(DB_PATH)
         
         return {
             "status": "success",

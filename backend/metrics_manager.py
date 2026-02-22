@@ -26,12 +26,11 @@ def parse_memory(mem_raw):
     # Si c'est juste des bytes
     return int(mem_str) // (1024 * 1024)
 
-def get_pod_metrics(namespace: str = None): # On passe à None par défaut
+def get_pod_metrics(namespace: str = None):
     if not custom_client:
         return []
 
     try:
-        # Si namespace est None, on récupère TOUT le cluster (plus utile pour un Dashboard)
         if namespace:
             metrics = custom_client.list_namespaced_custom_object(
                 group="metrics.k8s.io", version="v1beta1",
@@ -44,33 +43,33 @@ def get_pod_metrics(namespace: str = None): # On passe à None par défaut
         
         parsed_metrics = []
         for item in metrics.get("items", []):
+            # --- FIX : EXTRACTION DES INFOS DU POD ---
+            pod_metadata = item.get("metadata", {})
+            p_name = pod_metadata.get("name")
+            p_ns = pod_metadata.get("namespace")
+            
             containers = item.get("containers", [])
-            if not containers:
+            if not containers or not p_name:
                 continue
             
-            # On prend le premier conteneur, mais avec sécurité
-            usage = containers[0].get("usage", {})
-            if not usage:
-                continue
-
-            # Somme des métriques de tous les conteneurs du pod
             total_cpu = 0
             total_mem = 0
-            for container in item["containers"]:
-                usage = container["usage"]
-                total_cpu += parse_cpu(usage["cpu"])
-                total_mem += parse_memory(usage["memory"])
+            for container in containers:
+                usage = container.get("usage", {})
+                if usage:
+                    total_cpu += parse_cpu(usage.get("cpu", 0))
+                    total_mem += parse_memory(usage.get("memory", 0))
             
             parsed_metrics.append({
-                "pod_name": name,
-                "namespace": ns, # Ajout du NS pour le Front
+                "pod_name": p_name,      # ✅ Nom technique complet
+                "namespace": p_ns,       # ✅ Namespace correct
                 "cpuUsage": total_cpu,
                 "memoryUsage": total_mem
             })
-        print(f"DEBUG: Found {len(parsed_metrics)} pods with metrics")
+            
         return parsed_metrics
     except Exception as e:
-        print(f"ℹ️ Metrics-Server indisponible ou erreur: {str(e)}") 
+        print(f"🚨 Metrics-Server Error: {str(e)}") 
         return []
 
 async def scale_down_deployment(namespace: str, pod_name: str):

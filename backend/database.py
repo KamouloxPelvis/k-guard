@@ -7,7 +7,9 @@ import os
 v1 = None
 apps_client = None
 custom_client = None
-DB_PATH = "kguard.db"
+
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DB_PATH = os.path.join(BASE_DIR, "kguard.db")
 
 def init_k8s():
     global v1, apps_client, custom_client
