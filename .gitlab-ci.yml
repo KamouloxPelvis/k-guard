@@ -23,21 +23,15 @@ deploy_to_k3s:
   stage: deploy
   image: alpine:latest
   before_script:
-    # 1. On installe openssh ET curl pour les notifications après
     - apk add --no-cache openssh-client curl
     - eval $(ssh-agent -s)
-    
-    # 2. On nettoie et on ajoute la clé avec un saut de ligne forcé (règle l'erreur libcrypto)
-    - echo "$CI_CD_SSH_KEY" | tr -d '\r' > temp_key
+    - echo "$CI_CD_SSH_KEY" > temp_raw
+    - sed -i 's/-----BEGIN OPENSSH PRIVATE KEY-----/-----BEGIN OPENSSH PRIVATE KEY-----\n/' temp_raw
+    - sed -i 's/-----END OPENSSH PRIVATE KEY-----/\n-----END OPENSSH PRIVATE KEY-----/' temp_raw
+    - cat temp_raw | tr -d '\r' > temp_key
     - chmod 600 temp_key
-    - ssh-add temp_key
-    - rm temp_key
-
-    # 3. Setup de la confiance SSH
-    - mkdir -p ~/.ssh
-    - chmod 700 ~/.ssh
-    - ssh-keyscan $VPS_IP >> ~/.ssh/known_hosts
-    - chmod 644 ~/.ssh/known_hosts
+    - ssh-add temp_key || (cat temp_key && exit 1) 
+    - rm temp_raw temp_key
 
   script:
     - echo "🚀 Mise à jour du cluster k3s sur $VPS_IP..."
