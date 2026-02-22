@@ -56,10 +56,11 @@ async def api_heartbeat():
     """Heartbeat pour le Frontend Vue.js"""
     return {"status": "online", "message": "K-Guard API is reachable"}
 
-# --- 4. SERVIR LE FRONTEND (À mettre tout à la fin) ---
-# On vérifie si le dossier existe pour éviter un crash au démarrage
-if os.path.exists("/app/static"):
-    app.mount("/", StaticFiles(directory="/app/static", html=True), name="static")
+# --- 4. SERVIR LE FRONTEND (À la toute fin) ---
+static_path = "/app/static" # On définit la variable ICI
+
+if os.path.exists(static_path):
+    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
     print(f"✅ Frontend monté depuis {static_path}")
 else:
     print(f"⚠️ Warning: Frontend directory not found at {static_path}")
