@@ -23,9 +23,11 @@ deploy_to_k3s:
   stage: deploy
   image: alpine:latest
   before_script:
-    - apk add --no-cache openssh-client
+    # On installe openssh ET curl pour les notifications après
+    - apk add --no-cache openssh-client curl
     - eval $(ssh-agent -s)
-    - echo "$CI_CD_SSH_KEY" | tr -d '\r' | ssh-add -
+    # Protection : On s'assure qu'il y a un saut de ligne à la fin de la clé
+    - echo "$CI_CD_SSH_KEY" | tr -d '\r' | ssh-add - || (echo "$CI_CD_SSH_KEY" | tr -d '\r' | sed '$a\' | ssh-add -)
     - mkdir -p ~/.ssh
     - chmod 700 ~/.ssh
     - ssh-keyscan $VPS_IP >> ~/.ssh/known_hosts

@@ -7,7 +7,17 @@
 
 *Cet outil est un projet de recherche et d'apprentissage (Proof of Concept) développé pour un usage en environnement de développement contrôlé. En raison de l'accès direct au socket Docker et aux privilèges RBAC, l'utilisation de K-Guard dans un environnement de production non sécurisé peut exposer votre cluster à des risques d'escalade de privilèges. Ne déployez pas cet outil sur un réseau exposé sans une configuration stricte des Network Policies et une authentification renforcée.*
 
-K-Guard est un dashboard SRE (Site Reliability Engineering) dédié à l'observabilité et à l'audit de sécurité automatisé pour clusters Kubernetes (optimisé pour k3s). Conçu pour offrir une visibilité en temps réel sur l'état de santé des Pods et leur surface d'attaque, K-Guard intègre des fonctions de remédiation immédiates : redémarrage de services, délestage dynamique des réplicas en cas de saturation CPU/RAM, et signalement de mise à jour des images conteneurisées suite à la détection de vulnérabilités critiques.
+K-Guard est un orchestrateur de sécurité (SOAR-lite) dédié au durcissement (Hardening) et à la défense active des clusters Kubernetes (K3s). Il assure le Maintien en Condition de Sécurité (MCS) de l'infrastructure Cloud par une automatisation de la réponse aux incidents.
+
+🎯 Capacités Techniques :
+
+* 🚨 Réponse aux Incidents (IR) & MTTR : Automatisation de la détection des menaces et pilotage de l'API Kubernetes pour diagnostiquer et remédier aux services critiques, réduisant ainsi le Mean Time To Remediate.
+
+* 🛡️ Sécurité Opérationnelle : Intégration native de Trivy pour l'audit continu des vulnérabilités. Orchestration de "Smart Patches" via GitLab CI/CD pour déclencher la reconstruction des images dès l'identification de CVE critiques.
+
+* 🔒 Hardening & RBAC : Application du principe du moindre privilège via des ServiceAccounts isolés et sécurisation périmétrique par ACL (RFC 1918) sur l'Ingress Controller.
+
+* ⚡ Résilience (Self-Healing) : Détection de dérive de configuration et remédiation automatisée des services pour garantir une disponibilité maximale de la surface applicative.
 
 ## 📍 Sommaire
 - [🚀 Fonctionnalités](#features)
@@ -197,7 +207,17 @@ Blog technique & communautaire : https://blog.devopsnotes.org
 
 *This tool is a Research and Learning project (Proof of Concept) developed for use in controlled development environments. Due to direct access to the Docker socket and specific RBAC privileges, deploying K-Guard in an unsecured production environment may expose your cluster to significant risks, including privilege escalation. Do not deploy this tool on an exposed network without strict Network Policies, robust authentication, and a full understanding of the underlying security implications.*
 
-K-Guard is an SRE (Site Reliability Engineering) dashboard dedicated to observability and automated security auditing for Kubernetes clusters (optimized for k3s). Designed to provide real-time visibility into Pod health and attack surfaces, K-Guard integrates immediate remediation features: service restarts, dynamic replica scaling during CPU/RAM saturation, and update alerts for containerized images following the detection of critical vulnerabilities
+K-Guard is a Security & Resilience Orchestrator (SOAR-lite) for hardening and active defense of K3s clusters. It maintains a continuous Security Posture (MCS) through automated incident response and proactive infrastructure management.
+
+🎯 Core Security Features:
+
+* 🚨 Incident Response & MTTR: Threat detection automation and Kubernetes API interaction to diagnose and remediate critical services, effectively minimizing the Mean Time To Remediate.
+
+* 🔐 Security Operations: Native Trivy integration for continuous vulnerability auditing. Orchestrates "Smart Patches" via GitLab CI/CD to trigger secure image rebuilds upon critical CVE detection.
+
+* 🛡️ Hardening & RBAC: Enforces Least Privilege principles through dedicated ServiceAccounts and perimeter security via strict ACLs (RFC 1918) on Nginx Ingress.
+
+* 🛠️ Automated Resilience: Features configuration drift detection and "self-healing" capabilities to maintain service availability and infrastructure integrity.
 
 ## 📍 Summary
 - [🚀 Key Features](#features)
