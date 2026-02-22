@@ -44,7 +44,7 @@ func initialModel() model {
 // --- LOGIQUE DE STREAMING ---
 // Cette fonction lance le script et envoie chaque ligne au programme Bubble Tea
 func runDeploy(p *tea.Program) {
-	cmd := exec.Command("bash", "../scripts/deploy.sh")
+	cmd := exec.Command("bash", "./scripts/deploy.sh")
 		
 	// On récupère la sortie standard et les erreurs
 	stdout, _ := cmd.StdoutPipe()

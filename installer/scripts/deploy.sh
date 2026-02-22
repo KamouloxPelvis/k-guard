@@ -1,15 +1,11 @@
 #!/bin/bash
 
 # ==============================================================================
-# 🛡️  K-GUARD CYBER-WIZARD (GUM + STABLE FUSION)
+# 🛡️  K-GUARD DEPLOY-WIZARD (GO INSTALLER)
 # Author: Kamal | Visit: https://devopsnotes.org
 # ==============================================================================
-export TERM=xterm-256color
-export GUM_OPTS="--color=16"
-export DEBIAN_FRONTEND=noninteractive
 
 # 0. Initialisation & Check Privilèges
-# On définit proprement la racine du projet pour les chemins relatifs
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 cd "$PROJECT_ROOT" || exit
@@ -42,64 +38,43 @@ gum style \
     --align center --width 60 --margin "1 2" --padding "0 1" \
     "🛡️  K-GUARD " "KUBERNETES MONITOR & SECURITY OPERATOR" "Target: http://$TARGET_URL"
 
-# 1. CLEANING (Smart Clean)
+# 1. AUTHENTIFICATION REGISTRY
+gum style --foreground 212 "🔐 Checking Registry Access..."
+if ! kubectl get secret regcred -n k-guard >/dev/null 2>&1; then
+    gum spin --title "Creating ImagePullSecret..." -- \
+    kubectl create secret docker-registry regcred \
+        --docker-server=$CI_REGISTRY \
+        --docker-username=$CI_REGISTRY_USER \
+        --docker-password=$CI_REGISTRY_PASSWORD \
+        -n k-guard
+fi
+
+# 2. CLEANING (Adapté)
 if kubectl get namespace k-guard >/dev/null 2>&1; then
-    gum style --foreground 212 "🧹 Cleaning up old resources (keeping storage)..."
-    # On supprime les ressources éphémères mais ON GARDE le Namespace et les PVCs
-    kubectl delete deployment,service,ingress,secret -n k-guard --all --wait=true
+    gum style --foreground 212 "🧹 Cleaning ephemerals..."
+
+    kubectl delete deployment,service,ingress -n k-guard --wait=true
 else
     kubectl create namespace k-guard
 fi
-gum style --foreground 82 "  ✓ Environment ready"
 
-# 2. BUILDING
-gum style --foreground 212 "🏗️  Starting Binary Builds..."
-# Ajout de < /dev/null pour isoler le processus
-gum spin --spinner pulse --title "Compiling Backend Engine (+Trivy)..." -- \
-    docker build --no-cache -t k-guard-backend:latest ./backend < /dev/null
-gum spin --spinner pulse --title "Compiling Frontend Interface..." -- \
-    docker build --no-cache -t k-guard-frontend:latest ./frontend < /dev/null
-
-stty -echo && stty echo
-gum style --foreground 82 "  ✓ Images generated"
-
-# 3. IMPORTING
-gum style --foreground 212 "📦 Injecting into K3s Registry..."
-docker save k-guard-backend:latest -o backend.tar < /dev/null
-docker save k-guard-frontend:latest -o frontend.tar < /dev/null
-
-gum spin --spinner line --title "Importing layers to K3s..." -- \
-    bash -c "k3s ctr images import backend.tar && k3s ctr images import frontend.tar" < /dev/null
-
-rm -f backend.tar frontend.tar
-stty echo
-gum style --foreground 82 "  ✓ Registry updated"
+# 3. PULL & DEPLOY
+gum style --foreground 212 "📥 Pulling K-Guard from GitLab Registry..."
+gum style --foreground 82 "  ✓ Using remote image: $CI_REGISTRY_IMAGE/kguard-app:latest"
 
 # 4. ORCHESTRATION
 gum style --foreground 212 "🚀 Kubernetes Orchestration..."
 
-# Application du Secret (Correctement pointé vers PROJECT_ROOT)
+# Application des secrets applicatifs (.env)
 kubectl create secret generic k-guard-secrets \
     --from-env-file="$PROJECT_ROOT/backend/.env" \
     -n k-guard --dry-run=client -o yaml | kubectl apply -f -
 
-# Application du stockage et des ressources de base
-for manifest in k-guard-pvc service rbac ingress; do
-    if [ -f "k8s/$manifest.yaml" ]; then
-        kubectl apply -f "k8s/$manifest.yaml" -n k-guard > /dev/null
-    fi
-done
-
-# --- GESTION DYNAMIQUE DU GID DOCKER ---
+# Application des manifestes
 DOCKER_GID=$(stat -c '%g' /var/run/docker.sock 2>/dev/null || echo "988")
-gum style --foreground 212 "🛠️  Adaptation du GID Docker ($DOCKER_GID) pour la portabilité..."
-
-# On applique le deployment avec le patch de GID
 sed "s/supplementalGroups: \[.*\]/supplementalGroups: \[$DOCKER_GID\]/g" k8s/deployment.yaml > k8s/deployment_tmp.yaml
-kubectl apply -f k8s/deployment_tmp.yaml -n k-guard > /dev/null
+kubectl apply -f k8s/deployment_tmp.yaml -n k-guard
 rm k8s/deployment_tmp.yaml
-
-gum style --foreground 82 "  ✓ Manifests & Ingress applied"
 
 # 5. FINAL STABILIZATION
 echo ""

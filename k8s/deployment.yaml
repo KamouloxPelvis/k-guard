@@ -1,12 +1,19 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k-guard
+
+---
+
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: k-guard-deployment
+  name: kguard-deployment
   namespace: k-guard
 spec:
   replicas: 1
   strategy:
-    type: Recreate
+    type: Recreate # Préférable car on utilise un socket Docker et un cache local
   selector:
     matchLabels:
       app: k-guard
@@ -17,10 +24,12 @@ spec:
     spec:
       serviceAccountName: k-guard-sa
       automountServiceAccountToken: true
+      imagePullSecrets:
+        - name: regcred
 
       securityContext:
         fsGroup: 1000
-        supplementalGroups: [988] 
+        supplementalGroups: [988] # ID du groupe docker sur ton VPS Kamatera
 
       volumes:
         - name: docker-socket
@@ -30,24 +39,17 @@ spec:
         - name: trivy-cache
           persistentVolumeClaim:
             claimName: trivy-cache-pvc
-        # Espaces d'écriture temporaires pour Nginx
-        - name: nginx-cache
-          emptyDir: {}
-        - name: nginx-run
-          emptyDir: {}
 
       containers:
-      # --- 1. BACKEND (FastAPI + Trivy) ---
-      - name: backend
-        image: k-guard-backend:latest
-        imagePullPolicy: IfNotPresent
+      - name: kguard-app
+        # Cette URL doit correspondre exactement à celle de ton registre GitLab
+        image: registry.gitlab.com/portfolio-kamal-guidadou/k-guard/kguard-app:latest
+        imagePullPolicy: Always
         securityContext:
           runAsUser: 1000
-          runAsGroup: 1000
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
-          # hostPort SUPPRIMÉ : C'est le Service NodePort (30002) qui gère ça maintenant
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-socket
@@ -60,15 +62,8 @@ spec:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 60
-          periodSeconds: 30      
-          failureThreshold: 10
-        readinessProbe:
-          httpGet:
-            path: /api/health
-            port: 8000
-          initialDelaySeconds: 30
-          periodSeconds: 10
+          initialDelaySeconds: 45
+          periodSeconds: 30
         resources:
           limits:
             cpu: "1.5"
@@ -77,26 +72,19 @@ spec:
             cpu: "500m"
             memory: "1Gi"
 
-      # --- 2. FRONTEND (Vue.js + Nginx) ---
-      - name: frontend
-        image: k-guard-frontend:latest
-        imagePullPolicy: IfNotPresent
-        securityContext:
-          runAsUser: 101
-          allowPrivilegeEscalation: false
-          readOnlyRootFilesystem: true
-        ports:
-        - containerPort: 80
-          # hostPort SUPPRIMÉ : C'est le Service NodePort (30081) qui gère ça maintenant
-        volumeMounts:
-          - mountPath: /var/cache/nginx
-            name: nginx-cache
-          - mountPath: /var/run
-            name: nginx-run
-        resources:
-          limits:
-            cpu: "200m"     
-            memory: "1024Mi" 
-          requests:
-            cpu: "200m"
-            memory: "512Mi"
+---
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: kguard-service
+  namespace: k-guard
+spec:
+  type: NodePort
+  selector:
+    app: k-guard
+  ports:
+    - protocol: TCP
+      port: 80      # Port exposé en interne du cluster
+      targetPort: 8000 # Port sur lequel FastAPI écoute dans le container
+      nodePort: 30002 # Port accessible depuis l'IP du VPS
