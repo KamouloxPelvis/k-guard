@@ -32,9 +32,9 @@ async def startup_event():
     database.init_db()
 
 # --- 1. ROUTES INFRA (Hors API Prefix) ---
-@app.get("/", tags=["Root"])
-async def root():
-    return {"message": "🛡️ K-Guard API is running. Access via /api"}
+# @app.get("/", tags=["Root"])
+# async def root():
+#     return {"message": "🛡️ K-Guard API is running. Access via /api"}
 
 @app.get("/health", tags=["Infra"])
 async def liveness_probe():
@@ -56,11 +56,9 @@ async def api_heartbeat():
     """Heartbeat pour le Frontend Vue.js"""
     return {"status": "online", "message": "K-Guard API is reachable"}
 
-# --- 4. SERVIR LE FRONTEND (À la toute fin) ---
-static_path = "/app/static" # On définit la variable ICI
-
+# --- 4. SERVIR LE FRONTEND (À mettre tout à la fin du fichier) ---
+static_path = "/app/static"
 if os.path.exists(static_path):
+    # html=True est crucial : il redirige "/" vers "index.html" automatiquement
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
     print(f"✅ Frontend monté depuis {static_path}")
-else:
-    print(f"⚠️ Warning: Frontend directory not found at {static_path}")
