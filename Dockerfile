@@ -26,6 +26,13 @@ WORKDIR /app/backend
 # 3. On copie le contenu du dossier backend ICI (.)
 COPY backend/ .
 
+# Création manuelle du fichier vide pour garantir les permissions
+# Cela évite que SQLite ne doive "créer" le fichier, il n'aura qu'à l'ouvrir.
+RUN touch kguard.db && chmod 666 kguard.db
+
+# Permissions sur le dossier pour les fichiers temporaires SQLite
+RUN chmod 777 /app/backend
+
 # 4. On récupère le frontend statique (on le met un niveau au-dessus pour rester propre)
 COPY --from=build-frontend /app/frontend/dist /app/static
 
