@@ -25,13 +25,14 @@ deploy_to_k3s:
   before_script:
     - apk add --no-cache openssh-client curl
     - eval $(ssh-agent -s)
-    - echo "$CI_CD_SSH_KEY" > temp_raw
-    - sed -i 's/-----BEGIN OPENSSH PRIVATE KEY-----/-----BEGIN OPENSSH PRIVATE KEY-----\n/' temp_raw
-    - sed -i 's/-----END OPENSSH PRIVATE KEY-----/\n-----END OPENSSH PRIVATE KEY-----/' temp_raw
-    - cat temp_raw | tr -d '\r' > temp_key
+    - cat "$CI_CD_SSH_KEY" | tr -d '\r' > temp_key
     - chmod 600 temp_key
-    - ssh-add temp_key || (cat temp_key && exit 1) 
-    - rm temp_raw temp_key
+    - ssh-add temp_key || (echo "❌ Erreur fatale : La clé SSH est toujours invalide" && exit 1)
+    - rm temp_key
+    - mkdir -p ~/.ssh
+    - chmod 700 ~/.ssh
+    - ssh-keyscan $VPS_IP >> ~/.ssh/known_hosts
+    - chmod 644 ~/.ssh/known_hosts
 
   script:
     - echo "🚀 Mise à jour du cluster k3s sur $VPS_IP..."
