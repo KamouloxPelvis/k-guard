@@ -1,7 +1,7 @@
 package main
 
 import (
-	"fmt"
+	"fmt"	
 	"os"
 	"os/exec"
 	"runtime"
@@ -15,7 +15,7 @@ import (
 
 // --- CONFIGURATION & STYLES ---
 var (
-	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28")).Bold(true).BorderStyle(lipgloss.DoubleBorder()).Padding(0, 1).Width(29)
+	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28")).Bold(true).BorderStyle(lipgloss.DoubleBorder()).Padding(0, 1).Width(35)
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
 	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
@@ -44,14 +44,26 @@ func checkSystem() error {
 	return nil
 }
 
-// 2. Génération Credentials (Bcrypt Native)
+// 2. Génération Credentials
 func setupCredentials() error {
-	password := "admin_kguard" // À changer
+	password := "admin_kguard" // À changer manuellement plus tard
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 10)
 	if err != nil {
 		return err
 	}
-	envContent := fmt.Sprintf("ADMIN_PASSWORD_HASH=%s\nSECRET_KEY=kguard_%d\n", string(hash), time.Now().Unix())
+
+	// On reconstruit tout le .env basé sur ton .env.example
+	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION
+ALLOWED_ORIGINS=http://localhost:32726,http://113.30.191.17
+ADMIN_USERNAME=kamal
+ADMIN_PASSWORD_HASH=%s
+SECRET_KEY=kguard_%d
+ALGORITHM=HS256
+ACCESS_TOKEN_EXPIRE_MINUTES=600
+USER_DOMAIN=113.30.191.17
+PROJECT_NAME=K-Guard
+`, string(hash), time.Now().Unix())
+
 	return os.WriteFile("../backend/.env", []byte(envContent), 0600)
 }
 
