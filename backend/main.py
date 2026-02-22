@@ -1,6 +1,8 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from datetime import datetime
+
 import database
 import os
 
@@ -53,3 +55,11 @@ app.include_router(remediation.router, prefix="/api")
 async def api_heartbeat():
     """Heartbeat pour le Frontend Vue.js"""
     return {"status": "online", "message": "K-Guard API is reachable"}
+
+# --- 4. SERVIR LE FRONTEND (À mettre tout à la fin) ---
+# On vérifie si le dossier existe pour éviter un crash au démarrage
+if os.path.exists("/app/static"):
+    app.mount("/", StaticFiles(directory="/app/static", html=True), name="static")
+    print(f"✅ Frontend monté depuis {static_path}")
+else:
+    print(f"⚠️ Warning: Frontend directory not found at {static_path}")
