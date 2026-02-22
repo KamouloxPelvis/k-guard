@@ -30,9 +30,11 @@ deploy_to_k3s:
     - ssh-keyscan $VPS_IP >> ~/.ssh/known_hosts
     - chmod 644 ~/.ssh/known_hosts
   script:
-    - echo "🚀 Mise à jour du cluster k3s sur $VPS_IP..."
+    - echo "🚀 Déploiement/Mise à jour de l'infrastructure sur $VPS_IP..."
+    - scp -r k8s/ $VPS_USER@$VPS_IP:/home/kamal/infrastructure/apps/k-guard/
+    - ssh $VPS_USER@$VPS_IP "kubectl apply -f /home/kamal/infrastructure/apps/k-guard/k8s/ -n k-guard"
     - ssh $VPS_USER@$VPS_IP "kubectl rollout restart deployment kguard-deployment -n k-guard"
-    - ssh $VPS_USER@$VPS_IP "kubectl rollout status deployment kguard-deployment -n k-guard --timeout=60s"
+    - ssh $VPS_USER@$VPS_IP "kubectl rollout status deployment kguard-deployment -n k-guard --timeout=90s"
   after_script:
     - |
       if [ "$CI_JOB_STATUS" == "success" ]; then
