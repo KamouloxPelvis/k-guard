@@ -8,9 +8,10 @@ build_images:
   services:
     - docker:24.0.5-dind
   script:
-    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
-    - docker build -t $CI_REGISTRY_IMAGE/kguard-app:latest .
-    - docker push $CI_REGISTRY_IMAGE/kguard-app:latest
+    - echo "🚀 Déploiement/Mise à jour du cluster k3s sur $VPS_IP..."
+    - ssh $VPS_USER@$VPS_IP "kubectl apply -f /home/kamal/infrastructure/apps/k-guard/k8s/ -n k-guard"
+    - ssh $VPS_USER@$VPS_IP "kubectl rollout restart deployment kguard-deployment -n k-guard"
+    - ssh $VPS_USER@$VPS_IP "kubectl rollout status deployment kguard-deployment -n k-guard --timeout=60s"
   only:
     - main
 
