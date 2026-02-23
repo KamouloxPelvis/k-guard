@@ -1,4 +1,3 @@
----
 - name: 🛡️ Network Sentinel - Stratégie de Sécurité Globale
   hosts: localhost
   connection: local
@@ -229,7 +228,7 @@
                   - protocol: TCP
                     port: 443
     
-    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster"
+    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster (Consolidé)"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -244,45 +243,19 @@
                 app: k-guard
             policyTypes: ["Egress"]
             egress:
-              # 1. Autoriser l'accès à l'API Server (Indispensable pour Health/Security/Sentinel)
-              - to:
-                - ipBlock:
-                    cidr: 0.0.0.0/0 # On autorise l'egress vers l'API interne
-                ports:
-                  - protocol: TCP
-                    port: 443
-                  - protocol: TCP
-                    port: 6443
-              # 2. Autoriser la communication avec les autres pods pour les scans (Trivy/Sentinel)
-              - to:
-                - namespaceSelector: {} # Autorise l'accès aux autres namespaces protégés
-    
-    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster (API Access)"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-allow-kguard-mgmt
-            namespace: "k-guard"
-          spec:
-            podSelector:
-              matchLabels:
-                app: k-guard
-            policyTypes: ["Egress"]
-            egress:
-              # 1. Chemin interne (ClusterIP)
+              # 1. Accès API Server (Interne + Externe)
               - to:
                 - ipBlock:
                     cidr: 10.43.0.1/32
                 ports:
                   - protocol: TCP
                     port: 443
-              # 2. Chemin direct vers l'hôte (VPS IP)
               - to:
                 - ipBlock:
                     cidr: 113.30.191.17/32
                 ports:
                   - protocol: TCP
                     port: 6443
+              # 2. Accès aux Pods des autres Namespaces (Pour Discovery & Scans)
+              - to:
+                - namespaceSelector: {}
