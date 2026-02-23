@@ -1,4 +1,3 @@
-# infrastructure/apps/k-guard/infra/ansible/harden_network.yml
 ---
 - name: 🛡️ Network Sentinel - Stratégie de Sécurité Globale
   hosts: localhost

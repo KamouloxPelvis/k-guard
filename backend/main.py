@@ -58,20 +58,24 @@ async def api_heartbeat():
     """Heartbeat pour le Frontend Vue.js"""
     return {"status": "online", "message": "K-Guard API is reachable"}
 
-# --- 4. ROUTE CATCH-ALL POUR VUE.JS (Mode History) ---
-@app.get("/{full_path:path}")
-async def catch_all(full_path: str):
-    # On définit le chemin vers ton dossier static
-    static_dir = "/app/static"
-    file_path = os.path.join(static_dir, full_path)
+# --- 4. SERVIR LE FRONTEND (Version stabilisée) ---
+static_path = "/app/static"
+
+@app.get("/{full_path:path}", tags=["Frontend"])
+async def serve_spa(full_path: str):
+    """
+    Sert les fichiers statiques s'ils existent, sinon renvoie index.html.
+    C'est plus léger et évite les conflits avec app.mount.
+    """
+    file_path = os.path.join(static_path, full_path)
     
-    # Si c'est un fichier réel (js, css, image), on le sert
+    # Si c'est un fichier JS/CSS/Image réel, on le sert
     if os.path.isfile(file_path):
         return FileResponse(file_path)
     
-    # Sinon, on renvoie index.html pour laisser Vue gérer le routage
-    return FileResponse(os.path.join(static_dir, "index.html"))
-
-# --- 5. MONTAGE DES STATICS ---
-if os.path.exists(static_path):
-    app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
+    # Pour tout le reste (routage Vue), on sert l'index
+    index_file = os.path.join(static_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
+    
+    return {"error": "Frontend not found", "path": full_path}
