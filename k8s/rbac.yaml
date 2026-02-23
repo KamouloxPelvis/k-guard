@@ -22,7 +22,6 @@ rules:
     verbs: ["get", "list", "watch"]
 
   # 3. ACTION DE REMÉDIATION : Autorise spécifiquement le delete et patch
-  # On sépare les ressources sensibles
   - apiGroups: [""]
     resources: ["pods"]
     verbs: ["delete"] # Nécessaire pour ton restart_pod
@@ -36,6 +35,11 @@ rules:
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods", "nodes"]
     verbs: ["get", "list"]
+  
+  # 6. NETWORK POLICIES : Network Sentinel (Ansible Playbook)
+  - apiGroups: ["networking.k8s.io"] # LA LIGNE MANQUANTE
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
 
 ---
 # 3. Liaison (Binding)
