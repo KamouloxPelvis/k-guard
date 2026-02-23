@@ -10,21 +10,15 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Installation des dépendances système + TRIVY (Dépôt Officiel Stable)
+# Installation des dépendances système + TRIVY via script (Portable & Robuste)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
-    gnupg \
-    lsb-release \
     ca-certificates \
-    && mkdir -p /usr/share/keyrings \
-    && curl -tfL https://aquasecurity.github.io/trivy-repo/deb/public.key | gpg --dearmor -o /usr/share/keyrings/trivy.gpg \
-    && echo "deb [signed-by=/usr/share/keyrings/trivy.gpg] https://aquasecurity.github.io/trivy-repo/deb $(lsb_release -sc) main" | tee /etc/apt/sources.list.d/trivy.list \
-    && apt-get update \
-    && apt-get install -y trivy \
+    && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 1. Installation des requirements (Placé avant le COPY backend pour optimiser le cache)
+# 1. Installation des requirements
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
