@@ -68,8 +68,11 @@ const getStatusColor = (status: string) => {
   <div class="p-6 lg:p-10 space-y-8">
     
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-6 border border-slate-800/60 rounded-sm">
+
       <div>
-        <p class="text-[12px] text-slate-500 mt-6 uppercase tracking-[0.5em]">IDS & Traffic Mapping</p>
+        <p class="text-[12px] text-slate-500 uppercase tracking-[0.5em] leading-none">
+          IDS & Traffic Mapping
+        </p>
       </div>
       
       <div class="flex flex-wrap items-center gap-4">
