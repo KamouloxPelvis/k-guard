@@ -26,15 +26,14 @@ const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
 const fetchNetworkData = async () => {
   isLoading.value = true;
   try {
-    const nsParam = selectedNS.value === 'all-protected' ? '' : `?ns=${selectedNS.value}`;
-    const { data } = await api.get(`/sentinel/map${nsParam}`);
-    
-    // On mappe les données reçues du backend
+    const { data } = await api.get('/sentinel/map');
+    // On utilise l'opérateur de coalescence pour garantir un tableau
     pods.value = data.nodes || [];
     edges.value = data.edges || [];
-    
   } catch (error) {
-    console.error("Sentinel: Fetch Error", error);
+    pods.value = []; // On vide pour éviter le 'reading properties of null'
+    edges.value = [];
+    console.error("Sentinel UI Error", error);
   } finally {
     isLoading.value = false;
   }
@@ -46,7 +45,7 @@ const runQuickAudit = async () => {
 };
 
 const triggerHarden = async () => {
-  if (!confirm("🚨 Appliquer le durcissement Network Sentinel sur le cluster ?")) return;
+  if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
   try {
     await api.post('/sentinel/harden');
     alert("🛡️ Stratégie Network Sentinel appliquée avec succès !");
@@ -70,7 +69,7 @@ const getStatusColor = (status: string) => {
     
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-6 border border-slate-800/60 rounded-sm">
       <div>
-        <p class="text-xs text-slate-500 mt-1 font-mono uppercase">IDS & Traffic Mapping for K3s Infrastructure</p>
+        <p class="text-[12px] text-slate-500 mt-6 uppercase tracking-[0.5em]">IDS & Traffic Mapping</p>
       </div>
       
       <div class="flex flex-wrap items-center gap-4">
@@ -115,7 +114,7 @@ const getStatusColor = (status: string) => {
         </div>
       </div>
     </div>
-    
+
       <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <div v-for="pod in pods" :key="pod.id" 
             class="bg-[#0d0e12] border border-slate-800/60 p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden">
