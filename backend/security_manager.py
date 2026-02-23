@@ -1,33 +1,47 @@
 import subprocess
 import json
+import shutil
 
 def run_trivy_scan(image_name: str):
     # Log de début pour le monitoring SRE
     print(f"🔍 [K-GUARD ENGINE] Starting security audit for: {image_name}")
     
+    # 1. VÉRIFICATION DU BINAIRE (Sécurité anti-Errno 2)
+    trivy_path = shutil.which("trivy")
+    if not trivy_path:
+        error_msg = "Critical: 'trivy' binary not found in PATH. Please check installation."
+        print(f"❌ [K-GUARD ENGINE] {error_msg}")
+        return {"status": "error", "message": error_msg}
+
     # --- LOGIQUE DE DÉMO / STRESS TEST ---
     if image_name == "nginx:1.18":
         print("🚀 [DEMO MODE] Vulnerability simulation triggered via Shift+Click.")
     
     try:
-        # On lance Trivy via subprocess
+        # On lance Trivy via subprocess avec le chemin absolu trouvé
         command = [
-            "trivy", "image", 
+            trivy_path, "image", 
             "--format", "json", 
             "--severity", "HIGH,CRITICAL",
             image_name
         ]
         
-        # Timeout de 180s pour éviter de saturer le CPU du VPS indéfiniment
+        # Timeout de 180s pour éviter de saturer le CPU du VPS [cite: 2026-02-23]
         process = subprocess.run(command, capture_output=True, text=True, timeout=180)
         
         if process.returncode != 0:
-            print(f"❌ [K-GUARD ENGINE] Trivy Error: {process.stderr}")
+            print(f"❌ [K-GUARD ENGINE] Trivy Execution Error: {process.stderr}")
             return {"status": "error", "message": process.stderr}
 
         report = json.loads(process.stdout)
         results = report.get('Results', [])
-        vulnerabilities = results[0].get('Vulnerabilities', []) if results else []
+        
+        # On s'assure qu'il y a des résultats pour éviter le crash sur []
+        vulnerabilities = []
+        if results:
+            for res in results:
+                if 'Vulnerabilities' in res:
+                    vulnerabilities.extend(res.get('Vulnerabilities', []))
         
         critical_count = len([v for v in vulnerabilities if v['Severity'] == 'CRITICAL'])
         high_count = len([v for v in vulnerabilities if v['Severity'] == 'HIGH'])
@@ -47,7 +61,7 @@ def run_trivy_scan(image_name: str):
                     "pkg": v['PkgName'], 
                     "severity": v['Severity'],
                     "installed_version": v.get('InstalledVersion'),
-                    "fixed_version": v.get('FixedVersion') # Crucial pour le Smart-Patch
+                    "fixed_version": v.get('FixedVersion')
                 }
                 for v in vulnerabilities
             ]

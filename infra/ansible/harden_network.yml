@@ -267,3 +267,4 @@
               # 3. Micro-segmentation : Accès aux autres pods
               - to:
                 - namespaceSelector: {}
+    

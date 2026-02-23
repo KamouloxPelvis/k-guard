@@ -50,32 +50,40 @@
   };
 
   // --- 2. LANCEMENT DU SCAN TRIVY ---
-  const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
+const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
   loadingApp.value = appId;
-  try {
-    let imageToScan = defaultImage;
-    if (event?.shiftKey) imageToScan = "nginx:1.18"; 
+  
+  // LOGIQUE DE DÉTECTION FORCÉE
+  let imageToScan = defaultImage;
+  
+  // On vérifie si la touche Shift était pressée lors du clic
+  if (event && event.shiftKey) {
+    console.log("🚀 [STRESS TEST] Shift detected, forcing Nginx 1.18");
+    imageToScan = "nginx:1.18";
+  }
 
+  try {
+    // On envoie l'image au backend
     await api.post('/scan/scan', { image: imageToScan });
     
-    // On lance un intervalle pour vérifier le résultat en DB
+    // On lance la boucle de vérification
     const checkInterval = setInterval(async () => {
       const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
       if (data.status === 'completed') {
-        scanResults.value[appId] = data.data; // On stocke le rapport
+        scanResults.value[appId] = data.data;
         clearInterval(checkInterval);
         loadingApp.value = null;
       } else if (data.status === 'error') {
         clearInterval(checkInterval);
         loadingApp.value = null;
-        alert("Scan failed");
       }
-    }, 10000); // On check toutes les 5 secondes
+    }, 5000); 
 
-    } catch (error) {
-      loadingApp.value = null;
-    }
-  };
+  } catch (error) {
+    console.error("Scan Trigger Error:", error);
+    loadingApp.value = null;
+  }
+};
 
   // --- 3. LOGIQUE DE REMÉDIATION ---
   const fetchPatchLogs = async (namespace: string, appName: string) => {
