@@ -1,13 +1,14 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from datetime import datetime
 
 import database
 import os
 
 # Imports des routeurs
-from routers import auth, k3s, scan, remediation
+from routers import auth, k3s, scan, remediation, sentinel
 
 app = FastAPI(title="🛡️ K-Guard API", version="1.5.0")
 
@@ -47,6 +48,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(k3s.router, prefix="/api")          
 app.include_router(scan.router, prefix="/api")
 app.include_router(remediation.router, prefix="/api")
+app.include_router(sentinel.router, prefix="/api")
 
 
 # --- 3. ROUTES API GLOBALES (Post-Inclusion) ---
@@ -56,9 +58,20 @@ async def api_heartbeat():
     """Heartbeat pour le Frontend Vue.js"""
     return {"status": "online", "message": "K-Guard API is reachable"}
 
-# --- 4. SERVIR LE FRONTEND (À mettre tout à la fin du fichier) ---
-static_path = "/app/static"
+# --- 4. ROUTE CATCH-ALL POUR VUE.JS (Mode History) ---
+@app.get("/{full_path:path}")
+async def catch_all(full_path: str):
+    # On définit le chemin vers ton dossier static
+    static_dir = "/app/static"
+    file_path = os.path.join(static_dir, full_path)
+    
+    # Si c'est un fichier réel (js, css, image), on le sert
+    if os.path.isfile(file_path):
+        return FileResponse(file_path)
+    
+    # Sinon, on renvoie index.html pour laisser Vue gérer le routage
+    return FileResponse(os.path.join(static_dir, "index.html"))
+
+# --- 5. MONTAGE DES STATICS ---
 if os.path.exists(static_path):
-    # html=True est crucial : il redirige "/" vers "index.html" automatiquement
     app.mount("/", StaticFiles(directory=static_path, html=True), name="static")
-    print(f"✅ Frontend monté depuis {static_path}")

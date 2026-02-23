@@ -3,6 +3,7 @@ import Dashboard from '../views/Dashboard.vue'
 import HealthView from '../views/HealthView.vue'
 import SecurityView from '../views/SecurityView.vue'
 import Settings from '../views/Settings.vue'
+import SentinelView from '../views/SentinelView.vue';
 
 const routes = [
   {
@@ -14,16 +15,25 @@ const routes = [
         path: '', 
         name: 'Health',
         component: HealthView,
+        meta: { title: 'System Overview' }
       },
       {
         path: 'security', 
         name: 'Security',
         component: SecurityView,
+        meta: { title: 'Vulnerabilities' }
+      },
+      {
+        path: 'sentinel',
+        name: 'Sentinel',
+        component: SentinelView,
+        meta: { title: 'Network Sentinel' }
       },
       {
         path: 'settings',
         name: 'Settings',
         component: Settings,
+        meta: { title: 'Settings' }
       },
     ]
   },

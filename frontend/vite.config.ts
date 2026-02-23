@@ -19,7 +19,6 @@ export default defineConfig(() => {
     server: {
       port: 30002,
       proxy: {
-        // Proxy de développement (pour 'npm run dev' local)
         '/api': {
           target: 'http://localhost:8000',
           changeOrigin: true,

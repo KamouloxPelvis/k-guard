@@ -61,8 +61,10 @@
   });
 
   const pageTitle = computed(() => {
-    if (route.path === '/') return 'System Monitoring';
-    if (route.path === '/security') return 'Security Audit';
+    if (route.path === '/') return 'System Overview';
+    if (route.path === '/security') return 'Vulnerabilities';
+    if (route.path === '/sentinel') return 'Network Sentinel';
+    if (route.path === '/settings') return 'Settings';
     return 'K-Guard Dashboard';
   });
 </script>
@@ -105,7 +107,7 @@
           :class="route.path === '/' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">📊</span>
           <div class="flex flex-col md:hidden lg:flex">
-            <span class="text-[11px] font-bold uppercase tracking-widest">System Monitoring</span>
+            <span class="text-[11px] font-bold uppercase tracking-widest">System Overview</span>
             <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">K3s Cluster Status</span>
           </div>
         </router-link>
@@ -116,8 +118,19 @@
           :class="route.path === '/security' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">🔒</span>
           <div class="flex flex-col md:hidden lg:flex">
-            <span class="text-[11px] font-bold uppercase tracking-widest">Security</span>
+            <span class="text-[11px] font-bold uppercase tracking-widest">Vulnerabilities</span>
             <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">Trivy Image Scan</span>
+          </div>
+        </router-link>
+
+        <router-link to="/sentinel" 
+          @click="isMenuOpen = false"
+          class="nav-link"
+          :class="route.path === '/sentinel' ? 'nav-active' : 'nav-inactive'">
+          <span class="text-xl">🌐</span>
+          <div class="flex flex-col md:hidden lg:flex">
+            <span class="text-[11px] font-bold uppercase tracking-widest">Network Map</span>
+            <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">Network Sentinel</span>
           </div>
         </router-link>
         
