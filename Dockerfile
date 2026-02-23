@@ -10,34 +10,24 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# Installation des dépendances système + TRIVY via script (Portable & Robuste)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    ca-certificates \
+# 1. Dépendances système + Trivy (Portable)
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 1. Installation des requirements
+# 2. Installation des requirements (Optimisation cache)
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Setup du dossier Backend et permissions SQLite
+# 3. Setup du code Backend
+# On copie le CONTENU du dossier local backend dans /app/backend du conteneur
+COPY backend/ ./backend/
 WORKDIR /app/backend
 
-# On crée le fichier et on s'assure que TOUT le dossier est scriptable
-RUN touch kguard.db && \
-    chmod 666 kguard.db && \
-    chmod 777 /app/backend
+# 4. Fix des permissions SQLite pour K-Guard
+RUN touch kguard.db && chmod 777 kguard.db && chmod 777 .
 
-# Optionnel mais recommandé pour le DevSecOps : 
-# S'assurer que l'app peut écrire dans son propre répertoire
-RUN chown -R 1000:1000 /app/backend
-
-# Gestion de la DB SQLite et permissions
-RUN touch kguard.db && chmod 666 kguard.db
-
-# 3. Récupération du frontend
+# 5. Récupération du frontend
 COPY --from=build-frontend /app/frontend/dist /app/static
 
 ENV PYTHONUNBUFFERED=1
@@ -45,4 +35,5 @@ ENV PYTHONPATH=/app/backend
 
 EXPOSE 8000
 
+# Commande de lancement
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
