@@ -282,11 +282,14 @@
 
           <div class="space-y-3 mt-auto">
             <button 
-              @click="launchScan($event, app.id, app.image)" 
+              @click="(e) => launchScan(e, app.id, app.image)" 
               :disabled="!!loadingApp || !!patchingApp"  
-              class="w-full py-3 text-[10px] font-bold uppercase tracking-[0.3em] transition-all bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 cursor-pointer"
+              class="w-full py-3 text-[10px] font-bold uppercase tracking-[0.3em] transition-all bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[0_4px_15px_-3px_rgba(37,99,235,0.4)] hover:shadow-blue-500/20 active:scale-[0.98]"
             >
-              Launch Scan
+              <div class="flex items-center justify-center gap-2">
+                <span v-if="loadingApp === app.id" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
+                <span>{{ loadingApp === app.id ? 'Scanning...' : 'Launch Scan' }}</span>
+              </div>
             </button>
 
             <div class="flex gap-3 mt-4 items-center justify-between">

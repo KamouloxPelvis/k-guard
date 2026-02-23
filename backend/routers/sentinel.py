@@ -18,42 +18,75 @@ except Exception:
 
 @router.get("/sentinel/map")
 async def get_network_map(ns: Optional[str] = Query(None)):
+    """Découvre dynamiquement les pods, leurs IPs et leurs flux de trafic."""
     v1 = client.CoreV1Api()
-    
+    nodes = []
+    edges = []
+
     try:
-        # 1. On récupère les namespaces protégés depuis le .env (Fallback plus sûr)
+        # 1. Gestion des Namespaces (Dynamique ou Fallback)
         env_ns = os.getenv("KGUARD_PROTECTED_NS", "k-guard,blog-prod,portfolio-prod").split(",")
         
         if not ns:
             try:
-                # On tente la découverte dynamique
-                all_ns = v1.list_namespace(timeout_seconds=5)
-                target_ns = [n.metadata.name for n in all_ns.items 
+                # Tentative de découverte globale (nécessite ClusterRole)
+                all_namespaces = v1.list_namespace(timeout_seconds=5)
+                target_ns = [n.metadata.name for n in all_namespaces.items 
                              if n.metadata.name not in ["kube-system", "kube-public", "kube-node-lease"]]
             except Exception:
-                # Si ça échoue (RBAC ou Timeout), on reste sur le .env
+                # Fallback si les droits sont restreints
                 target_ns = env_ns
         else:
             target_ns = [ns]
 
-        nodes = []
-        edges = []
-
+        # 2. Scan des Pods et extraction des métadonnées
         for namespace in target_ns:
             try:
                 pods = v1.list_namespaced_pod(namespace, timeout_seconds=5)
                 for pod in pods.items:
-                    # Ton code d'extraction ici (IP, labels, status...)
-                    # ...
-            except Exception as e:
-                print(f"⚠️ Erreur sur le namespace {namespace}: {e}")
+                    pod_name = pod.metadata.name
+                    pod_ip = pod.status.pod_ip or "0.0.0.0" # Sécurité anti-null
+                    pod_status = pod.status.phase
+                    labels = pod.metadata.labels or {}
+                    
+                    # On ajoute le nœud avec toutes les infos pour le Frontend
+                    nodes.append({
+                        "id": pod_name,
+                        "name": pod_name,
+                        "namespace": namespace,
+                        "ip": pod_ip,
+                        "status": pod_status,
+                        "labels": labels, # Crucial pour afficher le rôle
+                        "role": labels.get("app", "generic")
+                    })
+
+                    # 3. Logique de Flux (Inter-pod)
+                    # Exemple : Lien automatique entre frontend et backend dans le même NS
+                    if "frontend" in pod_name.lower():
+                        edges.append({
+                            "source": pod_name,
+                            "target": f"backend-{namespace}", # Cible logique
+                            "label": "API Traffic"
+                        })
+                    
+                    # Ton flux spécifique Blog -> ClamAV
+                    if "blog-devopsnotes" in pod_name:
+                        edges.append({
+                            "source": pod_name,
+                            "target": "clamav",
+                            "label": "Scanner Flux"
+                        })
+
+            except Exception as ns_error:
+                print(f"⚠️ [SENTINEL] Error scanning namespace {namespace}: {ns_error}")
                 continue
 
+        # Réponse propre pour Vue.js (évite 'reading nodes of null')
         return {"nodes": nodes, "edges": edges}
 
-    except Exception as e:
-        print(f"💥 Critical Sentinel Error: {e}")
-        return {"nodes": [], "edges": [], "error": str(e)}
+    except Exception as global_error:
+        print(f"💥 [SENTINEL] Global failure: {global_error}")
+        return {"nodes": [], "edges": [], "error": str(global_error)}
 
 def get_cloudflare_ips():
     """Récupère dynamiquement les CIDR IPv4 de Cloudflare"""
