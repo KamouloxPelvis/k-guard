@@ -22,9 +22,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 2. Setup du dossier Backend
-COPY backend/ ./backend
+# 2. Setup du dossier Backend et permissions SQLite
 WORKDIR /app/backend
+
+# On crée le fichier et on s'assure que TOUT le dossier est scriptable
+RUN touch kguard.db && \
+    chmod 666 kguard.db && \
+    chmod 777 /app/backend
+
+# Optionnel mais recommandé pour le DevSecOps : 
+# S'assurer que l'app peut écrire dans son propre répertoire
+RUN chown -R 1000:1000 /app/backend
 
 # Gestion de la DB SQLite et permissions
 RUN touch kguard.db && chmod 666 kguard.db
