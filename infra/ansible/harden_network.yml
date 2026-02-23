@@ -115,7 +115,7 @@
                     cidr: 10.42.0.0/16 # Réseau interne des nodes K3s pour les Probes
       loop: "{{ protected_namespaces }}"
 
-      # --- COUCHE 4 : CERT-MANAGER & CLOUDFLARE ---
+      # --- COUCHE 5 : CERT-MANAGER & CLOUDFLARE ---
     - name: "🔐 Sentinel : Autoriser Cert-Manager à sortir (API Cloudflare / Let's Encrypt)"
       kubernetes.core.k8s:
         state: present
@@ -267,4 +267,11 @@
               # 3. Micro-segmentation : Accès aux autres pods
               - to:
                 - namespaceSelector: {}
+              # 4. Internet Access (Indispensable pour la mise à jour de la VulnDB Trivy)
+              - to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+                ports:
+                  - protocol: TCP
+                    port: 443
     
