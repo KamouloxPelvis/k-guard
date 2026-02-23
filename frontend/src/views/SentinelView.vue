@@ -70,7 +70,6 @@ const getStatusColor = (status: string) => {
     
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-6 border border-slate-800/60 rounded-sm">
       <div>
-        <h1 class="text-2xl font-bold text-white tracking-tight uppercase">Network Sentinel</h1>
         <p class="text-xs text-slate-500 mt-1 font-mono uppercase">IDS & Traffic Mapping for K3s Infrastructure</p>
       </div>
       
@@ -116,37 +115,45 @@ const getStatusColor = (status: string) => {
         </div>
       </div>
     </div>
-
-    <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="pod in pods" :key="pod.id" 
-           class="bg-[#0d0e12] border border-slate-800/60 p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden">
-        
-        <div class="flex items-start justify-between mb-4">
-          <div class="p-2 bg-blue-600/10 rounded-sm">
-            <span class="text-xl">📦</span>
-          </div>
-          <span :class="['px-2 py-1 text-[8px] font-bold uppercase border rounded-full', getStatusColor(pod.status)]">
-            {{ pod.status }}
-          </span>
-        </div>
-        
-        <h3 class="text-sm font-bold text-white truncate mb-1 uppercase tracking-tight">{{ pod.name }}</h3>
-        <p class="text-[10px] text-slate-500 font-mono mb-4">{{ pod.ip || 'No IP Allocated' }}</p>
-        
-        <div class="space-y-2 border-t border-slate-800/40 pt-4">
-          <div class="flex justify-between text-[9px] uppercase font-bold">
-            <span class="text-slate-600">Namespace</span>
-            <span class="text-blue-400">{{ pod.namespace }}</span>
-          </div>
-          <div class="flex flex-wrap gap-1 mt-2">
-            <span v-for="(val, key) in pod.labels" :key="key" 
-                  class="text-[7px] bg-slate-800/50 text-slate-400 px-1.5 py-0.5 rounded-sm">
-              {{ key }}:{{ val }}
+    
+      <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div v-for="pod in pods" :key="pod.id" 
+            class="bg-[#0d0e12] border border-slate-800/60 p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden">
+          
+          <div class="flex items-start justify-between mb-4">
+            <div class="flex flex-col">
+              <span class="text-[9px] font-mono text-blue-400 leading-none mb-1">{{ pod.ip || '0.0.0.0' }}</span>
+              <div class="p-2 bg-blue-600/10 rounded-sm w-fit">
+                <span class="text-xl">📦</span>
+              </div>
+            </div>
+            <span :class="['px-2 py-1 text-[8px] font-bold uppercase border rounded-full', getStatusColor(pod.status)]">
+              {{ pod.status }}
             </span>
+          </div>
+          
+          <h3 class="text-sm font-bold text-white truncate mb-1 uppercase tracking-tight">{{ pod.name }}</h3>
+          <p class="text-[10px] text-slate-500 font-mono mb-4 uppercase tracking-widest">Namespace: {{ pod.namespace }}</p>
+          
+          <div class="space-y-3 border-t border-slate-800/40 pt-4">
+            <div class="flex justify-between items-center text-[9px] uppercase font-bold">
+              <span class="text-slate-600">Detected Role</span>
+              <span class="text-orange-500">{{ pod.labels?.app || 'Generic Pod' }}</span>
+            </div>
+
+            <div class="flex flex-wrap gap-1">
+              <span v-for="(val, key) in pod.labels" :key="key" 
+                    class="text-[7px] bg-slate-800/50 text-slate-400 px-1.5 py-0.5 rounded-sm border border-slate-700/50">
+                {{ key }}:{{ val }}
+              </span>
+            </div>
+          </div>
+
+          <div class="absolute -right-2 -bottom-2 opacity-[0.03] text-4xl font-black italic select-none">
+            {{ pod.namespace.split('-')[0] }}
           </div>
         </div>
       </div>
-    </div>
 
     <div v-else class="flex flex-col justify-center items-center h-64 space-y-4">
       <div class="w-12 h-12 border-2 border-[#f05a28] border-t-transparent rounded-full animate-spin"></div>

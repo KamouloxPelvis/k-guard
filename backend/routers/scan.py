@@ -15,7 +15,14 @@ class ScanRequest(BaseModel):
 @router.post("/scan")
 async def launch_security_scan(payload: ScanRequest, background_tasks: BackgroundTasks, user: dict = Depends(verify_token)):
     """Lance le scan Trivy en tâche de fond pour éviter les timeouts 502/504."""
+    
+    print(f"🔍 [K-GUARD ENGINE] Received scan request for image: {payload.image}")
+    
+    if "nginx:1.18" in payload.image:
+        print("🚀 [DEMO MODE] Stress test detected: Vulnerability simulation active.")
+    
     background_tasks.add_task(run_and_store_scan, payload.image)
+    
     return {
         "status": "processing", 
         "message": f"Scan de {payload.image} en cours d'exécution..."

@@ -228,14 +228,14 @@
                   - protocol: TCP
                     port: 443
     
-    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster (Consolidé)"
+    - name: "🛡️ Sentinel : Autorisation Globale K-Guard (API + Inter-NS + DNS)"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-kguard-mgmt
+            name: sentinel-kguard-core-access
             namespace: "k-guard"
           spec:
             podSelector:
@@ -243,7 +243,15 @@
                 app: k-guard
             policyTypes: ["Egress"]
             egress:
-              # 1. Accès API Server (Interne + Externe)
+              # 1. DNS (Indispensable pour résoudre l'API)
+              - to:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: kube-system
+                ports:
+                  - protocol: UDP
+                    port: 53
+              # 2. API Server (Interne & Externe)
               - to:
                 - ipBlock:
                     cidr: 10.43.0.1/32
@@ -256,6 +264,6 @@
                 ports:
                   - protocol: TCP
                     port: 6443
-              # 2. Accès aux Pods des autres Namespaces (Pour Discovery & Scans)
+              # 3. Micro-segmentation : Accès aux autres pods
               - to:
                 - namespaceSelector: {}
