@@ -1,0 +1,187 @@
+# infrastructure/apps/k-guard/infra/ansible/harden_network.yml
+---
+- name: 🛡️ Network Sentinel - Stratégie de Sécurité Globale
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    ns_blog: "blog-prod"
+    protected_namespaces: ["k-guard", "blog-prod", "portfolio-prod"]
+
+  tasks:
+    # --- COUCHE 1 : ISOLATION TOTALE ---
+    - name: "🔒 Base : Deny-All (Ingress & Egress) par défaut"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-default-deny
+            namespace: "{{ item }}"
+          spec:
+            podSelector: {}
+            policyTypes: ["Ingress", "Egress"]
+      loop: "{{ protected_namespaces }}"
+
+    # --- COUCHE 2 : ACCÈS INTERNET ET SERVICES VITAUX ---
+    - name: "🔌 Infrastructure : Autoriser la Résolution DNS"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-dns
+            namespace: "{{ item }}"
+          spec:
+            podSelector: {}
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: kube-system
+                ports:
+                  - protocol: UDP
+                    port: 53
+                  - protocol: TCP
+                    port: 53
+      loop: "{{ protected_namespaces }}"
+
+    - name: "🌐 API Externes : Autoriser le HTTPS sortant (Resend, etc.)"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-egress-https
+            namespace: "{{ ns_blog }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app: blog-devopsnotes
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+                    except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
+                ports:
+                  - protocol: TCP
+                    port: 443
+    
+    # --- COUCHE 3 : COMMUNICATIONS INTER-PODS ---
+    - name: "🛡️ Micro-segmentation : Autoriser Blog <-> ClamAV"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-blog-clamav
+            namespace: "{{ ns_blog }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app: clamav
+            ingress:
+              - from:
+                - podSelector:
+                    matchLabels:
+                      app: blog-devopsnotes
+                ports:
+                  - protocol: TCP
+                    port: 3310
+    
+    # --- COUCHE 4 : FLUX DE MONITORING & PROBES ---
+    - name: "📊 Sentinel : Autoriser le Monitoring et les Probes K3s"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-monitoring-probes
+            namespace: "{{ item }}"
+          spec:
+            podSelector: {} # Tous les pods
+            ingress:
+              - from:
+                - namespaceSelector:
+                    matchLabels:
+                      kubernetes.io/metadata.name: monitoring # Pour Prometheus
+                - ipBlock:
+                    cidr: 10.42.0.0/16 # Réseau interne des nodes K3s pour les Probes
+      loop: "{{ protected_namespaces }}"
+
+      # --- COUCHE 4 : CERT-MANAGER & CLOUDFLARE ---
+    - name: "🔐 Sentinel : Autoriser Cert-Manager à sortir (API Cloudflare / Let's Encrypt)"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-cert-manager-egress
+            namespace: "cert-manager"
+          spec:
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/instance: cert-manager
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0 # Vers API Cloudflare & Let's Encrypt
+                ports:
+                  - protocol: TCP
+                    port: 443
+
+    - name: "☁️ Sentinel : Restriction Ingress aux IPs Cloudflare"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-cloudflare-only
+            namespace: "ingress-nginx"
+          spec:
+            podSelector:
+              matchLabels:
+                app.kubernetes.io/component: controller
+            ingress:
+              - from:
+                - ipBlock:
+                    cidr: "{{ item }}"
+                ports:
+                  - protocol: TCP
+                    port: 80
+                  - protocol: TCP
+                    port: 443
+      loop: "{{ cf_ips | default([]) }}" # Utilise la liste envoyée par Python
+
+    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-kguard-mgmt
+            namespace: "k-guard"
+          spec:
+            podSelector:
+              matchLabels:
+                app: k-guard
+            egress:
+              - to:
+                - namespaceSelector: {} # Autorise K-Guard à parler à tous les namespaces
+                ports:
+                  - protocol: TCP
+                    port: 443 # API Kubernetes
+                  - protocol: TCP
+                    port: 6443 # Port API K3s standard
