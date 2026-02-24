@@ -29,9 +29,20 @@
   // --- ETATS POUR LA MODALE DE ROLES ---
   const showRoleModal = ref(false);
   const selectedPod = ref<PodNode | null>(null);
-  
-  // --- GESTION DES VUES ---
   const currentViewMode = ref('list'); // 'list' ou 'topology'
+
+  // --- COMPUTED POUR LE FILTRAGE ---
+  const filteredPods = computed(() => {
+    if (selectedNS.value === 'all-protected') return pods.value;
+    return pods.value.filter(pod => pod.namespace === selectedNS.value);
+  });
+
+  const filteredEdges = computed(() => {
+    if (selectedNS.value === 'all-protected') return edges.value;
+    // On ne garde que les liens dont la source OU la cible fait partie du namespace sélectionné
+    const nsPodIds = filteredPods.value.map(p => p.id);
+    return edges.value.filter(edge => nsPodIds.includes(edge.source) || nsPodIds.includes(edge.target));
+  });
 
   const fetchNetworkData = async () => {
     isLoading.value = true;
@@ -88,11 +99,11 @@
 
   // --- DONNEES POUR LA TOPOLOGIE ---
   const uniqueSources = computed(() => {
-    return [...new Set(edges.value.map(e => e.source))];
+    return [...new Set(filteredEdges.value.map(e => e.source))];
   });
 
   const uniqueTargets = computed(() => {
-    return [...new Set(edges.value.map(e => e.target))];
+    return [...new Set(filteredEdges.value.map(e => e.target))];
   });
 </script>
 
@@ -216,8 +227,8 @@
     </div>
 
 
-    <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="pod in pods" :key="pod.id" 
+    <div v-if="!isLoading && currentViewMode === 'list'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div v-for="pod in filteredPods" :key="pod.id" 
           @click="openRoleDetails(pod)"
           :class="[
             'bg-[#0d0e12] border p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden cursor-pointer',

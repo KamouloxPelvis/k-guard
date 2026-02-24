@@ -9,8 +9,8 @@ import json
 router = APIRouter(tags=["Network Sentinel"])
 
 # --- CONFIGURATION DYNAMIQUE ---
-# On utilise des variables d'environnement pour éviter le hardcoding
-PROTECTED_NAMESPACES = os.getenv("KGUARD_PROTECTED_NS", "k-guard,blog-prod,portfolio-prod").split(",")
+# Fallback propre : si la variable d'environnement est absente, on check le namespace 'default'
+PROTECTED_NAMESPACES = os.getenv("KGUARD_PROTECTED_NS", "default").split(",")
 ANSIBLE_PATH = os.getenv("KGUARD_ANSIBLE_PATH", "../infra/ansible/harden_network.yml")
 
 try:
@@ -26,16 +26,30 @@ async def get_network_map(ns: Optional[str] = Query(None)):
     v1 = client.CoreV1Api()
     net_v1 = client.NetworkingV1Api()
     
-    # Utilisation de la liste dynamique ou du filtre utilisateur
-    target_ns = [ns] if ns else PROTECTED_NAMESPACES
-    
     nodes = []
     edges = []
     audit_results = {}
 
+    # 1. DÉCOUVERTE DYNAMIQUE DES NAMESPACES
+    try:
+        if ns:
+            target_ns = [ns]
+        else:
+            # Tentative de récupération globale (nécessite des droits ClusterRole)
+            all_ns = v1.list_namespace(timeout_seconds=5)
+            target_ns = [
+                n.metadata.name for n in all_ns.items 
+                if n.metadata.name not in ["kube-system", "kube-public", "kube-node-lease", "local-path-storage"]
+            ]
+    except Exception as rbac_error:
+        # Si le ServiceAccount de K-Guard est restreint, on utilise le .env
+        print(f"⚠️ [SENTINEL] Droits ClusterRole limités, utilisation du fallback env : {rbac_error}")
+        target_ns = PROTECTED_NAMESPACES
+
+    # 2. SCAN DES RESSOURCES
     try:
         for namespace in target_ns:
-            # Audit dynamique des politiques
+            # Audit des Network Policies
             policies = net_v1.list_namespaced_network_policy(namespace)
             audit_results[namespace] = {
                 "policy_count": len(policies.items),
@@ -43,27 +57,39 @@ async def get_network_map(ns: Optional[str] = Query(None)):
             }
 
             pods = v1.list_namespaced_pod(namespace)
+            
+            # Listes temporaires pour la création dynamique des flux
+            scanner_pods = []
+            standard_apps = []
+
             for pod in pods.items:
                 pod_name = pod.metadata.name
                 labels = pod.metadata.labels or {}
+                role = labels.get("app", "generic").lower()
                 
                 nodes.append({
                     "id": pod_name,
                     "namespace": namespace,
                     "status": pod.status.phase,
-                    "ip": pod.status.pod_ip,
+                    "ip": pod.status.pod_ip or "0.0.0.0",
                     "labels": labels,
                     "is_hardened": len(policies.items) > 0
                 })
 
-                # LOGIQUE DE GRAPHE DYNAMIQUE (Basée sur les labels)
-                # Si le pod a le label de ton blog, on cherche son service de scan
-                if labels.get("app") == "blog-devopsnotes":
-                    # On crée un lien vers n'importe quel pod ayant le label 'clamav' dans le même NS
+                # Tri intelligent basé sur les labels
+                if "clamav" in role or "scanner" in role or "trivy" in role:
+                    scanner_pods.append(pod_name)
+                elif role != "generic":
+                    standard_apps.append(pod_name)
+
+            # 3. GÉNÉRATION DES FLUX DYNAMIQUES (Graphe)
+            # Lie automatiquement les apps détectées aux pods de sécurité du namespace
+            for app in standard_apps:
+                for scanner in scanner_pods:
                     edges.append({
-                        "source": pod_name, 
-                        "target": "clamav-service", 
-                        "label": "Scanner Flux (3310)"
+                        "source": app, 
+                        "target": scanner, 
+                        "label": "Scanner Flux (Dynamic)"
                     })
                 
         return {
@@ -92,7 +118,6 @@ async def apply_hardening():
     extra_vars = json.dumps({"cf_ips": cf_ips})
     
     try:
-        # Utilisation du chemin dynamique vers le playbook
         result = subprocess.run(
             ["ansible-playbook", ANSIBLE_PATH, "--extra-vars", extra_vars],
             capture_output=True,

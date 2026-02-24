@@ -53,35 +53,54 @@
 const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
   loadingApp.value = appId;
   
-  // LOGIQUE DE DÉTECTION FORCÉE
   let imageToScan = defaultImage;
+  let forcedDemoMode = false; // On garde une trace locale
   
-  // On vérifie si la touche Shift était pressée lors du clic
   if (event && event.shiftKey) {
     console.log("🚀 [STRESS TEST] Shift detected, forcing Nginx 1.18");
     imageToScan = "nginx:1.18";
+    forcedDemoMode = true;
   }
 
   try {
-    // On envoie l'image au backend
+    // 1. Déclenchement du scan
     await api.post('/scan/scan', { image: imageToScan });
     
-    // On lance la boucle de vérification
+    // 2. Boucle de vérification
     const checkInterval = setInterval(async () => {
-      const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
-      if (data.status === 'completed') {
-        scanResults.value[appId] = data.data;
-        clearInterval(checkInterval);
-        loadingApp.value = null;
-      } else if (data.status === 'error') {
-        clearInterval(checkInterval);
-        loadingApp.value = null;
+      try {
+        const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
+        
+        if (data.status === 'completed') {
+          // On s'assure d'injecter manuellement l'info de l'image scannée 
+          // au cas où le backend ne le fait pas, pour que isDemoMode() fonctionne !
+          const finalData = { ...data.data };
+          if (!finalData.image) finalData.image = imageToScan;
+
+          scanResults.value[appId] = finalData;
+          clearInterval(checkInterval);
+          loadingApp.value = null;
+
+          if (forcedDemoMode) {
+              console.log("✅ Demo Scan (Nginx 1.18) completed and stored for app:", appId);
+          }
+          
+        } else if (data.status === 'error') {
+          console.error("❌ Scan failed on backend for image:", imageToScan);
+          clearInterval(checkInterval);
+          loadingApp.value = null;
+          alert(`Le scan de ${imageToScan} a échoué côté serveur.`);
+        }
+      } catch (pollError) {
+          // Si l'appel /scan/results échoue (erreur réseau, 500, etc.)
+          console.error("⚠️ Error while checking scan status:", pollError);
       }
     }, 5000); 
 
   } catch (error) {
-    console.error("Scan Trigger Error:", error);
+    console.error("❌ Scan Trigger Error:", error);
     loadingApp.value = null;
+    alert("Impossible de lancer le scan. Vérifiez la connexion réseau.");
   }
 };
 
