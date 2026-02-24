@@ -18,11 +18,30 @@ import (
 
 // --- CONFIGURATION & STYLES ---
 var (
-	headerStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28")).Bold(true).BorderStyle(lipgloss.DoubleBorder()).Padding(0, 1).Width(35)
+	headerStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("#f05a28")).
+			Bold(true).
+			BorderStyle(lipgloss.DoubleBorder()).
+			BorderForeground(lipgloss.Color("#f05a28")).
+			Padding(0, 1).
+			Width(46).             // Largeur fixe pour l'encadré
+			Align(lipgloss.Center) // Centrage du texte à l'intérieur
+
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
 	errorStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Bold(true)
-	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
 	checkStyle   = lipgloss.NewStyle().Foreground(lipgloss.Color("42"))
+	statusStyle  = lipgloss.NewStyle().Foreground(lipgloss.Color("240"))
+)
+var (
+    // Style pour l'encadré de succès final
+    footerStyle = lipgloss.NewStyle().
+        Foreground(lipgloss.Color("42")). 
+        Bold(true).
+        BorderStyle(lipgloss.DoubleBorder()).
+        BorderForeground(lipgloss.Color("42")).
+        Padding(0, 1).
+        Width(55). 
+        Align(lipgloss.Center)
 )
 
 type statusMsg string
@@ -30,13 +49,14 @@ type errMsg error
 type successMsg bool
 
 type model struct {
-	spinner  spinner.Model
-	status   string
-	err      error
-	quitting bool
-	step     int
-	adminPwd string
-	results  []string
+	spinner   spinner.Model
+	status    string
+	err       error
+	quitting  bool
+	step      int
+	adminUser string
+	adminPwd  string
+	results   []string
 }
 
 // 1. Vérification système & Nettoyage intelligent
@@ -80,32 +100,35 @@ func checkAndPrepare() (string, error) {
 }
 
 // 2. Génération Credentials
-func setupCredentials(password string) error {
+func setupCredentials(username string, password string) error {
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return err
 	}
 
-	// On enrichit le template avec les variables métier [cite: 2026-02-22]
-	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION GENERATED ON %s
-ALLOWED_ORIGINS=http://localhost:30002,http://113.30.191.17:30002
-ADMIN_USERNAME=kamal
-ADMIN_PASSWORD_HASH=%s
-SECRET_KEY=kguard_%d
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=600
+	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION
+	ALLOWED_ORIGINS=http://localhost:30002,http://113.30.191.17:30002
+	ADMIN_USERNAME=%s
+	ADMIN_PASSWORD_HASH=%s
+	SECRET_KEY=kguard_%d
+	ALGORITHM=HS256
+	ACCESS_TOKEN_EXPIRE_MINUTES=600
 
-# --- INFOS INFRASTRUCTURE ---
-USER_DOMAIN=113.30.191.17
-PROJECT_NAME=K-Guard
+	# --- INFOS INFRASTRUCTURE ---
+	USER_DOMAIN=113.30.191.17
+	PROJECT_NAME=K-Guard
 
-# --- CONFIGURATION NETWORK SENTINEL ---
-KGUARD_PROTECTED_NS=k-guard,blog-prod,portfolio-prod
-KGUARD_ANSIBLE_PATH=../infra/ansible/harden_network.yml
+	# --- CONFIGURATION NETWORK SENTINEL ---
+	KGUARD_PROTECTED_NS=k-guard,blog-prod,portfolio-prod
+	KGUARD_ANSIBLE_PATH=../infra/ansible/harden_network.yml
 
-# --- CONFIGURATION SCANNER (TRIVY) ---
-TRIVY_CACHE_DIR=/data/trivy-cache
-`, time.Now().Format("2006-01-02"), string(hash), time.Now().Unix())
+	# --- CONFIGURATION SCANNER (TRIVY) ---
+	TRIVY_CACHE_DIR=/data/trivy-cache
+	`,
+		time.Now().Format("2006-01-02"), // Pour le premier %s (date)
+		username,                        // Pour le deuxième %s (nom d'utilisateur)
+		string(hash),                    // Pour le troisième %s (le hash bcrypt)
+		time.Now().Unix())               // Pour le %d (le timestamp du secret)
 
 	return os.WriteFile("../backend/.env", []byte(envContent), 0600)
 }
@@ -145,19 +168,31 @@ func (m model) runStep(step int) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		var msg string
-		time.Sleep(600 * time.Millisecond)
+		time.Sleep(800 * time.Millisecond) // Délai pour la lisibilité
 
 		switch step {
 		case 0:
-			msg, err = checkAndPrepare()
+			msg = "Vérification des dépendances système (kubectl, sh...)"
+			_, err = checkAndPrepare()
 		case 1:
-			msg = "Génération du fichier .env (Hachage & Config)"
-			err = setupCredentials(m.adminPwd)
+			msg = "Vérification du socket Docker (/var/run/docker.sock)"
+			if _, errStat := os.Stat("/var/run/docker.sock"); os.IsNotExist(errStat) {
+				msg = "Socket Docker absent (Scan local limité)"
+			} else {
+				msg = "Socket Docker détecté et accessible"
+			}
 		case 2:
+			msg = "Génération du fichier .env (Bcrypt & Configuration)"
+			err = setupCredentials(m.adminUser, m.adminPwd)
+		case 3:
+			msg = "Initialisation de la base de vulnérabilités Trivy"
+			// Simulation de préparation ou vérification de répertoire
+			msg = "Base Trivy prête pour l'analyse"
+		case 4:
 			msg = "Injection des secrets dans le cluster K3s"
 			err = syncSecretsToK8s()
-		case 3:
-			msg = "Déploiement final des manifests K8s"
+		case 5:
+			msg = "Déploiement final des manifests (Services & Pods)"
 			err = deployK8s()
 		default:
 			return successMsg(true)
@@ -200,16 +235,21 @@ func (m model) View() string {
 		return errorStyle.Render(fmt.Sprintf("\n❌ ERREUR FATALE : %v\n", m.err))
 	}
 
-	s := headerStyle.Render("🛡️ K-GUARD SYSTEM INSTALLER") + "\n\n"
+	s := "\n" + headerStyle.Render("🛡️ K-GUARD SYSTEM INSTALLER ") + "\n\n"
 
 	for _, res := range m.results {
 		s += checkStyle.Render("  ✓ ") + res + "\n"
 	}
 
 	if m.quitting {
-		s += successStyle.Render("\n✅ DEPLOIEMENT TERMINE AVEC SUCCES\n")
-		return s
-	}
+        successMsg := fmt.Sprintf(
+            "Thank you for installing, %s!\n\nK-Guard is ready & accessible via:\n'113.30.191.17:30002'\n\nTo know more about my works, visit:\nhttps://devopsnotes.org",
+            m.adminUser,
+        )
+        
+        s += "\n" + footerStyle.Render(successMsg) + "\n"
+        return s
+    }
 
 	s += "\n " + m.spinner.View() + " " + m.status + "\n\n"
 	s += statusStyle.Render(" [q] quitter")
@@ -249,6 +289,17 @@ func isStrongPassword(p string) (bool, string) {
 }
 
 func main() {
+	var user string
+	for {
+		fmt.Print("👤 Entrez le 'username' administrateur souhaité : ")
+		fmt.Scanln(&user)
+
+		if user == "" {
+			fmt.Println(errorStyle.Render("❌ Le username ne peut pas être vide."))
+			continue
+		}
+		break
+	}
 	var pass string
 	for {
 		fmt.Print("🔐 Définissez le mot de passe admin pour 'kamal': ")

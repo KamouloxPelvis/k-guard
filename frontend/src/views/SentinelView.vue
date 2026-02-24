@@ -1,88 +1,99 @@
 <script setup lang="ts">
-import { ref, onMounted, watch } from 'vue';
-import api from '@/services/api';
+  import { ref, computed, onMounted, watch } from 'vue';
+  import api from '@/services/api';
 
-interface PodNode {
-  id: string;
-  name: string;
-  namespace: string;
-  status: string;
-  ip: string;
-  labels: Record<string, string>;
-  image?: string; // Pour le check de vulnérabilité
-}
-
-interface NetworkEdge {
-  source: string;
-  target: string;
-  label: string;
-  sourceIp?: string;
-  targetIp?: string;
-}
-
-const pods = ref<PodNode[]>([]);
-const edges = ref<NetworkEdge[]>([]);
-const selectedNS = ref('all-protected');
-const isLoading = ref(false);
-const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
-
-// --- ETATS POUR LA MODALE DE ROLES (DESIGN HEALTHVIEW) ---
-const showRoleModal = ref(false);
-const selectedPod = ref<PodNode | null>(null);
-
-const fetchNetworkData = async () => {
-  isLoading.value = true;
-  try {
-    const { data } = await api.get('/sentinel/map');
-    pods.value = data.nodes || [];
-    edges.value = data.edges || [];
-    
-    // Enrichissement des flux avec les IPs pour la partie graphique
-    edges.value = edges.value.map(edge => ({
-      ...edge,
-      sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
-      targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
-    }));
-  } catch (error) {
-    pods.value = [];
-    edges.value = [];
-    console.error("Sentinel UI Error", error);
-  } finally {
-    isLoading.value = false;
+  interface PodNode {
+    id: string;
+    name: string;
+    namespace: string;
+    status: string;
+    ip: string;
+    labels: Record<string, string>;
+    image?: string; 
   }
-};
 
-const openRoleDetails = (pod: PodNode) => {
-  selectedPod.value = pod;
-  showRoleModal.value = true;
-};
-
-const isVulnerable = (pod: PodNode) => {
-  // Logique alignée sur le Stress Test Mode
-  return pod.image?.includes('nginx:1.18') || pod.labels?.app === 'blog-devopsnotes';
-};
-
-const runQuickAudit = async () => {
-  await fetchNetworkData();
-};
-
-const triggerHarden = async () => {
-  if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
-  try {
-    await api.post('/sentinel/harden');
-    alert("🛡️ Stratégie Network Sentinel appliquée avec succès !");
-  } catch (e) {
-    alert("❌ Erreur lors de l'application du Playbook Ansible.");
+  interface NetworkEdge {
+    source: string;
+    target: string;
+    label: string;
+    sourceIp?: string;
+    targetIp?: string;
   }
-};
 
-onMounted(fetchNetworkData);
-watch(selectedNS, fetchNetworkData);
+  const pods = ref<PodNode[]>([]);
+  const edges = ref<NetworkEdge[]>([]);
+  const selectedNS = ref('all-protected');
+  const isLoading = ref(false);
+  const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
 
-const getStatusColor = (status: string) => {
-  if (status === 'Running' || status === 'Succeeded') return 'text-green-500 bg-green-500/10 border-green-500/20';
-  return 'text-red-500 bg-red-500/10 border-red-500/20';
-};
+  // --- ETATS POUR LA MODALE DE ROLES ---
+  const showRoleModal = ref(false);
+  const selectedPod = ref<PodNode | null>(null);
+  
+  // --- GESTION DES VUES ---
+  const currentViewMode = ref('list'); // 'list' ou 'topology'
+
+  const fetchNetworkData = async () => {
+    isLoading.value = true;
+    try {
+      const { data } = await api.get('/sentinel/map');
+      pods.value = data.nodes || [];
+      edges.value = data.edges || [];
+      
+      // Enrichissement des flux avec les IPs pour la partie graphique
+      edges.value = edges.value.map(edge => ({
+        ...edge,
+        sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
+        targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
+      }));
+    } catch (error) {
+      pods.value = [];
+      edges.value = [];
+      console.error("Sentinel UI Error", error);
+    } finally {
+      isLoading.value = false;
+    }
+  };
+
+  const openRoleDetails = (pod: PodNode) => {
+    selectedPod.value = pod;
+    showRoleModal.value = true;
+  };
+
+  const isVulnerable = (pod: PodNode) => {
+    return pod.image?.includes('nginx:1.18') || pod.labels?.app === 'blog-devopsnotes';
+  };
+
+  const runQuickAudit = async () => {
+    await fetchNetworkData();
+  };
+
+  const triggerHarden = async () => {
+    if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
+    try {
+      await api.post('/sentinel/harden');
+      alert("🛡️ Stratégie Network Sentinel appliquée avec succès !");
+    } catch (e) {
+      alert("❌ Erreur lors de l'application du Playbook Ansible.");
+    }
+  };
+
+  onMounted(fetchNetworkData);
+  watch(selectedNS, fetchNetworkData);
+
+  const getStatusColor = (status: string) => {
+    if (status === 'Running' || status === 'Succeeded') return 'text-green-500 bg-green-500/10 border-green-500/20';
+    return 'text-red-500 bg-red-500/10 border-red-500/20';
+  };
+
+  // --- DONNEES POUR LA TOPOLOGIE ---
+  const uniqueSources = computed(() => {
+    return [...new Set(edges.value.map(e => e.source))];
+  });
+
+  const uniqueTargets = computed(() => {
+    return [...new Set(edges.value.map(e => e.target))];
+  });
 </script>
 
 <template>
@@ -96,6 +107,19 @@ const getStatusColor = (status: string) => {
       </div>
       
       <div class="flex flex-wrap items-center gap-4">
+        <div class="inline-flex p-1 bg-[#0b0c10] border border-slate-700 rounded-sm mr-4">
+          <button @click="currentViewMode = 'list'" 
+                  :class="currentViewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'"
+                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">
+            List
+          </button>
+          <button @click="currentViewMode = 'topology'" 
+                  :class="currentViewMode === 'topology' ? 'bg-orange-600 text-white' : 'text-slate-500 hover:text-slate-300'"
+                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">
+            Topology
+          </button>
+        </div>
+
         <select v-model="selectedNS" 
                 class="bg-[#0b0c10] border border-slate-700 text-[10px] text-slate-300 px-4 py-2 rounded-sm focus:outline-none focus:border-[#f05a28] uppercase font-bold tracking-widest cursor-pointer">
           <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
@@ -109,34 +133,88 @@ const getStatusColor = (status: string) => {
       </div>
     </div>
 
-    <div v-if="edges.length > 0 && !isLoading" class="bg-[#111217] border border-slate-800/60 p-6 rounded-sm">
-      <h3 class="text-xs font-bold text-slate-400 mb-6 uppercase tracking-widest flex items-center gap-2">
-        <span class="w-2 h-2 bg-blue-500 rounded-full animate-pulse"></span>
-        Active Traffic Flows
+    <div v-if="edges.length > 0 && !isLoading && currentViewMode === 'list'" class="bg-[#111217] border border-slate-800/60 p-8 rounded-sm shadow-2xl">
+      <h3 class="text-xs font-bold text-slate-400 mb-10 uppercase tracking-widest flex items-center gap-3">
+        <span class="w-3 h-3 bg-blue-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(59,130,246,0.5)]"></span>
+        Real-Time Traffic Architecture
       </h3>
-      <div class="flex flex-col gap-6 py-4">
-        <div v-for="edge in edges" :key="edge.source + edge.target" class="flex items-center justify-center gap-4">
-          <div class="text-right">
-            <div class="px-4 py-2 bg-blue-900/20 border border-blue-500/30 rounded text-[10px] text-white font-mono uppercase">{{ edge.source }}</div>
-            <p class="text-[8px] text-slate-500 font-mono mt-1">{{ edge.sourceIp }}</p>
-          </div>
+      
+      <div class="flex flex-col gap-12 py-6">
+        <div v-for="edge in edges" :key="edge.source + edge.target" 
+            class="flex items-center justify-between gap-8 max-w-5xl mx-auto w-full group">
           
-          <div class="flex flex-col items-center min-w-[150px]">
-            <span class="text-[8px] text-[#f05a28] font-bold animate-pulse mb-1 uppercase tracking-tighter">
-              {{ edge.label }} <span class="text-slate-600 ml-1 font-mono">(TCP/443)</span>
-            </span>
-            <div class="h-px w-full bg-gradient-to-r from-blue-500 via-[#f05a28] to-[#f05a28] relative">
-              <div class="absolute right-0 -top-1 border-t-4 border-l-4 border-transparent border-l-[#f05a28]"></div>
+          <div class="flex-1 text-right">
+            <div class="inline-block px-6 py-4 bg-blue-900/10 border border-blue-500/40 rounded-sm group-hover:bg-blue-900/20 transition-all duration-500 shadow-lg">
+              <p class="text-[11px] text-white font-mono font-bold uppercase tracking-widest">{{ edge.source }}</p>
+              <p class="text-[9px] text-blue-400/60 font-mono mt-2 tracking-tighter">{{ edge.sourceIp }}</p>
             </div>
           </div>
           
-          <div class="text-left">
-            <div class="px-4 py-2 bg-[#f05a28]/10 border border-[#f05a28]/30 rounded text-[10px] text-white font-mono uppercase">{{ edge.target }}</div>
-            <p class="text-[8px] text-slate-500 font-mono mt-1">{{ edge.targetIp }}</p>
+          <div class="flex flex-col items-center min-w-[250px] relative">
+            <span class="text-[9px] text-[#f05a28] font-black animate-pulse mb-3 uppercase tracking-[0.2em] drop-shadow-md">
+              {{ edge.label }} <span class="text-slate-600 ml-1 font-mono opacity-60">(TCP/443)</span>
+            </span>
+            
+            <div class="h-[2px] w-full bg-slate-800 relative overflow-hidden rounded-full">
+              <div class="absolute inset-0 bg-gradient-to-r from-blue-500 via-[#f05a28] to-[#f05a28] opacity-80"></div>
+              <div class="absolute top-0 bottom-0 w-20 bg-white/20 blur-sm animate-flow-particle"></div>
+            </div>
+            <div class="absolute -right-1 top-[21px] border-t-[6px] border-l-[8px] border-t-transparent border-b-[6px] border-b-transparent border-l-[#f05a28]"></div>
           </div>
+          
+          <div class="flex-1 text-left">
+            <div class="inline-block px-6 py-4 bg-[#f05a28]/5 border border-[#f05a28]/40 rounded-sm group-hover:bg-[#f05a28]/10 transition-all duration-500 shadow-lg">
+              <p class="text-[11px] text-white font-mono font-bold uppercase tracking-widest">{{ edge.target }}</p>
+              <p class="text-[9px] text-orange-400/60 font-mono mt-2 tracking-tighter">{{ edge.targetIp }}</p>
+            </div>
+          </div>
+          
         </div>
       </div>
     </div>
+
+    <div v-if="edges.length > 0 && !isLoading && currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-10 rounded-sm relative overflow-hidden min-h-[500px] flex items-center justify-center">
+      
+      <div class="absolute inset-0 opacity-10" 
+           style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 30px 30px;"></div>
+
+      <div class="relative w-full max-w-6xl">
+        <h3 class="absolute -top-6 left-0 text-[10px] font-black text-blue-500/50 uppercase tracking-[0.5em]">
+          K-Guard Sentinel // Logical Topology Map
+        </h3>
+
+        <div class="grid grid-cols-3 gap-y-20 items-center">
+          
+          <div class="flex flex-col gap-12 items-end">
+            <div v-for="source in uniqueSources" :key="source" class="topology-node source-node group">
+              <div class="node-box border-blue-500/30 bg-blue-900/10">
+                <span class="node-label">{{ source }}</span>
+              </div>
+              <div class="connection-line-right"></div>
+            </div>
+          </div>
+
+          <div class="flex flex-col items-center z-20">
+            <div class="w-24 h-24 rounded-full border-2 border-orange-500/50 flex items-center justify-center bg-[#0b0c10] shadow-[0_0_30px_rgba(240,90,40,0.2)]">
+               <div class="w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse border border-orange-500/20">
+                 <span class="text-[10px] text-orange-500 font-black text-center uppercase tracking-tighter">Network<br/>Sentinel</span>
+               </div>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-12 items-start">
+            <div v-for="target in uniqueTargets" :key="target" class="topology-node target-node group">
+              <div class="connection-line-left"></div>
+              <div class="node-box border-orange-500/30 bg-orange-500/10">
+                <span class="node-label">{{ target }}</span>
+              </div>
+            </div>
+          </div>
+
+        </div>
+      </div>
+    </div>
+
 
     <div v-if="!isLoading" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div v-for="pod in pods" :key="pod.id" 
@@ -166,7 +244,7 @@ const getStatusColor = (status: string) => {
             <span class="text-[7px] text-slate-600 uppercase font-black">Detected Role</span>
             <span class="text-[9px] text-orange-500 font-bold uppercase">{{ pod.labels?.app || 'Generic' }}</span>
           </div>
-          <button class="text-[8px] font-bold uppercase bg-slate-800 px-3 py-1 hover:bg-blue-600 transition-colors rounded-sm">
+          <button class="text-[8px] font-bold uppercase bg-slate-800 px-3 py-1 hover:bg-blue-600 transition-colors rounded-sm cursor-pointer">
             View Roles
           </button>
         </div>
@@ -182,7 +260,7 @@ const getStatusColor = (status: string) => {
             </span>
             <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl cursor-pointer">&times;</button>
           </div>
-          <div class="flex-1 p-6 overflow-y-auto font-mono text-[11px] bg-black/40">
+          <div class="flex-1 p-6 overflow-y-auto font-mono text-[11px] bg-black/40 custom-scrollbar">
             <div v-for="(val, key) in selectedPod?.labels" :key="key" class="mb-2 flex gap-4 border-b border-slate-900 pb-1">
               <span class="text-slate-500 min-w-[120px] uppercase font-bold">{{ key }}</span>
               <span class="text-blue-300">{{ val }}</span>
@@ -202,6 +280,7 @@ const getStatusColor = (status: string) => {
 </template>
 
 <style scoped>
+/* Animations communes */
 .animate-vulnerable {
   animation: border-pulse 2s infinite;
 }
@@ -223,5 +302,69 @@ const getStatusColor = (status: string) => {
 @keyframes scan {
   0% { transform: translateY(-100%); }
   100% { transform: translateY(400%); }
+}
+
+/* Animations List View */
+@keyframes flow-particle {
+  0% { left: -20%; opacity: 0; }
+  20% { opacity: 1; }
+  80% { opacity: 1; }
+  100% { left: 100%; opacity: 0; }
+}
+
+.animate-flow-particle {
+  animation: flow-particle 2s linear infinite;
+}
+
+.group:hover .px-6 {
+  transform: scale(1.02);
+  border-color: rgba(240, 90, 40, 0.6);
+}
+
+/* Styles Topology Map */
+.topology-node {
+  @apply relative flex items-center;
+}
+
+.node-box {
+  @apply px-4 py-3 border rounded-sm transition-all duration-300 hover:scale-110 hover:shadow-2xl z-10;
+}
+
+.node-label {
+  @apply text-[9px] text-white font-mono uppercase font-bold tracking-widest;
+}
+
+.connection-line-right {
+  @apply h-px w-20 bg-gradient-to-r from-blue-500 to-orange-500 absolute -right-20 opacity-30 group-hover:opacity-100 transition-opacity;
+}
+
+.connection-line-left {
+  @apply h-px w-20 bg-gradient-to-r from-orange-500 to-blue-500 absolute -left-20 opacity-30 group-hover:opacity-100 transition-opacity;
+}
+
+.topology-node::after {
+  content: '';
+  @apply absolute w-1 h-1 bg-white rounded-full opacity-0 pointer-events-none;
+  animation: pulse-data 3s infinite linear;
+}
+
+.source-node::after {
+  animation: pulse-data-right 3s infinite linear;
+}
+
+.target-node::after {
+  animation: pulse-data-left 3s infinite linear;
+}
+
+@keyframes pulse-data-right {
+  0% { right: -20px; opacity: 0; }
+  50% { opacity: 1; }
+  100% { right: -80px; opacity: 0; }
+}
+
+@keyframes pulse-data-left {
+  0% { left: -20px; opacity: 0; }
+  50% { opacity: 1; }
+  100% { left: -80px; opacity: 0; }
 }
 </style>
