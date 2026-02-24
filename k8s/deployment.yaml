@@ -39,12 +39,19 @@ spec:
         - name: trivy-cache
           persistentVolumeClaim:
             claimName: trivy-cache-pvc
+      
+      initContainers:
+      - name: init-permissions
+        image: busybox
+        command: ["sh", "-c", "chown -R 1000:1000 /data/trivy-cache"]
+        volumeMounts:
+        - name: trivy-cache
+          mountPath: /data/trivy-cache
 
       containers:
       - name: kguard-app
-        # Cette URL doit correspondre exactement à celle de ton registre GitLab
         image: registry.gitlab.com/portfolio-kamal-guidadou/k-guard/kguard-app:latest
-        imagePullPolicy: Always
+        # Plus besoin de imagePullSecrets ici !
         securityContext:
           runAsUser: 1000
           allowPrivilegeEscalation: false

@@ -1,6 +1,7 @@
 import subprocess
 import json
 import shutil
+import os
 
 def run_trivy_scan(image_name: str):
     # Log de début pour le monitoring SRE
@@ -17,10 +18,14 @@ def run_trivy_scan(image_name: str):
     if image_name == "nginx:1.18":
         print("🚀 [DEMO MODE] Vulnerability simulation triggered via Shift+Click.")
     
+    # Récupération du chemin de cache (priorité à l'env, sinon /data/trivy-cache)
+    cache_path = os.getenv("TRIVY_CACHE_DIR", "/data/trivy-cache")
+    
     try:
         # On lance Trivy via subprocess avec le chemin absolu trouvé
         command = [
-            trivy_path, "image", 
+            trivy_path, "image",
+            "--cache-dir", cache_path, 
             "--format", "json", 
             "--severity", "HIGH,CRITICAL",
             image_name

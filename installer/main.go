@@ -58,6 +58,20 @@ func checkAndPrepare() (string, error) {
 		return "Mise à jour détectée : Nettoyage des ressources obsolètes terminé", nil
 	}
 
+	// Vérifier les dépendances binaires nécessaires au script sh
+	dependencies := []string{"kubectl", "sh"}
+	for _, dep := range dependencies {
+		if _, err := exec.LookPath(dep); err != nil {
+			return "", fmt.Errorf("Dépendance manquante : %s", dep)
+		}
+	}
+
+	// Vérifier le socket Docker (essentiel pour Trivy en mode image local)
+	if _, err := os.Stat("/var/run/docker.sock"); os.IsNotExist(err) {
+		// On prévient mais on ne bloque pas forcément, car Trivy peut scanner via registre
+		fmt.Println("⚠️  Attention: /var/run/docker.sock non trouvé. Les scans d'images locales pourraient échouer.")
+	}
+
 	// Nouveau déploiement
 	if err := exec.Command("kubectl", "create", "namespace", "k-guard").Run(); err != nil {
 		return "", fmt.Errorf("Échec création Namespace : %v", err)
@@ -72,18 +86,42 @@ func setupCredentials(password string) error {
 		return err
 	}
 
-	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION
-ALLOWED_ORIGINS=http://localhost:32726,http://113.30.191.17
+	// On enrichit le template avec les variables métier [cite: 2026-02-22]
+	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION GENERATED ON %s
+ALLOWED_ORIGINS=http://localhost:30002,http://113.30.191.17:30002
 ADMIN_USERNAME=kamal
 ADMIN_PASSWORD_HASH=%s
 SECRET_KEY=kguard_%d
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=600
+
+# --- INFOS INFRASTRUCTURE ---
 USER_DOMAIN=113.30.191.17
 PROJECT_NAME=K-Guard
-`, string(hash), time.Now().Unix())
+
+# --- CONFIGURATION NETWORK SENTINEL ---
+KGUARD_PROTECTED_NS=k-guard,blog-prod,portfolio-prod
+KGUARD_ANSIBLE_PATH=../infra/ansible/harden_network.yml
+
+# --- CONFIGURATION SCANNER (TRIVY) ---
+TRIVY_CACHE_DIR=/data/trivy-cache
+`, time.Now().Format("2006-01-02"), string(hash), time.Now().Unix())
 
 	return os.WriteFile("../backend/.env", []byte(envContent), 0600)
+}
+
+// 2.bis Synchronisation des Secrets vers K3s (Idempotent)
+func syncSecretsToK8s() error {
+	// On utilise sh -c pour pouvoir utiliser le pipe (|) et le dry-run
+	// Cela garantit que le secret est mis à jour sans erreur s'il existe déjà
+	script := "kubectl create secret generic k-guard-secrets --from-env-file=../backend/.env -n k-guard --dry-run=client -o yaml | kubectl apply -f -"
+
+	cmd := exec.Command("sh", "-c", script)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Échec synchro Secrets : %v\n%s", err, string(output))
+	}
+	return nil
 }
 
 // 3. Orchestration K8s (Idempotent)
@@ -113,10 +151,13 @@ func (m model) runStep(step int) tea.Cmd {
 		case 0:
 			msg, err = checkAndPrepare()
 		case 1:
-			msg = "Hachage sécurisé & Configuration .env"
+			msg = "Génération du fichier .env (Hachage & Config)"
 			err = setupCredentials(m.adminPwd)
 		case 2:
-			msg = "Déploiement/Mise à jour des manifests Kubernetes"
+			msg = "Injection des secrets dans le cluster K3s"
+			err = syncSecretsToK8s()
+		case 3:
+			msg = "Déploiement final des manifests K8s"
 			err = deployK8s()
 		default:
 			return successMsg(true)
