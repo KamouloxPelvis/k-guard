@@ -33,22 +33,26 @@ K-Guard agit comme un **SOAR** (Security Orchestration, Automation, and Response
 
 * **Observabilité & Health Monitoring** : Télémétrie dynamique de l'empreinte ressource (CPU/RAM) avec scoring de criticité intelligent (Bleu/Orange/Rouge) pour prévenir les attaques par déni de service (DoS).
 
-![Dashboard](frontend/public/screenshots/health_view.png)
+![Dashboard](frontend/public/screenshots/kguard-1.png)
+*Dashboard des déploiements avec calcul de la charge matérielle*
 
 * **Audit de Sécurité Continu** : Scan automatisé des workloads via Trivy pour identifier les failles de sécurité (CVE) introduites dans la Supply Chain logicielle.
 
-![Update Required View](frontend/public/screenshots/demo_view.png)
+![Update Required View](frontend/public/screenshots/kguard-4.png)
+*Affichage centralisé des vulnérabilités critiques et hautes*
 
 * **Dynamic Risk Scoring** : Interprétation automatique de la posture de sécurité globale avec des états d'alerte contextualisés (SECURE, WATCH OUT, UPDATE REQUIRED).
 
 * **Gestion Opérationnelle Sécurisée** : Accès chiffré aux logs des Pods en temps réel et interface de remédiation manuelle pour isoler ou redémarrer les services compromis.
 
-![Logs](frontend/public/screenshots/log.png)
+![Logs](frontend/public/screenshots/kguard-2.png)
+*Il suffit de cliquer sur l'un des pods du cluster pour consulter son log*
 
 ### 💡 *Threat Intelligence - Mode Démo :*
 En maintenant la touche `Shift` lors d'un clic sur "Launch Scan", K-Guard force intentionnellement l'analyse d'une image obsolète et vulnérable (`nginx:1.18`) pour valider la chaîne de détection des CVE.
 
-![Security View](frontend/public/screenshots/security_view.png)
+![Vulnerabilities' Details](frontend/public/screenshots/kguard-5.png)
+*Détail des vulnérabilités trouvées par Trivy*
 
 ---
 
@@ -95,7 +99,7 @@ Avant l'initialisation de K-Guard, validez la topologie de votre environnement :
 
 ### Auto-check & Dépendances
 
-L'assistant lance un script de "Pre-flight check" (`check_env.py`) pour valider la configuration sécurisée de Docker et de l'API K3s. Pré-requis sur l'hôte :
+L'assistant lance un script de "Pre-flight check" pour valider la configuration sécurisée de Docker et de l'API K3s. Pré-requis sur l'hôte :
 
 * K3s (`curl -sfL https://get.k3s.io | sh -`)
 * Docker (`sudo apt install docker.io -y`)
@@ -106,29 +110,20 @@ L'assistant lance un script de "Pre-flight check" (`check_env.py`) pour valider 
 ```bash
 # Récupération du dépôt
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
-cd k-guard
 
-# Application des droits d'exécution stricts
-chmod +x scripts/deploy.sh
+cd k-guard/installer
 
-# Lancement de la TUI de configuration
-sudo ./scripts/deploy.sh
+# Accorder les droits d'exécution
+chmod +x kguard-installer
+
+# Lancer l'installation
+./kguard-installer
 ```
 
 ### 2. Accès au Panel de Contrôle (Post-Déploiement)
 
-Par conception, K-Guard verrouille ses accès dès la fin du déploiement. Configuration DNS requise :
-
-Ajoutez l'IP de votre serveur dans votre fichier de résolution locale (Spoofing prevention) :
-* *Linux/MacOS* (`/etc/hosts`) ou *Windows* (`C:\Windows\System32\drivers\etc\hosts`) :
-
-**[IP_DE_VOTRE_VPS]  k-guard.local**
-*Exemple : 114.35.188.19  k-guard.local*
-
-**Connexion Chiffrée** :
-Naviguez vers `https://k-guard.local`.
-
-🔒 **Note de Sécurité** : L'Ingress Nginx force un durcissement cryptographique (TLS 1.3). La session est protégée contre l'interception et restreinte par les listes de contrôle d'accès (ACL) configurées à l'installation.
+L'accès au dashboard de K-Guard se fait par l'IP de votre IP sur le port 30002 (ex: http://VPS_IP:30002)
+*Vérifiez vos règles de pare-feu !*
 
 ### Que fait le script de déploiement ?
 
@@ -221,22 +216,23 @@ K-Guard operates as a lightweight **SOAR** (Security Orchestration, Automation, 
 
 * **Observability & Health Monitoring**: Dynamic telemetry mapping of CPU/RAM footprint, featuring intelligent risk scoring (Blue/Orange/Red) to detect potential Denial of Service (DoS) conditions.
 
-![Dashboard](frontend/public/screenshots/health_view.png)
+![Dashboard](frontend/public/screenshots/kguard-1.png)
+*Deployment Dashboard featuring real-time hardware resource consumption analysis*
 
 * **Continuous Security Audit**: Automated workload scanning powered by Trivy to identify software supply chain vulnerabilities (CVEs).
 
-![Update Required View](frontend/public/screenshots/demo_view.png)
+![Update Required View](frontend/public/screenshots/kguard-5.png)
 
 * **Dynamic Risk Scoring**: Contextualized interpretation of the overall security posture (SECURE, WATCH OUT, UPDATE REQUIRED).
 
 * **Secure Operational Management**: Encrypted real-time Pod log streaming and a manual remediation interface to securely restart or isolate compromised services.
 
-![Logs](frontend/public/screenshots/log.png)
+![Logs](frontend/public/screenshots/kguard-2.png)
 
 ### 💡 *Threat Intelligence - Demo Mode:*
 By holding `Shift` while clicking "Launch Scan", K-Guard intentionally forces an audit on a legacy, highly vulnerable image (`nginx:1.18`) to validate the CVE detection pipeline.
 
-![Security View](frontend/public/screenshots/security_view.png)
+![Security View](frontend/public/screenshots/kguard-3.png)
 
 ---
 
@@ -294,29 +290,19 @@ The setup wizard executes a validation script (`check_env.py`) to confirm secure
 ```bash
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
-cd k-guard
+cd k-guard/installer
 
 # Apply strict execution permissions
-chmod +x scripts/deploy.sh
+chmod +x kguard-installer
 
-# Launch the interactive configuration TUI
-sudo ./scripts/deploy.sh
+# Launch installation
+./kguard-installer
 ```
 
 ### 2. Accessing the Control Panel (Post-Deployment)
 
-By design, K-Guard locks down access immediately after deployment. DNS configuration is required:
-
-Add your server's IP to your local resolution file (Spoofing prevention):
-* *Linux/MacOS* (`/etc/hosts`) or *Windows* (`C:\Windows\System32\drivers\etc\hosts`):
-
-**[YOUR_VPS_IP]  k-guard.local**
-*Example: 114.35.188.19  k-guard.local*
-
-**Encrypted Connection**:
-Navigate to `https://k-guard.local`.
-
-🔒 **Security Note**: The Nginx Ingress enforces cryptographic hardening (TLS 1.3). Your session is protected against interception and restricted by the Access Control Lists (ACL) configured during deployment.
+Control panel is accessible after installation via your VPS IP on port 30002 (e.g : http://VPS_IP:30002)
+*Please check your firewall !*
 
 ### Automated Setup Workflow
 

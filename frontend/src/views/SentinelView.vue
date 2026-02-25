@@ -197,9 +197,9 @@
         <div class="grid grid-cols-3 gap-y-20 items-center">
           
           <div class="flex flex-col gap-12 items-end">
-            <div v-for="source in uniqueSources" :key="source" class="topology-node source-node group">
-              <div class="node-box border-blue-500/30 bg-blue-900/10">
-                <span class="node-label">{{ source }}</span>
+            <div v-for="source in uniqueSources" :key="source" class="topology-node source-node group relative flex items-center">
+              <div class="node-box px-4 py-3 border border-blue-500/30 bg-blue-900/10 rounded-sm">
+                <span class="node-label text-white">{{ source }}</span>
               </div>
               <div class="connection-line-right"></div>
             </div>
@@ -214,10 +214,10 @@
           </div>
 
           <div class="flex flex-col gap-12 items-start">
-            <div v-for="target in uniqueTargets" :key="target" class="topology-node target-node group">
+            <div v-for="target in uniqueTargets" :key="target" class="topology-node target-node group relative flex items-center">
               <div class="connection-line-left"></div>
-              <div class="node-box border-orange-500/30 bg-orange-500/10">
-                <span class="node-label">{{ target }}</span>
+              <div class="node-box px-4 py-3 border border-orange-500/30 bg-orange-500/10 rounded-sm">
+                <span class="node-label text-white">{{ target }}</span>
               </div>
             </div>
           </div>
@@ -225,7 +225,6 @@
         </div>
       </div>
     </div>
-
 
     <div v-if="!isLoading && currentViewMode === 'list'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       <div v-for="pod in filteredPods" :key="pod.id" 
@@ -291,7 +290,8 @@
 </template>
 
 <style scoped>
-/* Animations communes */
+
+/* Animations de sécurité et d'alerte */
 .animate-vulnerable {
   animation: border-pulse 2s infinite;
 }
@@ -302,12 +302,14 @@
   100% { border-color: rgba(220, 38, 38, 0.4); box-shadow: 0 0 0px rgba(220, 38, 38, 0); }
 }
 
+/* Effet de scan Sentinel sur survol */
 .group:hover::after {
   content: "";
   position: absolute;
   top: 0; left: 0; right: 0; height: 1px;
   background: linear-gradient(90deg, transparent, #f05a28, transparent);
   animation: scan 2s linear infinite;
+  pointer-events: none;
 }
 
 @keyframes scan {
@@ -315,7 +317,11 @@
   100% { transform: translateY(400%); }
 }
 
-/* Animations List View */
+/* Visualisation des flux (Flow Particles) */
+.animate-flow-particle {
+  animation: flow-particle 2s linear infinite;
+}
+
 @keyframes flow-particle {
   0% { left: -20%; opacity: 0; }
   20% { opacity: 1; }
@@ -323,40 +329,59 @@
   100% { left: 100%; opacity: 0; }
 }
 
-.animate-flow-particle {
-  animation: flow-particle 2s linear infinite;
-}
-
-.group:hover .px-6 {
-  transform: scale(1.02);
-  border-color: rgba(240, 90, 40, 0.6);
-}
-
-/* Styles Topology Map */
-.topology-node {
-  @apply relative flex items-center;
-}
-
+/* Design des Nodes de la topologie */
 .node-box {
-  @apply px-4 py-3 border rounded-sm transition-all duration-300 hover:scale-110 hover:shadow-2xl z-10;
+  transition: all 0.3s ease-in-out;
+  z-index: 10;
+}
+
+.node-box:hover {
+  transform: scale(1.1);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
 }
 
 .node-label {
-  @apply text-[9px] text-white font-mono uppercase font-bold tracking-widest;
+  font-size: 9px;
+  text-transform: uppercase;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+}
+
+/* Lignes de connexion Network Sentinel */
+.connection-line-right, .connection-line-left {
+  height: 1px;
+  width: 5rem; /* Equivalent w-20 */
+  position: absolute;
+  opacity: 0.3;
+  transition: opacity 0.3s;
+}
+
+.group:hover .connection-line-right,
+.group:hover .connection-line-left {
+  opacity: 1;
 }
 
 .connection-line-right {
-  @apply h-px w-20 bg-gradient-to-r from-blue-500 to-orange-500 absolute -right-20 opacity-30 group-hover:opacity-100 transition-opacity;
+  right: -5rem;
+  background: linear-gradient(to right, #3b82f6, #f97316);
 }
 
 .connection-line-left {
-  @apply h-px w-20 bg-gradient-to-r from-orange-500 to-blue-500 absolute -left-20 opacity-30 group-hover:opacity-100 transition-opacity;
+  left: -5rem;
+  background: linear-gradient(to right, #f97316, #3b82f6);
 }
 
+/* Particules de données sur les connexions */
 .topology-node::after {
   content: '';
-  @apply absolute w-1 h-1 bg-white rounded-full opacity-0 pointer-events-none;
-  animation: pulse-data 3s infinite linear;
+  position: absolute;
+  width: 4px;
+  height: 4px;
+  background-color: white;
+  border-radius: 9999px;
+  opacity: 0;
+  pointer-events: none;
 }
 
 .source-node::after {
