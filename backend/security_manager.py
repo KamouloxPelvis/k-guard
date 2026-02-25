@@ -31,8 +31,8 @@ def run_trivy_scan(image_name: str):
             image_name
         ]
         
-        # Timeout de 180s pour éviter de saturer le CPU du VPS [cite: 2026-02-23]
-        process = subprocess.run(command, capture_output=True, text=True, timeout=180)
+        # Timeout de 180s pour éviter de saturer le CPU du VPS
+        process = subprocess.run(command, capture_output=True, text=True, timeout=360)
         
         if process.returncode != 0:
             print(f"❌ [K-GUARD ENGINE] Trivy Execution Error: {process.stderr}")
