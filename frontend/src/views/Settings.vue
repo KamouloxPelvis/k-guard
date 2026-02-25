@@ -73,7 +73,7 @@
 
     <div v-else class="max-w-5xl mx-auto space-y-8 pb-20">
       
-      <div v-if="debugData && Object.keys(debugData.disks).length > 0" 
+      <div v-if="debugData && debugData.disks && Object.keys(debugData.disks).length > 0" 
            class="bg-[#111217]/80 border border-slate-800 p-8 rounded-sm">
         
         <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
@@ -83,7 +83,7 @@
               Infrastructure Storage
             </h3>
             <div class="flex flex-wrap gap-2 mt-4">
-              <span v-for="(info, path) in debugData.disks" :key="path" 
+              <span v-for="(_, path) in debugData.disks" :key="path" 
                     class="text-[9px] bg-slate-900 border border-slate-700 px-3 py-1 text-slate-400 font-mono rounded-full uppercase">
                 📍 {{ path }}
               </span>
@@ -92,7 +92,7 @@
 
           <div class="flex items-baseline gap-2">
             <span class="text-5xl font-extralight text-white leading-none">
-              {{ Object.values(debugData.disks)[0].percent }}%
+              {{ Object.values(debugData.disks)[0]?.percent }}%
             </span>
             <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Used</span>
           </div>
@@ -102,15 +102,15 @@
           <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden mb-6">
             <div 
               class="h-full transition-all duration-1000 ease-out"
-              :class="Object.values(debugData.disks)[0].percent > 85 ? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.3)]'"
-              :style="{ width: `${Object.values(debugData.disks)[0].percent}%` }"
+              :class="(Object.values(debugData.disks)[0]?.percent ?? 0) > 85 ? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.3)]'"
+              :style="{ width: `${Object.values(debugData.disks)[0]?.percent ?? 0}%` }"
             ></div>
           </div>
           
           <div class="flex justify-between items-center text-[10px] text-slate-500 font-mono uppercase tracking-[0.1em]">
             <div class="flex gap-6">
-              <span>Free space: <b class="text-blue-400">{{ Object.values(debugData.disks)[0].free_gb }} GB</b></span>
-              <span>Total capacity: {{ Object.values(debugData.disks)[0].total_gb }} GB</span>
+              <span>Free space: <b class="text-blue-400">{{ Object.values(debugData.disks)[0]?.free_gb }} GB</b></span>
+              <span>Total capacity: {{ Object.values(debugData.disks)[0]?.total_gb }} GB</span>
             </div>
             <span class="text-slate-600">Kernel: Virtual Disk Ext4</span>
           </div>
