@@ -73,30 +73,46 @@
 
     <div v-else class="max-w-5xl mx-auto space-y-8 pb-20">
       
-      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div v-for="(info, path) in debugData?.disks" :key="path" 
-             class="bg-[#111217]/80 border border-slate-800 p-6 rounded-sm hover:border-slate-700 transition-colors">
-          <h3 class="text-[10px] text-slate-500 uppercase font-bold mb-4 tracking-widest flex items-center gap-2">
-            <span class="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-            Mount: {{ path }}
-          </h3>
-          
-          <div class="flex items-end gap-2 mb-2">
-            <span class="text-3xl font-light text-white">{{ info.percent }}%</span>
-            <span class="text-[10px] text-slate-600 mb-1 uppercase font-mono">Capacity Used</span>
+      <div v-if="debugData && Object.keys(debugData.disks).length > 0" 
+           class="bg-[#111217]/80 border border-slate-800 p-8 rounded-sm">
+        
+        <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-6">
+          <div>
+            <h3 class="text-[11px] text-slate-400 uppercase font-black mb-2 tracking-[0.3em] flex items-center gap-2">
+              <span class="w-2 h-2 bg-blue-500 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.6)]"></span>
+              Infrastructure Storage
+            </h3>
+            <div class="flex flex-wrap gap-2 mt-4">
+              <span v-for="(info, path) in debugData.disks" :key="path" 
+                    class="text-[9px] bg-slate-900 border border-slate-700 px-3 py-1 text-slate-400 font-mono rounded-full uppercase">
+                📍 {{ path }}
+              </span>
+            </div>
           </div>
 
-          <div class="w-full bg-slate-900 h-1.5 rounded-full overflow-hidden mb-4">
+          <div class="flex items-baseline gap-2">
+            <span class="text-5xl font-extralight text-white leading-none">
+              {{ Object.values(debugData.disks)[0].percent }}%
+            </span>
+            <span class="text-[10px] text-slate-500 uppercase font-bold tracking-widest">Used</span>
+          </div>
+        </div>
+        
+        <div class="relative pt-2">
+          <div class="w-full bg-slate-900 h-2 rounded-full overflow-hidden mb-6">
             <div 
               class="h-full transition-all duration-1000 ease-out"
-              :class="info.percent > 85 ? 'bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.5)]' : 'bg-blue-500'"
-              :style="{ width: `${info.percent}%` }"
+              :class="Object.values(debugData.disks)[0].percent > 85 ? 'bg-red-500 shadow-[0_0_20px_rgba(239,68,68,0.4)]' : 'bg-blue-600 shadow-[0_0_15px_rgba(37,99,235,0.3)]'"
+              :style="{ width: `${Object.values(debugData.disks)[0].percent}%` }"
             ></div>
           </div>
           
-          <div class="flex justify-between text-[9px] text-slate-500 font-mono uppercase">
-            <span>Free: {{ info.free_gb }} GB</span>
-            <span>Total: {{ info.total_gb }} GB</span>
+          <div class="flex justify-between items-center text-[10px] text-slate-500 font-mono uppercase tracking-[0.1em]">
+            <div class="flex gap-6">
+              <span>Free space: <b class="text-blue-400">{{ Object.values(debugData.disks)[0].free_gb }} GB</b></span>
+              <span>Total capacity: {{ Object.values(debugData.disks)[0].total_gb }} GB</span>
+            </div>
+            <span class="text-slate-600">Kernel: Virtual Disk Ext4</span>
           </div>
         </div>
       </div>

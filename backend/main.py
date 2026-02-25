@@ -49,7 +49,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(k3s.router, prefix="/api")          
 app.include_router(scan.router, prefix="/api")
 app.include_router(remediation.router, prefix="/api")
-app.include_router(network_router)
+app.include_router(network_router, prefix="/api")
 
 
 # --- 3. ROUTES API GLOBALES (Post-Inclusion) ---
