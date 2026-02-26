@@ -109,7 +109,7 @@ L'assistant lance un script de "Pre-flight check" pour valider la configuration 
 
 ```bash
 # Récupération du dépôt
-git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
+git clone https://gitlab.com/portfolio-kamal-guidadou/k-guard.git
 
 cd k-guard/installer
 
@@ -289,7 +289,7 @@ The setup wizard executes a validation script (`check_env.py`) to confirm secure
 
 ```bash
 # Clone the repository
-git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
+git clone https://gitlab.com/portfolio-kamal-guidadou/k-guard.git
 cd k-guard/installer
 
 # Apply strict execution permissions
