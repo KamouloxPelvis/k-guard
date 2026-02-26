@@ -23,7 +23,7 @@
             policyTypes: ["Ingress", "Egress"]
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 2 : ACCÈS INTERNET ET SERVICES VITAUX ---
+    # --- COUCHE 2 : INFRASTRUCTURE & DNS ---
     - name: "🔌 Infrastructure : Autoriser la Résolution DNS"
       kubernetes.core.k8s:
         state: present
@@ -48,14 +48,15 @@
                     port: 53
       loop: "{{ protected_namespaces }}"
 
-    - name: "🌐 API Externes : Autoriser le HTTPS sortant (Resend, etc.)"
+    # --- COUCHE 3 : FLUX EXTERNES (MONGODB ATLAS & API) ---
+    - name: "🌐 Cloud : Autoriser Sortie Blog -> MongoDB Atlas & HTTPS"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-egress-https
+            name: sentinel-allow-blog-egress-external
             namespace: "{{ ns_blog }}"
           spec:
             podSelector:
@@ -69,17 +70,19 @@
                     except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
                 ports:
                   - protocol: TCP
-                    port: 443
+                    port: 443   # Pour Resend / APIs
+                  - protocol: TCP
+                    port: 27017 # Pour MongoDB Atlas
     
-    # --- COUCHE 3 : COMMUNICATIONS INTER-PODS ---
-    - name: "🛡️ Micro-segmentation : Autoriser Entrée ClamAV depuis Blog"
+    # --- COUCHE 4 : MICRO-SEGMENTATION (CLAMAV) ---
+    - name: "🛡️ Micro-segmentation : Autoriser Flux Blog <-> ClamAV"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-blog-clamav-ingress
+            name: sentinel-allow-blog-clamav-sync
             namespace: "{{ ns_blog }}"
           spec:
             podSelector:
@@ -93,8 +96,8 @@
                 ports:
                   - protocol: TCP
                     port: 3310
-
-    - name: "🛡️ Micro-segmentation : Autoriser Sortie Blog -> ClamAV"
+    
+    - name: "🛡️ Micro-segmentation : Sortie Blog vers ClamAV"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -116,9 +119,33 @@
                 ports:
                   - protocol: TCP
                     port: 3310
-    
-    # --- COUCHE 4 : FLUX DE MONITORING & PROBES ---
-    - name: "📊 Sentinel : Autoriser le Monitoring et les Probes K3s"
+
+    - name: "🛡️ ClamAV : Autoriser Mise à jour des signatures (Egress)"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-clamav-updates
+            namespace: "{{ ns_blog }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app: clamav
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+                ports:
+                  - protocol: TCP
+                    port: 80
+                  - protocol: TCP
+                    port: 443
+
+    # --- COUCHE 5 : MONITORING & PROBES ---
+    - name: "📊 Sentinel : Autoriser le Monitoring et les Probes"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -138,17 +165,18 @@
                     cidr: 10.42.0.0/16
       loop: "{{ protected_namespaces }}"
 
-    - name: "📊 Sentinel : Autoriser le Scraping Prometheus (Ports spécifiques)"
+    - name: "📊 Sentinel : Scraping & Egress Prometheus"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-prometheus-ingress
+            name: sentinel-allow-prometheus-all
             namespace: "{{ item }}"
           spec:
             podSelector: {}
+            policyTypes: ["Ingress", "Egress"]
             ingress:
               - from:
                 - namespaceSelector:
@@ -163,20 +191,8 @@
                     port: 5000
                   - protocol: TCP
                     port: 3000
-      loop: "{{ protected_namespaces }}"
-
-    - name: "📊 Sentinel : Autoriser Sortie vers Prometheus (Réponse métriques)"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-allow-egress-prometheus
-            namespace: "{{ item }}"
-          spec:
-            podSelector: {}
-            policyTypes: ["Egress"]
+                  - protocol: TCP
+                    port: 8000
             egress:
               - to:
                 - namespaceSelector:
@@ -184,78 +200,8 @@
                       kubernetes.io/metadata.name: monitoring
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 5 : CERT-MANAGER & CLOUDFLARE ---
-    - name: "🔐 Sentinel : Autoriser Cert-Manager à sortir"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-allow-cert-manager-egress
-            namespace: "cert-manager"
-          spec:
-            podSelector:
-              matchLabels:
-                app.kubernetes.io/instance: cert-manager
-            policyTypes: ["Egress"]
-            egress:
-              - to:
-                - ipBlock:
-                    cidr: 0.0.0.0/0
-                ports:
-                  - protocol: TCP
-                    port: 443
-
-    - name: "☁️ Sentinel : Restriction Ingress aux IPs Cloudflare"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-allow-cloudflare-only
-            namespace: "ingress-nginx"
-          spec:
-            podSelector:
-              matchLabels:
-                app.kubernetes.io/component: controller
-            ingress:
-              - from:
-                - ipBlock:
-                    cidr: "{{ item }}"
-                ports:
-                  - protocol: TCP
-                    port: 80
-                  - protocol: TCP
-                    port: 443
-      loop: "{{ cf_ips | default([]) }}"
-
-    # --- COUCHE 6 : GESTION INGRESS VERS APPS ---
-    - name: "🔓 Rétablissement : Ouvrir l'Ingress Nginx au trafic Web"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-emergency-open-ingress
-            namespace: "ingress-nginx"
-          spec:
-            podSelector:
-              matchLabels:
-                app.kubernetes.io/component: controller
-            ingress:
-              - from:
-                - ipBlock:
-                    cidr: 0.0.0.0/0
-                ports:
-                  - protocol: TCP
-                    port: 80
-                  - protocol: TCP
-                    port: 443
-
-    - name: "🔓 Rétablissement : Autoriser Ingress -> Apps (Ports Spécifiques)"
+    # --- COUCHE 6 : GESTION INGRESS (TRAFIC WEB) ---
+    - name: "🔓 Rétablissement : Autoriser Ingress -> Apps (Ports Alignés)"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -274,101 +220,54 @@
                       kubernetes.io/metadata.name: ingress-nginx
                 ports:
                   - protocol: TCP
-                    port: 5000
+                    port: 80   # Frontend Blog / K-Guard
                   - protocol: TCP
-                    port: 3000
+                    port: 443  # HTTPS standard
                   - protocol: TCP
-                    port: 80
+                    port: 5000 # API Blog
+                  - protocol: TCP
+                    port: 8000 # API K-Guard (Backend)
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 7 : SÉCURITÉ K-GUARD ---
-    - name: "🛡️ Sentinel : Autoriser K-Guard à administrer le Cluster"
+    # --- COUCHE 7 : SÉCURITÉ & CTI K-GUARD ---
+    - name: "🛡️ Sentinel : Autorisations Core K-Guard"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-kguard-mgmt
+            name: sentinel-kguard-core
             namespace: "k-guard"
           spec:
             podSelector:
               matchLabels:
                 app: k-guard
-            egress:
-              - to:
-                - namespaceSelector: {}
-                ports:
-                  - protocol: TCP
-                    port: 443
-                  - protocol: TCP
-                    port: 6443
-    
-    - name: "🔓 Temporaire : Autoriser l'accès externe direct à K-Guard"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-allow-external-debug
-            namespace: "k-guard"
-          spec:
-            podSelector:
-              matchLabels:
-                app: k-guard
+            policyTypes: ["Ingress", "Egress"]
             ingress:
               - from:
                 - ipBlock:
                     cidr: 0.0.0.0/0 
                 ports:
                   - protocol: TCP
-                    port: 8000
-    
-    - name: "🛡️ Sentinel : Autorisation Globale K-Guard (API + Inter-NS + DNS)"
-      kubernetes.core.k8s:
-        state: present
-        definition:
-          apiVersion: networking.k8s.io/v1
-          kind: NetworkPolicy
-          metadata:
-            name: sentinel-kguard-core-access
-            namespace: "k-guard"
-          spec:
-            podSelector:
-              matchLabels:
-                app: k-guard
-            policyTypes: ["Egress"]
+                    port: 8000 # Debug direct
             egress:
               - to:
-                - namespaceSelector:
-                    matchLabels:
-                      kubernetes.io/metadata.name: kube-system
-                ports:
-                  - protocol: UDP
-                    port: 53
-              - to:
-                - ipBlock:
-                    cidr: 10.43.0.1/32
+                - namespaceSelector: {} # Administration cluster
                 ports:
                   - protocol: TCP
                     port: 443
-              - to:
-                - ipBlock:
-                    cidr: 113.30.191.17/32
-                ports:
                   - protocol: TCP
                     port: 6443
               - to:
-                - namespaceSelector: {}
-              - to:
                 - ipBlock:
-                    cidr: 0.0.0.0/0
+                    cidr: 0.0.0.0/0 # CTI & Updates
                 ports:
                   - protocol: TCP
                     port: 443
-    
-    - name: "📊 Sentinel : Autoriser Prometheus à scraper l'Ingress Nginx"
+
+    # --- COUCHE 8 : INFRASTRUCTURE INGRESS-NGINX ---
+    - name: "📊 Sentinel : Monitoring Ingress-Nginx"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -389,4 +288,30 @@
                       kubernetes.io/metadata.name: monitoring
                 ports:
                   - protocol: TCP
-                    port: 10254 # Port standard d'export des métriques Nginx
+                    port: 10254
+    
+    - name: "🔓 Sentinel : Autoriser Trafic VPS Host -> K-Guard Backend"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-host-to-kguard
+            namespace: "k-guard"
+          spec:
+            podSelector:
+              matchLabels:
+                app: k-guard
+            policyTypes: ["Ingress"]
+            ingress:
+              - from:
+                - ipBlock:
+                    cidr: 127.0.0.1/32
+                - ipBlock:
+                    cidr: 10.42.0.0/16 # Autorise le subnet interne K3s
+                - ipBlock:
+                    cidr: 172.16.0.0/12 # Souvent utilisé par Docker/K3s pour l'hôte
+                ports:
+                  - protocol: TCP
+                    port: 8000
