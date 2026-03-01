@@ -290,14 +290,14 @@
                   - protocol: TCP
                     port: 10254
     
-    - name: "🔓 Sentinel : Autoriser Trafic VPS Host -> K-Guard Backend"
+    - name: "🔓 Sentinel : Autoriser Trafic VPS Host (Nginx) -> K-Guard Backend"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-host-to-kguard
+            name: sentinel-allow-host-nginx-to-kguard
             namespace: "k-guard"
           spec:
             podSelector:
@@ -307,11 +307,11 @@
             ingress:
               - from:
                 - ipBlock:
+                    cidr: 113.30.191.17/32 
+                - ipBlock:
                     cidr: 127.0.0.1/32
-                - ipBlock:
-                    cidr: 10.42.0.0/16 # Autorise le subnet interne K3s
-                - ipBlock:
-                    cidr: 172.16.0.0/12 # Souvent utilisé par Docker/K3s pour l'hôte
                 ports:
                   - protocol: TCP
                     port: 8000
+                  - protocol: TCP
+                    port: 8443 
