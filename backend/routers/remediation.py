@@ -33,7 +33,8 @@ async def restart_deployment(namespace: str, deployment_name: str, user: dict = 
         }
         apps_client.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=body)
         print(f"🚀 [K-GUARD] Patch appliqué sur le déploiement {deployment_name} ({namespace})")
-        return {"status": "success", "message": f"Rolling restart lancé pour {deployment_name}"}    except Exception as e:
+        return {"status": "success", "message": f"Rolling restart lancé pour {deployment_name}"}    
+    except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @router.post("/remediate/{namespace}/{pod_name}")
