@@ -65,30 +65,26 @@
   };
 
   const fetchClusterData = async () => {
-  if (isInitialLoad.value) loading.value = true;
-  try {
-    // 1. On tape sur la bonne route qui renvoie la LISTE des pods
-    const { data } = await api.get('/k3s/cluster-status');
-    
-    // 2. Sécurité : On s'assure que data est bien un Array avant de mapper
-    if (Array.isArray(data)) {
-      apps.value = data;
-      
-      // On récupère les métriques pour chaque namespace unique trouvé
-      const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
-      namespaces.forEach(ns => fetchMetrics(ns as string));
-    } else {
-      console.warn("⚠️ Expected Array from cluster-status, got:", typeof data);
-      apps.value = [];
-    }
-  } catch (error: any) {
-    console.error("Cluster data fetch error", error);
+    loading.value = true; 
     apps.value = [];
-  } finally {
-    loading.value = false;
-    isInitialLoad.value = false;
-  }
-};
+    
+    try {
+      const { data } = await api.get('/k3s/cluster-status');
+      if (Array.isArray(data)) {
+        apps.value = data;
+        const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
+        namespaces.forEach(ns => fetchMetrics(ns as string));
+      }
+    } catch (error: any) {
+      console.error("Cluster data fetch error", error);
+    } finally {
+      // Petit délai pour que l'œil humain voit le spinner
+      setTimeout(() => {
+        loading.value = false;
+        isInitialLoad.value = false;
+      }, 500);
+    }
+  };
 
   // --- Logique métier (Backend déjà converti en Millicores et MiB) ---
   
@@ -187,7 +183,7 @@
       </div>
     </header>
 
-    <div v-if="loading && isInitialLoad" class="flex flex-col items-center justify-center py-40">
+    <div v-if="loading" class="flex flex-col items-center justify-center py-40">
       <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
       <span class="text-[9px] uppercase tracking-[0.5em] text-blue-500">Scanning Nodes...</span>
     </div>

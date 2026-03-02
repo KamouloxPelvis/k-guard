@@ -5,7 +5,7 @@
   vars:
     ansible_python_interpreter: /usr/bin/python3
     ns_blog: "blog-prod"
-    protected_namespaces: ["k-guard", "blog-prod", "portfolio-prod"]
+    protected_namespaces: ["k-guard", "blog-prod", "portfolio-prod", "monitoring", "cert-manager"]
 
   tasks:
     # --- COUCHE 1 : ISOLATION TOTALE ---
@@ -49,14 +49,14 @@
       loop: "{{ protected_namespaces }}"
 
     # --- COUCHE 3 : FLUX EXTERNES (MONGODB ATLAS & API) ---
-    - name: "🌐 Cloud : Autoriser Sortie Blog -> MongoDB Atlas & HTTPS"
+    - name: "🌐 Cloud : Autoriser Sortie Blog -> DNS & APIs"
       kubernetes.core.k8s:
         state: present
         definition:
           apiVersion: networking.k8s.io/v1
           kind: NetworkPolicy
           metadata:
-            name: sentinel-allow-blog-egress-external
+            name: sentinel-allow-blog-egress-fix
             namespace: "{{ ns_blog }}"
           spec:
             podSelector:
@@ -67,10 +67,9 @@
               - to:
                 - ipBlock:
                     cidr: 0.0.0.0/0
-                    except: ["10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"]
                 ports:
                   - protocol: TCP
-                    port: 443   # Pour Resend / APIs
+                    port: 443   # Pour Google Indexing & APIs
                   - protocol: TCP
                     port: 27017 # Pour MongoDB Atlas
     
@@ -93,6 +92,37 @@
                 - podSelector:
                     matchLabels:
                       app: blog-devopsnotes
+                ports:
+                  - protocol: TCP
+                    port: 3310
+
+    - name: "🛡️ Micro-segmentation : Autoriser Flux Interne ClamAV (Loopback)"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-clamav-internal
+            namespace: "{{ ns_blog }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app: clamav
+            policyTypes: ["Ingress", "Egress"]
+            ingress:
+              - from:
+                - podSelector:
+                    matchLabels:
+                      app: clamav
+                ports:
+                  - protocol: TCP
+                    port: 3310
+            egress:
+              - to:
+                - podSelector:
+                    matchLabels:
+                      app: clamav
                 ports:
                   - protocol: TCP
                     port: 3310
@@ -198,6 +228,13 @@
                 - namespaceSelector:
                     matchLabels:
                       kubernetes.io/metadata.name: monitoring
+              - to:
+                - ipBlock:
+                    cidr: 10.43.0.1/32 
+                ports:
+                  - protocol: TCP
+                    port: 443
+              # -----------------
       loop: "{{ protected_namespaces }}"
 
     # --- COUCHE 6 : GESTION INGRESS (TRAFIC WEB) ---
@@ -314,4 +351,29 @@
                   - protocol: TCP
                     port: 8000
                   - protocol: TCP
-                    port: 8443 
+                    port: 8443
+    
+    - name: "🛡️ Micro-segmentation : Autoriser Loopback ClamAV"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-clamav-self
+            namespace: "{{ ns_blog }}"
+          spec:
+            podSelector:
+              matchLabels:
+                app: clamav
+            policyTypes: ["Ingress", "Egress"]
+            ingress:
+              - from:
+                - podSelector:
+                    matchLabels:
+                      app: clamav
+            egress:
+              - to:
+                - podSelector:
+                    matchLabels:
+                      app: clamav
