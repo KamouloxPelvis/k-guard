@@ -9,7 +9,7 @@ import os
 
 # Imports des routeurs
 from network_manager import router as network_router
-from routers import auth, k3s, scan, remediation
+from routers import auth, k3s, scan, remediation, integrations
 
 app = FastAPI(title="🛡️ K-Guard API", version="1.5.0")
 
@@ -50,7 +50,8 @@ app.include_router(k3s.router, prefix="/api")
 app.include_router(scan.router, prefix="/api")
 app.include_router(remediation.router, prefix="/api")
 app.include_router(network_router, prefix="/api")
-
+app.include_router(integrations.router, prefix="/api")
+    
 
 # --- 3. ROUTES API GLOBALES (Post-Inclusion) ---
 # Spécifique au Frontend, passe par Nginx via /api/health
