@@ -74,6 +74,29 @@
                   - protocol: TCP
                     port: 27017 # MongoDB Atlas
     
+    # --- COUCHE 3.5 : FLUX EXTERNES K-GUARD (WEBEX API) ---
+    - name: "🌐 Cloud : Autoriser Sortie K-Guard -> Webex APIs"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-kguard-egress-webex
+            namespace: "k-guard"
+          spec:
+            podSelector:
+              matchLabels:
+                app: k-guard
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - ipBlock:
+                    cidr: 0.0.0.0/0
+                ports:
+                  - protocol: TCP
+                    port: 443   # Indispensable pour l'API Webex
+
     # --- COUCHE 4 : MONITORING & PROBES ---
     - name: "📊 Sentinel : Autoriser le Monitoring et les Probes"
       kubernetes.core.k8s:
