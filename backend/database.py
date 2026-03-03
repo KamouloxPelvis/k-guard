@@ -40,22 +40,49 @@ def init_k8s():
 init_k8s()
 
 def init_db():
-    """Initialise la table si elle n'existe pas au démarrage du backend"""
+    """Initialise les tables de sécurité et d'intégrations au démarrage"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    # On stocke l'image, le statut et le résultat brut en JSON
+    
+    # 1. Table des Scans
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS security_scans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             image TEXT NOT NULL,
-            status TEXT NOT NULL, -- 'processing', 'completed', 'error'
-            report TEXT,          -- Le JSON de Trivy sera ici
+            status TEXT NOT NULL,
+            report TEXT,
             created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
         )
     ''')
+
+    # 2. Table des Intégrations (orientée Cisco DevNet)
+    # On utilise 'name' comme clé primaire pour l'idempotence
+    cursor.execute('''
+        CREATE TABLE IF NOT EXISTS integrations (
+            name TEXT PRIMARY KEY,
+            enabled INTEGER DEFAULT 0,
+            token TEXT,
+            target_id TEXT,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    ''')
+    
+    # Insertion par défaut pour Webex
+    cursor.execute("INSERT OR IGNORE INTO integrations (name, enabled) VALUES ('webex', 0)")
+    
     conn.commit()
     conn.close()
-    print("✅ Base de données K-Guard initialisée.")
+    print("✅ Base de données K-Guard (Scans + Integrations) initialisée.")
+
+# Fonction utilitaire pour récupérer la config Webex lors d'un scan
+def get_integration_settings(name):
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row # Pour accéder par nom de colonne
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM integrations WHERE name = ?", (name,))
+    row = cursor.fetchone()
+    conn.close()
+    return dict(row) if row else None
 
 def update_scan_status(image, status, report=None):
     """Met à jour ou insère un résultat de scan"""
