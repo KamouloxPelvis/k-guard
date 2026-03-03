@@ -135,7 +135,16 @@
               </div>
 
               <div class="flex justify-end pt-2">
-                <button @click="handleSaveWebex" :disabled="savingWebex" class="text-[10px] font-black text-cyan-500 hover:text-white uppercase tracking-widest border border-cyan-900/50 hover:bg-cyan-600 px-6 py-2 transition-all">
+                <button 
+                  @click="handleSaveWebex" 
+                  :disabled="savingWebex || !webexConfig.enabled" 
+                  class="text-[10px] font-black uppercase tracking-widest border px-6 py-2 transition-all"
+                  :class="[
+                    webexConfig.enabled 
+                      ? 'text-cyan-500 border-cyan-900/50 hover:bg-cyan-600 hover:text-white cursor-pointer' 
+                      : 'text-slate-600 border-slate-800 bg-slate-900/50 cursor-not-allowed opacity-50'
+                  ]"
+                >
                   {{ savingWebex ? 'Syncing...' : 'Save Configuration' }}
                 </button>
               </div>

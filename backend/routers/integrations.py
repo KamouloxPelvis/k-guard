@@ -10,7 +10,7 @@ class WebexConfig(BaseModel):
     token: str
     room_id: str
 
-@router.post("/integrations/webex")
+@router.post("/settings/integrations/webex")
 async def update_webex(config: WebexConfig):
     """
     Configure l'intégration Cisco Webex et met à jour l'environnement à chaud.

@@ -5,6 +5,7 @@ from .auth import verify_token
 from database import DB_PATH, update_scan_status
 from security_manager import run_trivy_scan
 from pydantic import BaseModel
+from services.cisco_notifier import CiscoWebexNotifier
 
 router = APIRouter(prefix="/scan", tags=["Security Scan"])
 
@@ -61,14 +62,22 @@ async def get_scan_results(image_name: str, user: dict = Depends(verify_token)):
 
 # 3. Fonction de traitement en arrière-plan
 def run_and_store_scan(image: str):
+    notifier = CiscoWebexNotifier() # Instanciation
     try:
-        # Appel du binaire Trivy via ton security_manager
-        report = run_trivy_scan(image)
-        # On sauvegarde le succès dans SQLite via database.py
-        update_scan_status(image, "completed", report)
+        # 1. Exécution du scan Trivy via security_manager
+        report = run_trivy_scan(image) #
+        
+        # 2. Sauvegarde en base SQLite via database.py
+        update_scan_status(image, "completed", report) #
+        
+        # 3. ALERTE CHATOPS : Envoi du rapport sur Webex si activé
+        if report and "summary" in report:
+            print(f"🛰️ [K-GUARD] Sending report to Webex for {image}")
+            notifier.send_scan_report(image, report["summary"]) #
+
     except Exception as e:
-        # En cas de crash du binaire ou de timeout
-        update_scan_status(image, "error", {"error": str(e)})
+        print(f"❌ [K-GUARD] Scan/Notify Error: {e}")
+        update_scan_status(image, "error", {"error": str(e)}) #
 
 @router.get("/debug-storage")
 async def debug_storage(user: dict = Depends(verify_token)):
