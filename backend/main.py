@@ -16,7 +16,7 @@ app = FastAPI(title="🛡️ K-Guard API", version="1.5.0")
 # --- CONFIGURATION CORS ---
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
-    "http://localhost:32726,http://127.0.0.1:32726"
+    "http://localhost:32726,http://127.0.0.1:32726",
 )
 origins = [origin.strip() for origin in raw_origins.split(",")]
 
