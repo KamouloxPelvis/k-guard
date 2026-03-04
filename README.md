@@ -35,31 +35,31 @@
 
 * **Trivy Security Engine**: Scans container images for vulnerabilities directly from the UI.
 
-![K-Guard System Overview](screenshots/kguard-3.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-3.png)
 
-![K-Guard System Overview](screenshots/kguard-4.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-4.png)
 
 * **Network Sentinel**: Implements idempotent Zero-Trust NetworkPolicies via Ansible playbooks.
 
-![K-Guard System Overview](screenshots/kguard-5.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-5.png)
 
 * **Cisco Webex ChatOps**: Real-time incident alerting with persistent integration settings in SQLite.
 
-![K-Guard System Overview](screenshots/kguard-10.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-10.png)
 
-![K-Guard System Overview](screenshots/kguard-12.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-12.png)
 
 * **SRE Control Center**: Live monitoring of cluster latency, storage diagnostics, and pod health.
 
-![K-Guard System Overview](screenshots/kguard-1.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-1.png)
 
-![K-Guard System Overview](screenshots/kguard-2.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-2.png)
 
 ---
 
 ## 🛠️ <a name="-installation--setup"></a>Installation & Setup
 
-![K-Guard System Overview](/screenshots/install.png)
+![K-Guard System Overview](frontend/public/screenshots/install.png)
 
 ### <a name="1-cli-installer-go"></a>1. CLI Installer (Go)
 Déploiement de la stack complète via un installateur spécialisé en **Go** :
@@ -106,7 +106,7 @@ Transformez vos audits de sécurité techniques en alertes opérationnelles en t
 2.  **Configure**: Renseignez votre `Bot Access Token` et votre `Target Room ID`.
 3.  **Validate**: Les paramètres sont persistés dans la base SQLite `kguard.db` uniquement après un test de connectivité réussi.
 
-![K-Guard System Overview](screenshots/kguard-9.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-9.png)
 
 ---
 
@@ -118,7 +118,7 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 * **Selective Egress**: Flux sortants autorisés uniquement vers les APIs critiques (Webex, Google Indexing, MongoDB Atlas) sur le port 443.
 * **Visual Topology**: Cartographie dynamique du trafic et identification visuelle des nœuds vulnérables dans le cluster.
 
-![K-Guard System Overview](screenshots/kguard-6.png)
+![K-Guard System Overview](frontend/screenshots/kguard-6.png)
 
 ---
 
@@ -172,31 +172,31 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 
 * **Trivy Security Engine**: Scans container images for vulnerabilities directly from the UI.
 
-![K-Guard System Overview](screenshots/kguard-3.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-3.png)
 
-![K-Guard System Overview](screenshots/kguard-4.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-4.png)
 
 * **Network Sentinel**: Implements idempotent Zero-Trust NetworkPolicies via Ansible playbooks.
 
-![K-Guard System Overview](screenshots/kguard-5.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-5.png)
 
 * **Cisco Webex ChatOps**: Real-time incident alerting with persistent integration settings in SQLite.
 
-![K-Guard System Overview](screenshots/kguard-10.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-10.png)
 
-![K-Guard System Overview](screenshots/kguard-12.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-12.png)
 
 * **SRE Control Center**: Live monitoring of cluster latency, storage diagnostics, and pod health.
 
-![K-Guard System Overview](screenshots/kguard-1.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-1.png)
 
-![K-Guard System Overview](screenshots/kguard-2.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-2.png)
 
 ---
 
 ## 🛠️ <a name="en-installation--setup"></a>Installation & Setup
 
-![K-Guard System Overview](/screenshots/install.png)
+![K-Guard System Overview](frontend/public/screenshots/install.png)
 
 ### <a name="en-1-cli-installer-go"></a>1. CLI Installer (Go)
 Full stack deployment via a specialized **Go** installer:
@@ -242,7 +242,7 @@ Transform technical security audits into real-time operational alerts :
 2.  **Configure**: Enter your `Bot Access Token` and your `Target Room ID`.
 3.  **Validate**: Settings are persisted in the `kguard.db` SQLite database only after a successful connectivity test.
 
-![K-Guard System Overview](screenshots/kguard-9.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-9.png)
 
 ---
 
@@ -253,7 +253,7 @@ K-Guard enforces a Zero-Trust security posture via idempotent Ansible playbooks 
 * **Selective Egress**: Authorized outgoing traffic only to critical APIs (Webex, Google Indexing, MongoDB Atlas) on port 443.
 * **Visual Topology**: Dynamic traffic mapping and visual identification of vulnerable nodes within the cluster.
 
-![K-Guard System Overview](screenshots/kguard-6.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-6.png)
 
 ---
 
