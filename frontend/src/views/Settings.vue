@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue';
+  import { ref } from 'vue';
   import api from '@/services/api';
 
   interface DiskInfo {
@@ -24,48 +24,54 @@
   const loading = ref(true);
   const purging = ref(false);
   const savingWebex = ref(false);
+  const isAlreadyConfigured = ref(false);
 
-  const fetchSettings = async () => {
-    loading.value = true;
-    try {
-      // 1. Fetch Storage Info
-      const storageRes = await api.get('/k3s/debug/storage');
-      debugData.value = storageRes.data;
+ const fetchSettings = async () => {
+  loading.value = true;
+  try {
+    // 1. Fetch Storage Info
+    const storageRes = await api.get('/k3s/debug/storage');
+    debugData.value = storageRes.data;
 
-      // 2. Fetch Webex Config (Depuis ta nouvelle table integrations)
-      // On suppose une route GET /api/settings/integrations/webex
-      const webexRes = await api.get('/settings/integrations/webex');
-      if (webexRes.data) {
-        webexConfig.value = {
-          enabled: webexRes.data.enabled === 1,
-          token: webexRes.data.token || '',
-          room_id: webexRes.data.target_id || ''
-        };
-      }
-    } catch (error) {
-      console.error("Failed to fetch settings", error);
-    } finally {
-      loading.value = false;
+    // 2. Fetch Webex Config
+    const webexRes = await api.get('/settings/integrations/webex');
+    
+    // Si 'configured' est vrai (depuis l'endpoint GET qu'on a créé ensemble)
+    if (webexRes.data && webexRes.data.configured) {
+      isAlreadyConfigured.value = true;
+      webexConfig.value = {
+        enabled: webexRes.data.enabled,
+        // On affiche le preview du token si tu l'as envoyé, sinon vide pour la saisie
+        token: '', 
+        room_id: webexRes.data.room_id || ''
+      };
+    } else {
+      isAlreadyConfigured.value = false;
     }
-  };
+  } catch (error) {
+    console.error("Failed to fetch settings", error);
+  } finally {
+    loading.value = false;
+  }
+};
 
-  onMounted(fetchSettings);
-
-  const handleSaveWebex = async () => {
-    savingWebex.value = true;
-    try {
-      await api.post('/settings/integrations/webex', {
-        enabled: webexConfig.value.enabled,
-        token: webexConfig.value.token,
-        room_id: webexConfig.value.room_id
-      });
-      alert("✅ Cisco Webex configuration synced with K-Guard DB");
-    } catch (error) {
-      alert("❌ Failed to sync Webex settings.");
-    } finally {
-      savingWebex.value = false;
-    }
-  };
+const handleSaveWebex = async () => {
+  savingWebex.value = true;
+  try {
+    await api.post('/settings/integrations/webex', {
+      enabled: webexConfig.value.enabled,
+      token: webexConfig.value.token,
+      room_id: webexConfig.value.room_id
+    });
+    // On rafraîchit l'état après la sauvegarde
+    isAlreadyConfigured.value = true;
+    alert("✅ Cisco Webex configuration synced with K-Guard DB");
+  } catch (error) {
+    alert("❌ Failed to sync Webex settings.");
+  } finally {
+    savingWebex.value = false;
+  }
+};
 
   const handlePurgeCache = async () => {
     if (!confirm("⚠️ WARNING: This will delete all Trivy local databases. Proceed?")) return;
@@ -102,50 +108,61 @@
     <div v-else class="max-w-5xl mx-auto space-y-8 pb-20">
       
       <div class="bg-[#111217]/80 border border-slate-800 p-8 rounded-sm">
-        <h3 class="text-[11px] text-slate-400 uppercase font-black mb-8 tracking-[0.3em] flex items-center gap-2">
+      <div class="flex justify-between items-center mb-8">
+        <h3 class="text-[11px] text-slate-400 uppercase font-black tracking-[0.3em] flex items-center gap-2">
           <span class="w-2 h-2 bg-cyan-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
           External Integrations
         </h3>
+        <span v-if="isAlreadyConfigured" class="text-[9px] px-2 py-1 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold rounded-sm animate-pulse">
+          ● LINKED TO WEBEX CLOUD
+        </span>
+      </div>
 
-        <div class="grid grid-cols-1 gap-6">
-          <div class="border border-slate-800 bg-slate-900/30 p-6 rounded-sm flex flex-col md:flex-row gap-8">
-            <div class="flex flex-col items-center justify-center min-w-[120px]">
-              <img src="/logo_webex.png" alt="Cisco Webex" class="w-16 h-16 object-contain mb-4 grayscale hover:grayscale-0 transition-all duration-500">
-              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Webex API</span>
+      <div class="grid grid-cols-1 gap-6">
+        <div class="border border-slate-800 bg-slate-900/30 p-6 rounded-sm flex flex-col md:flex-row gap-8">
+          <div class="flex flex-col items-center justify-center min-w-[120px]">
+            <img src="/logo_webex.png" alt="Cisco Webex" class="w-16 h-16 object-contain mb-4" :class="webexConfig.enabled ? 'grayscale-0' : 'grayscale'">
+            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Webex API</span>
+          </div>
+
+          <div class="flex-1 space-y-4">
+            <div class="flex justify-between items-center">
+              <h4 class="text-white text-sm font-bold uppercase">Cisco Webex Notifier</h4>
+              <label class="relative inline-flex items-center cursor-pointer">
+                <input type="checkbox" v-model="webexConfig.enabled" class="sr-only peer">
+                <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-cyan-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+              </label>
             </div>
 
-            <div class="flex-1 space-y-4">
-              <div class="flex justify-between items-center">
-                <h4 class="text-white text-sm font-bold uppercase">Cisco Webex Notifier</h4>
-                <label class="relative inline-flex items-center cursor-pointer">
-                  <input type="checkbox" v-model="webexConfig.enabled" class="sr-only peer">
-                  <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-600"></div>
-                </label>
+            <div v-if="webexConfig.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div class="space-y-1">
+                <label class="text-[9px] text-slate-500 uppercase font-bold">Bot Access Token</label>
+                <input type="password" v-model="webexConfig.token" placeholder="Bearer..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
               </div>
-
-              <div v-if="webexConfig.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div class="space-y-1">
-                  <label class="text-[9px] text-slate-500 uppercase font-bold">Bot Access Token</label>
-                  <input type="password" v-model="webexConfig.token" placeholder="Bearer..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
-                </div>
-                <div class="space-y-1">
-                  <label class="text-[9px] text-slate-500 uppercase font-bold">Target Room ID</label>
-                  <input type="text" v-model="webexConfig.room_id" placeholder="Y2lzY29..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
-                </div>
+              <div class="space-y-1">
+                <label class="text-[9px] text-slate-500 uppercase font-bold">Target Room ID</label>
+                <input type="text" v-model="webexConfig.room_id" placeholder="Y2lzY29..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
               </div>
+            </div>
 
               <div class="flex justify-end pt-2">
                 <button 
                   @click="handleSaveWebex" 
                   :disabled="savingWebex || !webexConfig.enabled" 
-                  class="text-[10px] font-black uppercase tracking-widest border px-6 py-2 transition-all"
+                  class="text-[10px] font-black uppercase tracking-widest border px-6 py-2 transition-all cursor-pointer"
                   :class="[
                     webexConfig.enabled 
-                      ? 'text-cyan-500 border-cyan-900/50 hover:bg-cyan-600 hover:text-white cursor-pointer' 
+                      ? 'text-cyan-500 border-cyan-900/50 hover:bg-cyan-600 hover:text-white' 
                       : 'text-slate-600 border-slate-800 bg-slate-900/50 cursor-not-allowed opacity-50'
                   ]"
                 >
-                  {{ savingWebex ? 'Syncing...' : 'Save Configuration' }}
+                  <span v-if="savingWebex" class="flex items-center gap-2">
+                    <div class="w-2 h-2 border border-white border-t-transparent rounded-full animate-spin"></div>
+                    Syncing...
+                  </span>
+                  <span v-else>
+                    {{ isAlreadyConfigured ? 'Update Webex Configuration' : 'Save Configuration' }}
+                  </span>
                 </button>
               </div>
             </div>

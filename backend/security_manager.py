@@ -2,27 +2,24 @@ import subprocess
 import json
 import shutil
 import os
+# --- 1. IMPORTATION DU NOTIFICATEUR ---
+from service.cisco_notifier import CiscoWebexNotifier
 
 def run_trivy_scan(image_name: str):
-    # Log de début pour le monitoring SRE
     print(f"🔍 [K-GUARD ENGINE] Starting security audit for: {image_name}")
     
-    # 1. VÉRIFICATION DU BINAIRE (Sécurité anti-Errno 2)
     trivy_path = shutil.which("trivy")
     if not trivy_path:
         error_msg = "Critical: 'trivy' binary not found in PATH. Please check installation."
         print(f"❌ [K-GUARD ENGINE] {error_msg}")
         return {"status": "error", "message": error_msg}
 
-    # --- LOGIQUE DE DÉMO / STRESS TEST ---
     if image_name == "nginx:1.18":
-        print("🚀 [DEMO MODE] Vulnerability simulation triggered via Shift+Click.")
+        print("🚀 [DEMO MODE] Vulnerability simulation triggered.")
     
-    # Récupération du chemin de cache (priorité à l'env, sinon /data/trivy-cache)
     cache_path = os.getenv("TRIVY_CACHE_DIR", "/data/trivy-cache")
     
     try:
-        # On lance Trivy via subprocess avec le chemin absolu trouvé
         command = [
             trivy_path, "image",
             "--cache-dir", cache_path, 
@@ -31,7 +28,6 @@ def run_trivy_scan(image_name: str):
             image_name
         ]
         
-        # Timeout de 180s pour éviter de saturer le CPU du VPS
         process = subprocess.run(command, capture_output=True, text=True, timeout=360)
         
         if process.returncode != 0:
@@ -41,7 +37,6 @@ def run_trivy_scan(image_name: str):
         report = json.loads(process.stdout)
         results = report.get('Results', [])
         
-        # On s'assure qu'il y a des résultats pour éviter le crash sur []
         vulnerabilities = []
         if results:
             for res in results:
@@ -51,15 +46,22 @@ def run_trivy_scan(image_name: str):
         critical_count = len([v for v in vulnerabilities if v['Severity'] == 'CRITICAL'])
         high_count = len([v for v in vulnerabilities if v['Severity'] == 'HIGH'])
         
+        summary = {"critical": critical_count, "high": high_count}
         print(f"✅ [K-GUARD ENGINE] Audit complete: {critical_count} Critical, {high_count} High vulnerabilities found.")
+
+        # --- 2. ENVOI DE L'ALERTE WEBEX ---
+        try:
+            notifier = CiscoWebexNotifier()
+            notifier.send_scan_report(image_name, summary)
+            print(f"📨 [K-GUARD] Webex alert dispatched for {image_name}")
+        except Exception as webex_err:
+            # On ne bloque pas le retour du scan si Webex échoue (fail-safe)
+            print(f"⚠️ [K-GUARD] Webex notification failed: {webex_err}")
 
         return {
             "status": "success",
             "image": image_name,
-            "summary": {
-                "critical": critical_count,
-                "high": high_count
-            },
+            "summary": summary,
             "vulnerabilities": [
                 {
                     "id": v['VulnerabilityID'], 

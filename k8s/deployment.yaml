@@ -51,7 +51,6 @@ spec:
       containers:
       - name: kguard-app
         image: registry.gitlab.com/portfolio-kamal-guidadou/k-guard/kguard-app:latest
-        # Plus besoin de imagePullSecrets ici !
         securityContext:
           runAsUser: 1000
           allowPrivilegeEscalation: false

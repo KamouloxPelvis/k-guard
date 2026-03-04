@@ -10,6 +10,27 @@ class WebexConfig(BaseModel):
     token: str
     room_id: str
 
+@router.get("/settings/integrations/webex")
+async def get_webex_status():
+    """
+    Récupère la configuration actuelle pour l'affichage Frontend.
+    """
+    try:
+        settings = database.get_integration_settings("webex")
+        if not settings:
+            return {"enabled": False, "configured": False}
+        
+        # On ne renvoie jamais le token complet pour la sécurité (DevSecOps !)
+        # On renvoie juste un booléen et éventuellement la fin du token pour rassurer l'user
+        return {
+            "enabled": bool(settings['enabled']),
+            "configured": bool(settings['token']),
+            "room_id": settings['target_id'] or "",
+            "token_preview": f"***{settings['token'][-4:]}" if settings['token'] else ""
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.post("/settings/integrations/webex")
 async def update_webex(config: WebexConfig):
     """
