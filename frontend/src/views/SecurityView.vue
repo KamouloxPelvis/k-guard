@@ -10,7 +10,7 @@
     image: string;
   }
 
-  // --- ÉTATS RÉACTIFS ---
+  // --- REACTIVE STATES ---
   const apps = ref<AppDeployment[]>([]); 
   const isLoadingApps = ref(true);
   const loadingApp = ref<string | null>(null);
@@ -24,20 +24,29 @@
   const activePatchApp = ref("");
   let logInterval: any = null;
 
+  /**
+   * Checks if the scanned image is the legacy Nginx 1.18 used for simulations.
+   */
   const isDemoMode = (appId: string): boolean => {
     return scanResults.value[appId]?.image === 'nginx:1.18';
   };
 
+  /**
+   * Opens the detail modal for a specific application's vulnerabilities.
+   */
   const openVulnerabilityDetails = (app: AppDeployment) => {
-  const result = scanResults.value[app.id];
-  if (result?.vulnerabilities) {
-    selectedAppVulnerabilities.value = result.vulnerabilities;
-    selectedAppName.value = app.name;
-    showVulnerabilityModal.value = true;
-  }
-};
+    const result = scanResults.value[app.id];
+    if (result?.vulnerabilities) {
+      selectedAppVulnerabilities.value = result.vulnerabilities;
+      selectedAppName.value = app.name;
+      showVulnerabilityModal.value = true;
+    }
+  };
 
-  // --- 1. CHARGEMENT DES APPS ---
+  // --- 1. APPLICATION DISCOVERY ---
+  /**
+   * Fetches all active deployments from the K3s cluster.
+   */
   const fetchApps = async () => {
     try {
       const response = await api.get('/k3s/deployments/all');
@@ -49,62 +58,67 @@
     }
   };
 
-  // --- 2. LANCEMENT DU SCAN TRIVY ---
-const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
-  loadingApp.value = appId;
-  
-  let imageToScan = defaultImage;
-  let forcedDemoMode = false; // On garde une trace locale
-  
-  if (event && event.shiftKey) {
-    console.log("🚀 [STRESS TEST] Shift detected, forcing Nginx 1.18");
-    imageToScan = "nginx:1.18";
-    forcedDemoMode = true;
-  }
-
-  try {
-    // 1. Déclenchement du scan
-    await api.post('/scan/scan', { image: imageToScan });
+  // --- 2. TRIVY SCAN ORCHESTRATION ---
+  /**
+   * Launches an asynchronous Trivy scan. Supports Shift+Click for Stress Test simulation.
+   */
+  const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
+    loadingApp.value = appId;
     
-    // 2. Boucle de vérification
-    const checkInterval = setInterval(async () => {
-      try {
-        const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
-        
-        if (data.status === 'completed') {
-          // On s'assure d'injecter manuellement l'info de l'image scannée 
-          // au cas où le backend ne le fait pas, pour que isDemoMode() fonctionne !
-          const finalData = { ...data.data };
-          if (!finalData.image) finalData.image = imageToScan;
+    let imageToScan = defaultImage;
+    let forcedDemoMode = false;
+    
+    // Developer Secret: Shift + Click triggers a scan on a known vulnerable image (Nginx 1.18)
+    if (event && event.shiftKey) {
+      console.log("🚀 [STRESS TEST] Shift detected, forcing Nginx 1.18 simulation.");
+      imageToScan = "nginx:1.18";
+      forcedDemoMode = true;
+    }
 
-          scanResults.value[appId] = finalData;
-          clearInterval(checkInterval);
-          loadingApp.value = null;
-
-          if (forcedDemoMode) {
-              console.log("✅ Demo Scan (Nginx 1.18) completed and stored for app:", appId);
-          }
+    try {
+      // 1. Trigger the background scan task
+      await api.post('/scan/scan', { image: imageToScan });
+      
+      // 2. Polling loop to retrieve results
+      const checkInterval = setInterval(async () => {
+        try {
+          const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
           
-        } else if (data.status === 'error') {
-          console.error("❌ Scan failed on backend for image:", imageToScan);
-          clearInterval(checkInterval);
-          loadingApp.value = null;
-          alert(`Le scan de ${imageToScan} a échoué côté serveur.`);
+          if (data.status === 'completed') {
+            // Ensure scanned image info is manually injected for local state consistency
+            const finalData = { ...data.data };
+            if (!finalData.image) finalData.image = imageToScan;
+
+            scanResults.value[appId] = finalData;
+            clearInterval(checkInterval);
+            loadingApp.value = null;
+
+            if (forcedDemoMode) {
+              console.log("✅ Demo Scan (Nginx 1.18) completed for app:", appId);
+            }
+            
+          } else if (data.status === 'error') {
+            console.error("❌ Scan failed on backend for image:", imageToScan);
+            clearInterval(checkInterval);
+            loadingApp.value = null;
+            alert(`Scan for ${imageToScan} failed on the server side.`);
+          }
+        } catch (pollError) {
+          console.error("⚠️ Error while polling scan status:", pollError);
         }
-      } catch (pollError) {
-          // Si l'appel /scan/results échoue (erreur réseau, 500, etc.)
-          console.error("⚠️ Error while checking scan status:", pollError);
-      }
-    }, 5000); 
+      }, 5000); 
 
-  } catch (error) {
-    console.error("❌ Scan Trigger Error:", error);
-    loadingApp.value = null;
-    alert("Impossible de lancer le scan. Vérifiez la connexion réseau.");
-  }
-};
+    } catch (error) {
+      console.error("❌ Scan Trigger Error:", error);
+      loadingApp.value = null;
+      alert("Unable to launch scan. Please check network connection.");
+    }
+  };
 
-  // --- 3. LOGIQUE DE REMÉDIATION ---
+  // --- 3. REMEDIATION LOGIC ---
+  /**
+   * Streams K3s events during the patching process.
+   */
   const fetchPatchLogs = async (namespace: string, appName: string) => {
     try {
       const response = await api.get(`/remediation/patch-logs/${namespace}/${appName}`);
@@ -114,11 +128,14 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
     }
   };
 
+  /**
+   * Applies an automated security patch by updating the deployment image.
+   */
   const patchApplication = async (namespace: string, appName: string, appId: string) => {
     const result = scanResults.value[appId];
     const suggestion = result?.vulnerabilities?.find((v: any) => v.fixed_version)?.fixed_version;
     
-    if (!suggestion) return alert("No fix version identified.");
+    if (!suggestion) return alert("No fixed version identified for this vulnerability set.");
     if (!confirm(`🚀 Trigger automated remediation for ${appName}?`)) return;
 
     showPatchModal.value = true;
@@ -127,15 +144,17 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
     patchingApp.value = appId;
 
     try {
+      // Apply the Strategic Merge Patch via the backend
       await api.post('/remediation/patch-image', {
         namespace: namespace,
         deployment: appName,
         new_image: `${result.image.split(':')[0]}:${suggestion}` 
       });
 
+      // Start polling for K8s rollout logs
       logInterval = setInterval(() => fetchPatchLogs(namespace, appName), 2000);
     } catch (error: any) {
-      patchLogs.value += `\n❌ Critical Error: ${error.response?.data?.detail || 'Backend failed'}`;
+      patchLogs.value += `\n❌ Critical Error: ${error.response?.data?.detail || 'Backend communication failed'}`;
     } finally {
       patchingApp.value = null; 
     }
@@ -146,6 +165,9 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
     if (logInterval) clearInterval(logInterval);
   };
 
+  /**
+   * Maps current security state to UI status labels.
+   */
   const getAppStatus = (appId: string) => {
     const result = scanResults.value[appId];
     if (!result) return { text: 'IDLE', class: 'text-slate-500 border-slate-800' };
@@ -166,7 +188,7 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
     </header>
 
     <div class="mb-8 p-4 border border-blue-500/20 bg-blue-500/5 text-xs text-slate-400 italic">
-      Tip: Shift + Left Click forces a scan on an obsolete Nginx 1.18 image to simulate vulnerability detection. (Stress Test Mode)    
+      Tip: Shift + Left Click triggers a scan on an obsolete Nginx 1.18 image to simulate vulnerability detection (Stress Test Mode).    
     </div>
     
     <transition name="fade">
@@ -214,9 +236,6 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
               </tbody>
             </table>
           </div>
-          <div class="p-4 border-t border-slate-700 bg-[#121822] text-right">
-            <button @click="showVulnerabilityModal = false" class="bg-slate-700 hover:bg-slate-600 text-white px-4 py-2 rounded uppercase text-[10px] font-bold tracking-widest transition-all">Close</button>
-          </div>
         </div>
       </div>
     </Teleport>
@@ -224,7 +243,6 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
     <Teleport to="body">
       <div v-if="showPatchModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
         <div class="bg-[#0b0f15] border border-orange-500/30 w-full max-w-3xl shadow-[0_0_50px_-12px_rgba(249,115,22,0.2)]">
-          
           <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-black/40">
             <div class="flex items-center gap-3">
               <div class="w-2 h-2 bg-orange-500 animate-pulse rounded-full"></div>
@@ -232,19 +250,12 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
             </div>
             <button @click="closePatchModal" class="text-slate-500 hover:text-white transition-colors cursor-pointer">✕</button>
           </div>
-
           <div class="p-6 h-80 overflow-y-auto font-mono text-[11px] bg-black/60 custom-scrollbar">
             <pre class="text-blue-400/90 whitespace-pre-wrap leading-relaxed">{{ patchLogs }}</pre>
             <div class="mt-4 flex items-center gap-2 text-slate-600">
               <span class="animate-spin inline-block">⚙️</span>
               <span class="italic uppercase text-[9px] tracking-widest">Kubernetes Rolling Update in progress...</span>
             </div>
-          </div>
-
-          <div class="p-4 bg-slate-900/20 text-right">
-            <button @click="closePatchModal" class="border border-slate-700 text-slate-400 px-4 py-2 text-[10px] hover:bg-white/5 uppercase font-bold tracking-widest transition-all cursor-pointer">
-              Close Console
-            </button>
           </div>
         </div>
       </div>
@@ -259,35 +270,28 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
         </div>
 
         <div class="p-8 flex flex-col h-full">
-          <div class="flex justify-between items-start mb-6 h-20"><div>
-            <h3 class="text-md font-bold text-slate-200 tracking-widest uppercase leading-tight">{{ app.name }}</h3>
-            
-            <div class="flex flex-col mt-1 gap-1">
-              <p class="text-[10px] text-slate-200 font-mono">Namespace: {{ app.namespace }}</p>
-              
-              <p class="text-[11px] font-mono tracking-wider transition-colors duration-300"
-                :class="isDemoMode(app.id) ? 'text-orange-400 font-bold animate-pulse' : 'text-slate-400'">
-                Image: {{ isDemoMode(app.id) ? '⚠️ DÉMO : Nginx 1.18' : app.image }}
-              </p>
+          <div class="flex justify-between items-start mb-6 h-20">
+            <div>
+              <h3 class="text-md font-bold text-slate-200 tracking-widest uppercase leading-tight">{{ app.name }}</h3>
+              <div class="flex flex-col mt-1 gap-1">
+                <p class="text-[10px] text-slate-200 font-mono">Namespace: {{ app.namespace }}</p>
+                <p class="text-[11px] font-mono tracking-wider transition-colors duration-300"
+                  :class="isDemoMode(app.id) ? 'text-orange-400 font-bold animate-pulse' : 'text-slate-400'">
+                  Image: {{ isDemoMode(app.id) ? '⚠️ DEMO : Nginx 1.18' : app.image }}
+                </p>
+              </div>
             </div>
-          </div>
 
-          <div class="flex flex-col items-end gap-2">
+            <div class="flex flex-col items-end gap-2">
               <span :class="getAppStatus(app.id).class" class="text-[8px] font-black px-2 py-1 tracking-[0.2em] uppercase border whitespace-nowrap transition-all duration-500">
                 {{ patchingApp === app.id ? 'PATCHING...' : getAppStatus(app.id).text }}
               </span>
-              <div v-if="patchingApp === app.id" class="flex gap-1">
-                <span class="w-1 h-1 bg-orange-500 animate-bounce"></span>
-                <span class="w-1 h-1 bg-orange-500 animate-bounce [animation-delay:-0.3s]"></span>
-                <span class="w-1 h-1 bg-orange-500 animate-bounce [animation-delay:-0.5s]"></span>
-              </div>
             </div>
           </div>
 
           <div :class="[
             patchingApp === app.id ? 'bg-blue-500 animate-pulse' :
             getAppStatus(app.id).text === 'UPDATE REQUIRED' ? 'bg-red-600' : 
-            getAppStatus(app.id).text === 'WATCH OUT' ? 'bg-orange-500' : 
             'bg-slate-800'
           ]" class="h-[1px] w-full mb-8 transition-colors duration-700"></div>
 
@@ -311,19 +315,16 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
             <button 
               @click="(e) => launchScan(e, app.id, app.image)" 
               :disabled="!!loadingApp || !!patchingApp"  
-              class="w-full py-3 text-[10px] font-bold uppercase tracking-[0.3em] transition-all bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer shadow-[0_4px_15px_-3px_rgba(37,99,235,0.4)] hover:shadow-blue-500/20 active:scale-[0.98]"
+              class="w-full py-3 text-[10px] font-bold uppercase tracking-[0.3em] transition-all bg-blue-600 text-white hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
             >
-              <div class="flex items-center justify-center gap-2">
-                <span v-if="loadingApp === app.id" class="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                <span>{{ loadingApp === app.id ? 'Scanning...' : 'Launch Scan' }}</span>
-              </div>
+              {{ loadingApp === app.id ? 'Scanning...' : 'Launch Scan' }}
             </button>
 
             <div class="flex gap-3 mt-4 items-center justify-between">
               <button 
                 v-if="scanResults[app.id]" 
                 @click="openVulnerabilityDetails(app)" 
-                class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border border-slate-700 bg-slate-800/30 text-slate-400 hover:border-blue-500/50 hover:text-blue-400 transition-all duration-300 rounded-sm cursor-pointer"
+                class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border border-slate-700 bg-slate-800/30 text-slate-400 hover:border-blue-500/50 hover:text-blue-400 transition-all rounded-sm cursor-pointer"
               >
                 View Full Report
               </button>
@@ -332,7 +333,7 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
                 v-if="scanResults[app.id]?.summary?.critical > 0" 
                 @click="patchApplication(app.namespace, app.name, app.id)"
                 :disabled="!!patchingApp"
-                class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border border-orange-500/40 bg-orange-500/5 text-orange-500 hover:bg-orange-600 hover:text-white disabled:opacity-30 disabled:cursor-not-allowed transition-all duration-300 rounded-sm cursor-pointer"
+                class="flex-1 py-2 text-[10px] font-bold uppercase tracking-widest border border-orange-500/40 bg-orange-500/5 text-orange-500 hover:bg-orange-600 hover:text-white disabled:opacity-30 transition-all rounded-sm cursor-pointer"
               >
                 Apply Patch
               </button>
@@ -341,28 +342,5 @@ const launchScan = async (event: MouseEvent | null, appId: string, defaultImage:
         </div>
       </div>
     </div>
-    
-    <div v-else class="text-center py-20 border border-dashed border-slate-800">
-       <p class="text-slate-500 font-mono text-xs uppercase tracking-[0.3em]">No Deployments Found in Namespace</p>
-    </div>
-
   </div>
 </template>
-
-<style scoped>
-  /* Animation Radar */
-  .radar-loader {
-    width: 40px; height: 40px;
-    border: 1px solid #3b82f6; border-radius: 50%;
-    position: relative; animation: pulse-radar 1.5s infinite;
-  }
-  .radar-loader::after {
-    content: ''; position: absolute; top: 50%; left: 50%;
-    width: 100%; height: 100%;
-    background: #3b82f6; border-radius: 50%;
-    transform: translate(-50%, -50%) scale(0);
-    opacity: 0.5; animation: inner-pulse 1.5s infinite;
-  }
-  @keyframes pulse-radar { 0% { transform: scale(0.9); opacity: 1; } 100% { transform: scale(1.3); opacity: 0; } }
-  @keyframes inner-pulse { 0% { transform: translate(-50%, -50%) scale(0); opacity: 0.8; } 100% { transform: translate(-50%, -50%) scale(1); opacity: 0; } }
-</style>

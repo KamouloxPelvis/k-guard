@@ -2,6 +2,7 @@
   import { ref, computed, onMounted, watch } from 'vue';
   import api from '@/services/api';
 
+  // --- Interfaces ---
   interface PodNode {
     id: string;
     name: string;
@@ -20,18 +21,19 @@
     targetIp?: string;
   }
 
+  // --- Reactive State ---
   const pods = ref<PodNode[]>([]);
   const edges = ref<NetworkEdge[]>([]);
   const selectedNS = ref('all-protected');
   const isLoading = ref(false);
   const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
 
-  // --- ETATS POUR LA MODALE DE ROLES ---
+  // --- UI States ---
   const showRoleModal = ref(false);
   const selectedPod = ref<PodNode | null>(null);
-  const currentViewMode = ref('list'); // 'list' ou 'topology'
+  const currentViewMode = ref('list'); 
 
-  // --- COMPUTED POUR LE FILTRAGE ---
+  // --- Computed Filtering Logic ---
   const filteredPods = computed(() => {
     if (selectedNS.value === 'all-protected') return pods.value;
     return pods.value.filter(pod => pod.namespace === selectedNS.value);
@@ -39,20 +41,22 @@
 
   const filteredEdges = computed(() => {
     if (selectedNS.value === 'all-protected') return edges.value;
-    // On ne garde que les liens dont la source OU la cible fait partie du namespace sélectionné
     const nsPodIds = filteredPods.value.map(p => p.id);
     return edges.value.filter(edge => nsPodIds.includes(edge.source) || nsPodIds.includes(edge.target));
   });
 
+  /**
+   * Fetches real-time network mapping data from the Sentinel engine.
+   */
   const fetchNetworkData = async () => {
     isLoading.value = true;
     try {
       const { data } = await api.get('/sentinel/map');
       pods.value = data.nodes || [];
-      edges.value = data.edges || [];
+      const rawEdges = data.edges || [];
       
-      // Enrichissement des flux avec les IPs pour la partie graphique
-      edges.value = edges.value.map(edge => ({
+      // Enrich edges with IP addresses for visual mapping
+      edges.value = rawEdges.map((edge: NetworkEdge) => ({
         ...edge,
         sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
         targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
@@ -60,7 +64,7 @@
     } catch (error) {
       pods.value = [];
       edges.value = [];
-      console.error("Sentinel UI Error", error);
+      console.error("Sentinel UI Sync Error", error);
     } finally {
       isLoading.value = false;
     }
@@ -71,6 +75,9 @@
     showRoleModal.value = true;
   };
 
+  /**
+   * Simple heuristic to flag potentially vulnerable workloads.
+   */
   const isVulnerable = (pod: PodNode) => {
     return pod.image?.includes('nginx:1.18') || pod.labels?.app === 'blog-devopsnotes';
   };
@@ -79,13 +86,16 @@
     await fetchNetworkData();
   };
 
+  /**
+   * Triggers the Ansible-based hardening process for the network layer.
+   */
   const triggerHarden = async () => {
     if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
     try {
       await api.post('/sentinel/harden');
-      alert("🛡️ Stratégie Network Sentinel appliquée avec succès !");
+      alert("🛡️ Network Sentinel strategy applied successfully!");
     } catch (e) {
-      alert("❌ Erreur lors de l'application du Playbook Ansible.");
+      alert("❌ Error: Ansible Playbook execution failed.");
     }
   };
 
@@ -97,50 +107,32 @@
     return 'text-red-500 bg-red-500/10 border-red-500/20';
   };
 
-  // --- DONNEES POUR LA TOPOLOGIE ---
-  const uniqueSources = computed(() => {
-    return [...new Set(filteredEdges.value.map(e => e.source))];
-  });
-
-  const uniqueTargets = computed(() => {
-    return [...new Set(filteredEdges.value.map(e => e.target))];
-  });
+  // --- Topology Mapping Data ---
+  const uniqueSources = computed(() => [...new Set(filteredEdges.value.map(e => e.source))]);
+  const uniqueTargets = computed(() => [...new Set(filteredEdges.value.map(e => e.target))]);
 </script>
 
 <template>
   <div class="p-6 lg:p-10 space-y-8 relative">
     
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-6 border border-slate-800/60 rounded-sm">
-      <div>
-        <p class="text-[12px] text-slate-500 uppercase tracking-[0.5em] leading-none">
-          IDS & Traffic Mapping
-        </p>
-      </div>
+      <div><p class="text-[12px] text-slate-500 uppercase tracking-[0.5em] leading-none">IDS & Traffic Mapping</p></div>
       
       <div class="flex flex-wrap items-center gap-4">
         <div class="inline-flex p-1 bg-[#0b0c10] border border-slate-700 rounded-sm mr-4">
           <button @click="currentViewMode = 'list'" 
                   :class="currentViewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-500 hover:text-slate-300'"
-                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">
-            List
-          </button>
+                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">List</button>
           <button @click="currentViewMode = 'topology'" 
                   :class="currentViewMode === 'topology' ? 'bg-orange-600 text-white' : 'text-slate-500 hover:text-slate-300'"
-                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">
-            Topology
-          </button>
+                  class="px-4 py-1 text-[9px] font-black uppercase tracking-widest transition-all rounded-sm cursor-pointer">Topology</button>
         </div>
 
-        <select v-model="selectedNS" 
-                class="bg-[#0b0c10] border border-slate-700 text-[10px] text-slate-300 px-4 py-2 rounded-sm focus:outline-none focus:border-[#f05a28] uppercase font-bold tracking-widest cursor-pointer">
+        <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[10px] text-slate-300 px-4 py-2 rounded-sm focus:border-[#f05a28] uppercase font-bold tracking-widest cursor-pointer">
           <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
         </select>
-        <button @click="runQuickAudit" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-6 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer">
-            🔍 Quick Audit
-        </button>
-        <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-6 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all cursor-pointer">
-          Deploy Hardening
-        </button>
+        <button @click="runQuickAudit" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-6 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest cursor-pointer">🔍 Quick Audit</button>
+        <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-6 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest cursor-pointer">Deploy Hardening</button>
       </div>
     </div>
 
@@ -151,60 +143,43 @@
       </h3>
       
       <div class="flex flex-col gap-12 py-6">
-        <div v-for="edge in edges" :key="edge.source + edge.target" 
-            class="flex items-center justify-between gap-8 max-w-5xl mx-auto w-full group">
-          
+        <div v-for="edge in edges" :key="edge.source + edge.target" class="flex items-center justify-between gap-8 max-w-5xl mx-auto w-full group">
           <div class="flex-1 text-right">
-            <div class="inline-block px-6 py-4 bg-blue-900/10 border border-blue-500/40 rounded-sm group-hover:bg-blue-900/20 transition-all duration-500 shadow-lg">
+            <div class="inline-block px-6 py-4 bg-blue-900/10 border border-blue-500/40 rounded-sm">
               <p class="text-[11px] text-white font-mono font-bold uppercase tracking-widest">{{ edge.source }}</p>
               <p class="text-[9px] text-blue-400/60 font-mono mt-2 tracking-tighter">{{ edge.sourceIp }}</p>
             </div>
           </div>
-          
           <div class="flex flex-col items-center min-w-[250px] relative">
-            <span class="text-[9px] text-[#f05a28] font-black animate-pulse mb-3 uppercase tracking-[0.2em] drop-shadow-md">
+            <span class="text-[9px] text-[#f05a28] font-black animate-pulse mb-3 uppercase tracking-[0.2em]">
               {{ edge.label }} <span class="text-slate-600 ml-1 font-mono opacity-60">(TCP/443)</span>
             </span>
-            
             <div class="h-[2px] w-full bg-slate-800 relative overflow-hidden rounded-full">
-              <div class="absolute inset-0 bg-gradient-to-r from-blue-500 via-[#f05a28] to-[#f05a28] opacity-80"></div>
+              <div class="absolute inset-0 bg-gradient-to-r from-blue-500 to-[#f05a28] opacity-80"></div>
               <div class="absolute top-0 bottom-0 w-20 bg-white/20 blur-sm animate-flow-particle"></div>
             </div>
-            <div class="absolute -right-1 top-[21px] border-t-[6px] border-l-[8px] border-t-transparent border-b-[6px] border-b-transparent border-l-[#f05a28]"></div>
           </div>
-          
           <div class="flex-1 text-left">
-            <div class="inline-block px-6 py-4 bg-[#f05a28]/5 border border-[#f05a28]/40 rounded-sm group-hover:bg-[#f05a28]/10 transition-all duration-500 shadow-lg">
+            <div class="inline-block px-6 py-4 bg-[#f05a28]/5 border border-[#f05a28]/40 rounded-sm">
               <p class="text-[11px] text-white font-mono font-bold uppercase tracking-widest">{{ edge.target }}</p>
               <p class="text-[9px] text-orange-400/60 font-mono mt-2 tracking-tighter">{{ edge.targetIp }}</p>
             </div>
           </div>
-          
         </div>
       </div>
     </div>
 
     <div v-if="edges.length > 0 && !isLoading && currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-10 rounded-sm relative overflow-hidden min-h-[500px] flex items-center justify-center">
-      
-      <div class="absolute inset-0 opacity-10" 
-           style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 30px 30px;"></div>
-
+      <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 30px 30px;"></div>
       <div class="relative w-full max-w-6xl">
-        <h3 class="absolute -top-6 left-0 text-[10px] font-black text-blue-500/50 uppercase tracking-[0.5em]">
-          K-Guard Sentinel // Logical Topology Map
-        </h3>
-
         <div class="grid grid-cols-3 gap-y-20 items-center">
-          
           <div class="flex flex-col gap-12 items-end">
             <div v-for="source in uniqueSources" :key="source" class="topology-node source-node group relative flex items-center">
               <div class="node-box px-4 py-3 border border-blue-500/30 bg-blue-900/10 rounded-sm">
-                <span class="node-label text-white">{{ source }}</span>
+                <span class="text-[9px] text-white font-bold uppercase tracking-widest">{{ source }}</span>
               </div>
-              <div class="connection-line-right"></div>
             </div>
           </div>
-
           <div class="flex flex-col items-center z-20">
             <div class="w-24 h-24 rounded-full border-2 border-orange-500/50 flex items-center justify-center bg-[#0b0c10] shadow-[0_0_30px_rgba(240,90,40,0.2)]">
                <div class="w-20 h-20 rounded-full bg-orange-500/10 flex items-center justify-center animate-pulse border border-orange-500/20">
@@ -212,28 +187,20 @@
                </div>
             </div>
           </div>
-
           <div class="flex flex-col gap-12 items-start">
             <div v-for="target in uniqueTargets" :key="target" class="topology-node target-node group relative flex items-center">
-              <div class="connection-line-left"></div>
               <div class="node-box px-4 py-3 border border-orange-500/30 bg-orange-500/10 rounded-sm">
-                <span class="node-label text-white">{{ target }}</span>
+                <span class="text-[9px] text-white font-bold uppercase tracking-widest">{{ target }}</span>
               </div>
             </div>
           </div>
-
         </div>
       </div>
     </div>
 
     <div v-if="!isLoading && currentViewMode === 'list'" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-      <div v-for="pod in filteredPods" :key="pod.id" 
-          @click="openRoleDetails(pod)"
-          :class="[
-            'bg-[#0d0e12] border p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden cursor-pointer',
-            isVulnerable(pod) ? 'border-red-600/50 shadow-[0_0_15px_-5px_rgba(220,38,38,0.3)] animate-vulnerable' : 'border-slate-800/60'
-          ]">
-        
+      <div v-for="pod in filteredPods" :key="pod.id" @click="openRoleDetails(pod)"
+          :class="['bg-[#0d0e12] border p-5 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden cursor-pointer', isVulnerable(pod) ? 'border-red-600/50 animate-vulnerable' : 'border-slate-800/60']">
         <div class="flex items-start justify-between mb-4">
           <div class="flex flex-col">
             <span class="text-[9px] font-mono text-blue-400 leading-none mb-1">{{ pod.ip || '0.0.0.0' }}</span>
@@ -245,19 +212,8 @@
             {{ pod.status }}
           </span>
         </div>
-        
         <h3 class="text-sm font-bold text-white truncate mb-1 uppercase tracking-tight">{{ pod.name }}</h3>
         <p class="text-[10px] text-slate-500 font-mono mb-4 uppercase tracking-widest">Namespace: {{ pod.namespace }}</p>
-        
-        <div class="space-y-3 border-t border-slate-800/40 pt-4 flex justify-between items-center">
-          <div class="flex flex-col">
-            <span class="text-[7px] text-slate-600 uppercase font-black">Detected Role</span>
-            <span class="text-[9px] text-orange-500 font-bold uppercase">{{ pod.labels?.app || 'Generic' }}</span>
-          </div>
-          <button class="text-[8px] font-bold uppercase bg-slate-800 px-3 py-1 hover:bg-blue-600 transition-colors rounded-sm cursor-pointer">
-            View Roles
-          </button>
-        </div>
       </div>
     </div>
 
@@ -265,9 +221,7 @@
       <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl h-[60vh] flex flex-col rounded-sm">
           <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">
-              RBAC Explorer // {{ selectedPod?.name }}
-            </span>
+            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">RBAC Explorer // {{ selectedPod?.name }}</span>
             <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl cursor-pointer">&times;</button>
           </div>
           <div class="flex-1 p-6 overflow-y-auto font-mono text-[11px] bg-black/40 custom-scrollbar">
@@ -276,12 +230,8 @@
               <span class="text-blue-300">{{ val }}</span>
             </div>
             <div v-if="isVulnerable(selectedPod!)" class="mt-8 p-4 bg-red-900/10 border border-red-900/30 text-red-500 text-[10px] uppercase font-bold animate-pulse">
-              [ SECURITY ALERT ] : Vulnerable image detected. Hardening suggested.
+              [ SECURITY ALERT ] : Potential vulnerability detected. Review NetworkPolicies.
             </div>
-          </div>
-          <div class="p-3 border-t border-slate-900 bg-black/40 flex justify-between items-center text-[8px] text-slate-600">
-            <span class="uppercase font-bold tracking-[0.3em]">Sentinel Role Engine v2.0</span>
-            <span class="font-mono">Audit Path: {{ selectedPod?.namespace }} / labels</span>
           </div>
         </div>
       </div>
@@ -290,117 +240,10 @@
 </template>
 
 <style scoped>
-
-/* Animations de sécurité et d'alerte */
-.animate-vulnerable {
-  animation: border-pulse 2s infinite;
-}
-
-@keyframes border-pulse {
-  0% { border-color: rgba(220, 38, 38, 0.4); box-shadow: 0 0 0px rgba(220, 38, 38, 0); }
-  50% { border-color: rgba(220, 38, 38, 0.9); box-shadow: 0 0 15px rgba(220, 38, 38, 0.2); }
-  100% { border-color: rgba(220, 38, 38, 0.4); box-shadow: 0 0 0px rgba(220, 38, 38, 0); }
-}
-
-/* Effet de scan Sentinel sur survol */
-.group:hover::after {
-  content: "";
-  position: absolute;
-  top: 0; left: 0; right: 0; height: 1px;
-  background: linear-gradient(90deg, transparent, #f05a28, transparent);
-  animation: scan 2s linear infinite;
-  pointer-events: none;
-}
-
-@keyframes scan {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(400%); }
-}
-
-/* Visualisation des flux (Flow Particles) */
-.animate-flow-particle {
-  animation: flow-particle 2s linear infinite;
-}
-
-@keyframes flow-particle {
-  0% { left: -20%; opacity: 0; }
-  20% { opacity: 1; }
-  80% { opacity: 1; }
-  100% { left: 100%; opacity: 0; }
-}
-
-/* Design des Nodes de la topologie */
-.node-box {
-  transition: all 0.3s ease-in-out;
-  z-index: 10;
-}
-
-.node-box:hover {
-  transform: scale(1.1);
-  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
-}
-
-.node-label {
-  font-size: 9px;
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.1em;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
-}
-
-/* Lignes de connexion Network Sentinel */
-.connection-line-right, .connection-line-left {
-  height: 1px;
-  width: 5rem; /* Equivalent w-20 */
-  position: absolute;
-  opacity: 0.3;
-  transition: opacity 0.3s;
-}
-
-.group:hover .connection-line-right,
-.group:hover .connection-line-left {
-  opacity: 1;
-}
-
-.connection-line-right {
-  right: -5rem;
-  background: linear-gradient(to right, #3b82f6, #f97316);
-}
-
-.connection-line-left {
-  left: -5rem;
-  background: linear-gradient(to right, #f97316, #3b82f6);
-}
-
-/* Particules de données sur les connexions */
-.topology-node::after {
-  content: '';
-  position: absolute;
-  width: 4px;
-  height: 4px;
-  background-color: white;
-  border-radius: 9999px;
-  opacity: 0;
-  pointer-events: none;
-}
-
-.source-node::after {
-  animation: pulse-data-right 3s infinite linear;
-}
-
-.target-node::after {
-  animation: pulse-data-left 3s infinite linear;
-}
-
-@keyframes pulse-data-right {
-  0% { right: -20px; opacity: 0; }
-  50% { opacity: 1; }
-  100% { right: -80px; opacity: 0; }
-}
-
-@keyframes pulse-data-left {
-  0% { left: -20px; opacity: 0; }
-  50% { opacity: 1; }
-  100% { left: -80px; opacity: 0; }
-}
+@keyframes flow-particle { 0% { left: -20%; opacity: 0; } 20% { opacity: 1; } 80% { opacity: 1; } 100% { left: 100%; opacity: 0; } }
+.animate-flow-particle { animation: flow-particle 2s linear infinite; }
+.animate-vulnerable { animation: border-pulse 2s infinite; }
+@keyframes border-pulse { 0%, 100% { border-color: rgba(220, 38, 38, 0.4); } 50% { border-color: rgba(220, 38, 38, 0.9); } }
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
 </style>

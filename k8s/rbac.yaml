@@ -1,4 +1,4 @@
-# 1. Identité du ServiceAccount
+# 1. ServiceAccount Identity
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -6,43 +6,44 @@ metadata:
   namespace: k-guard
   
 ---
+# 2. ClusterRole Definition
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
   name: k-guard-cluster-role
 rules:
-  # 1. OBSERVABILITÉ : Lecture seule globale
+  # 1. OBSERVABILITY: Global Read-Only access
   - apiGroups: [""]
     resources: ["namespaces", "nodes", "events", "services"]
     verbs: ["get", "list", "watch"]
 
-  # 2. GESTION DES PODS : Lecture seule + Logs
+  # 2. POD MANAGEMENT: Read-Only + Log streaming
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
     verbs: ["get", "list", "watch"]
 
-  # 3. ACTION DE REMÉDIATION : Autorise spécifiquement le delete et patch
+  # 3. REMEDIATION ACTIONS: Specifically allows deletion for pod restarts
   - apiGroups: [""]
     resources: ["pods"]
-    verbs: ["delete"] # Nécessaire pour ton restart_pod
+    verbs: ["delete"] # Required for the restart_pod logic
 
-  # 4. SMART PATCH : Deployments
+  # 4. SMART PATCHING: Deployment management
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "patch"] 
 
-  # 5. MÉTRIQUES : Dashboard Health
+  # 5. METRICS: Health Dashboard data source
   - apiGroups: ["metrics.k8s.io"]
     resources: ["pods", "nodes"]
     verbs: ["get", "list"]
   
-  # 6. NETWORK POLICIES : Network Sentinel (Ansible Playbook)
-  - apiGroups: ["networking.k8s.io"] # LA LIGNE MANQUANTE
+  # 6. NETWORK SENTINEL: Network Policy audit (Ansible Playbook integration)
+  - apiGroups: ["networking.k8s.io"] 
     resources: ["networkpolicies"]
     verbs: ["get", "list", "watch"]
 
 ---
-# 3. Liaison (Binding)
+# 3. ClusterRoleBinding (Linking Identity to Permissions)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

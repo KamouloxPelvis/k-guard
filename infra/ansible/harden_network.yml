@@ -1,4 +1,4 @@
-- name: 🛡️ Network Sentinel - Stratégie de Sécurité Globale
+- name: 🛡️ Network Sentinel - Global Security Strategy
   hosts: localhost
   connection: local
   gather_facts: no
@@ -9,8 +9,8 @@
     protected_namespaces: ["k-guard", "blog-prod", "portfolio-prod", "monitoring", "cert-manager"]
 
   tasks:
-    # --- COUCHE 1 : ISOLATION TOTALE ---
-    - name: "🔒 Base : Deny-All (Ingress & Egress) par défaut"
+    # --- LAYER 1: TOTAL ISOLATION (ZERO TRUST BASE) ---
+    - name: "🔒 Baseline: Default Deny-All (Ingress & Egress)"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -20,12 +20,12 @@
             name: sentinel-default-deny
             namespace: "{{ item }}"
           spec:
-            podSelector: {}
+            podSelector: {} # Targets all pods in the namespace
             policyTypes: ["Ingress", "Egress"]
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 2 : INFRASTRUCTURE & DNS ---
-    - name: "🔌 Infrastructure : Autoriser la Résolution DNS"
+    # --- LAYER 2: CORE INFRASTRUCTURE & DNS ---
+    - name: "🔌 Infrastructure: Allow DNS Resolution"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -49,8 +49,8 @@
                     port: 53
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 3 : FLUX EXTERNES (MONGODB & GOOGLE) ---
-    - name: "🌐 Cloud : Autoriser Sortie Blog -> DNS & APIs"
+    # --- LAYER 3: EXTERNAL CLOUD FLOWS (BLOG -> MONGODB & GOOGLE) ---
+    - name: "🌐 Cloud: Allow Blog Egress -> DNS & External APIs"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -70,12 +70,12 @@
                     cidr: 0.0.0.0/0
                 ports:
                   - protocol: TCP
-                    port: 443   # Indispensable pour Google Indexing
+                    port: 443   # Required for Google Search Indexing APIs
                   - protocol: TCP
-                    port: 27017 # MongoDB Atlas
+                    port: 27017 # Required for MongoDB Atlas connectivity
     
-    # --- COUCHE 3.5 : FLUX EXTERNES K-GUARD (WEBEX API) ---
-    - name: "🌐 Cloud : Autoriser Sortie K-Guard -> Webex APIs"
+    # --- LAYER 3.5: K-GUARD EXTERNAL FLOWS (WEBEX CHATOPS) ---
+    - name: "🌐 Cloud: Allow K-Guard Egress -> Webex APIs"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -95,10 +95,10 @@
                     cidr: 0.0.0.0/0
                 ports:
                   - protocol: TCP
-                    port: 443   # Indispensable pour l'API Webex
+                    port: 443   # Required for outbound Cisco Webex Bot notifications
 
-    # --- COUCHE 4 : MONITORING & PROBES ---
-    - name: "📊 Sentinel : Autoriser le Monitoring et les Probes"
+    # --- LAYER 4: MONITORING & HEALTH PROBES ---
+    - name: "📊 Sentinel: Allow Monitoring Traffic & Health Probes"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -115,11 +115,11 @@
                     matchLabels:
                       kubernetes.io/metadata.name: monitoring
                 - ipBlock:
-                    cidr: 10.42.0.0/16 
+                    cidr: 10.42.0.0/16 # Allow internal Pod-to-Pod monitoring traffic
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 5 : GESTION INGRESS (TRAFIC WEB) ---
-    - name: "🔓 Rétablissement : Autoriser Ingress -> Apps"
+    # --- LAYER 5: INGRESS MANAGEMENT (WEB TRAFFIC) ---
+    - name: "🔓 Connectivity: Allow Ingress Controller -> Applications"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -149,8 +149,8 @@
                     port: 8443 
       loop: "{{ protected_namespaces }}"
 
-    # --- COUCHE 6 : ACCÈS VPS HOST -> K-GUARD  ---
-    - name: "🛡️ Sentinel : Autoriser Trafic VPS Host (Nginx) -> K-Guard"
+    # --- LAYER 6: VPS HOST -> K-GUARD SECURE ACCESS ---
+    - name: "🛡️ Sentinel: Allow VPS Host (Local Nginx) -> K-Guard Access"
       kubernetes.core.k8s:
         state: present
         definition:
@@ -174,4 +174,4 @@
                   - protocol: TCP
                     port: 8000
                   - protocol: TCP
-                    port: 8443 
+                    port: 8443

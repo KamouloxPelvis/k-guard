@@ -12,13 +12,11 @@ class PatchImagePayload(BaseModel):
     deployment: str
     new_image: str
 
-import datetime
-
 @router.post("/restart/{namespace}/{deployment_name}")
 async def restart_deployment(namespace: str, deployment_name: str, user: dict = Depends(verify_token)):
-    """Déclenche un Rolling Restart propre via une annotation (Méthode SRE)"""
+    """Triggers a clean Rolling Restart using annotations (SRE best practice)"""
     try:
-        # On ajoute une annotation avec l'heure pour forcer le restart
+        # Update metadata with a timestamp to force a new rollout
         now = datetime.datetime.now().isoformat()
         body = {
             "spec": {
@@ -32,41 +30,41 @@ async def restart_deployment(namespace: str, deployment_name: str, user: dict = 
             }
         }
         apps_client.patch_namespaced_deployment(name=deployment_name, namespace=namespace, body=body)
-        print(f"🚀 [K-GUARD] Patch appliqué sur le déploiement {deployment_name} ({namespace})")
-        return {"status": "success", "message": f"Rolling restart lancé pour {deployment_name}"}    
+        print(f"🚀 [K-GUARD] Patch applied to deployment {deployment_name} ({namespace})")
+        return {"status": "success", "message": f"Rolling restart initiated for {deployment_name}"}    
     except Exception as e:
         return {"status": "error", "message": str(e)}
 
 @router.post("/remediate/{namespace}/{pod_name}")
 async def remediate_pod(namespace: str, pod_name: str, user: dict = Depends(verify_token)):
-    """Déclenche une remédiation SRE (Scale Down à 0)"""
+    """Triggers an SRE remediation (Scale Down to 0)"""
     try:
-        # On s'assure que scale_down_deployment gère bien l'in-cluster config
+        # Ensure scale_down_deployment handles in-cluster configuration correctly
         result = await scale_down_deployment(namespace, pod_name)
         return result   
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur de remédiation : {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Remediation error: {str(e)}")
 
 @router.post("/patch-image")
 async def patch_deployment_image(
-    payload: PatchImagePayload, # Utilisation de Pydantic pour la validation
+    payload: PatchImagePayload, # Pydantic validation for incoming payload
     user: dict = Depends(verify_token)
 ):
     """
-    Met à jour l'image d'un déploiement (Mise à jour de sécurité)
+    Updates a deployment image (Security Patching)
     """
     try:
-        # 1. On récupère le déploiement
+        # 1. Fetch deployment metadata
         deployment = apps_client.read_namespaced_deployment(name=payload.deployment, namespace=payload.namespace)
         
-        # 2. On identifie dynamiquement le conteneur (plus robuste)
-        # On cherche un conteneur qui n'est pas un 'sidecar' ou on prend le premier si un seul
+        # 2. Dynamically identify the container (Robustness)
+        # Identify main container to avoid patching sidecars accidentally
         container_name = deployment.spec.template.spec.containers[0].name
         if len(deployment.spec.template.spec.containers) > 1:
-             # Si plusieurs conteneurs, on peut loguer pour debug ou affiner la logique
+             # Log warning for multi-container deployments to assist debugging
              print(f"⚠️ Multi-container detected for {payload.deployment}, patching first: {container_name}")
 
-        # 3. Application du patch stratégique (Strategic Merge Patch)
+        # 3. Application of a Strategic Merge Patch
         body = {
             "spec": {
                 "template": {
@@ -90,17 +88,17 @@ async def patch_deployment_image(
 
         return {
             "status": "success", 
-            "message": f"Update vers {payload.new_image} en cours..."
+            "message": f"Updating to {payload.new_image} in progress..."
         }
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/patch-logs/{namespace}/{deployment_name}")
 async def get_patch_events(namespace: str, deployment_name: str, user: dict = Depends(verify_token)):
-    """Récupère les derniers événements K3s liés au déploiement"""
+    """Retrieves the latest K3s events related to the deployment"""
     try:
         events = v1.list_namespaced_event(namespace)
-        # Filtrage intelligent sur les événements liés au déploiement
+        # Intelligent filtering on events associated with the specific deployment
         relevant_events = [
             f"[{e.last_timestamp.strftime('%H:%M:%S') if e.last_timestamp else '?'}] {e.message}" 
             for e in events.items 
@@ -108,4 +106,4 @@ async def get_patch_events(namespace: str, deployment_name: str, user: dict = De
         ]
         return {"logs": "\n".join(relevant_events[-15:])}
     except Exception as e:
-        return {"logs": f"Erreur de lecture des événements : {str(e)}"}
+        return {"logs": f"Error reading K8s events: {str(e)}"}

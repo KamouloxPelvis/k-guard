@@ -13,7 +13,7 @@
     timestamp: string;
   }
 
-  // État pour l'intégration Webex
+  // --- External Integration State (Cisco Webex) ---
   const webexConfig = ref({
     enabled: false,
     token: '',
@@ -26,27 +26,30 @@
   const savingWebex = ref(false);
   const isAlreadyConfigured = ref(false);
 
+ /**
+  * Synchronizes infrastructure diagnostics and integration settings.
+  */
  const fetchSettings = async () => {
   loading.value = true;
   
-  // 1. On lance l'infra en arrière-plan sans bloquer
+  // 1. Fetch infrastructure storage stats in background
   api.get('/k3s/debug/storage')
     .then(res => { debugData.value = res.data; })
-    .catch(_ => { console.warn("Infrastructure stats unavailable"); });
+    .catch(_ => { console.warn("Infrastructure diagnostics unavailable"); });
 
-  // 2. On gère Webex de manière isolée
+  // 2. Fetch Cisco Webex integration status
   try {
     const webexRes = await api.get('/settings/integrations/webex');
     if (webexRes.data && webexRes.data.configured) {
       isAlreadyConfigured.value = true;
       webexConfig.value = {
         enabled: webexRes.data.enabled,
-        token: '', 
+        token: '', // Token is never sent back for security reasons
         room_id: webexRes.data.room_id || ''
       };
     }
   } catch (error) {
-    console.error("Webex sync error", error);
+    console.error("Webex synchronization error", error);
   } finally {
     loading.value = false;
   }
@@ -56,6 +59,9 @@ onMounted(() => {
   fetchSettings();
 });
 
+/**
+ * Persists Webex Bot configuration to the K-Guard database.
+ */
 const handleSaveWebex = async () => {
   savingWebex.value = true;
   try {
@@ -64,16 +70,19 @@ const handleSaveWebex = async () => {
       token: webexConfig.value.token,
       room_id: webexConfig.value.room_id
     });
-    // On rafraîchit l'état après la sauvegarde
+    // Update local UI state after successful persistence
     isAlreadyConfigured.value = true;
     alert("✅ Cisco Webex configuration synced with K-Guard DB");
   } catch (error) {
-    alert("❌ Failed to sync Webex settings.");
+    alert("❌ Failed to sync Webex settings. Check API logs.");
   } finally {
     savingWebex.value = false;
   }
 };
 
+  /**
+   * SRE maintenance action: Clears local Trivy databases on the PVC.
+   */
   const handlePurgeCache = async () => {
     if (!confirm("⚠️ WARNING: This will delete all Trivy local databases. Proceed?")) return;
     purging.value = true;
@@ -82,7 +91,7 @@ const handleSaveWebex = async () => {
       alert(data.message);
       await fetchSettings();
     } catch (error) {
-      alert("Purge failed.");
+      alert("Purge operation failed.");
     } finally {
       purging.value = false;
     }
@@ -109,42 +118,42 @@ const handleSaveWebex = async () => {
     <div v-else class="max-w-5xl mx-auto space-y-8 pb-20">
       
       <div class="bg-[#111217]/80 border border-slate-800 p-8 rounded-sm">
-      <div class="flex justify-between items-center mb-8">
-        <h3 class="text-[11px] text-slate-400 uppercase font-black tracking-[0.3em] flex items-center gap-2">
-          <span class="w-2 h-2 bg-cyan-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
-          External Integrations
-        </h3>
-        <span v-if="isAlreadyConfigured" class="text-[9px] px-2 py-1 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold rounded-sm animate-pulse">
-          ● LINKED TO WEBEX CLOUD
-        </span>
-      </div>
+        <div class="flex justify-between items-center mb-8">
+          <h3 class="text-[11px] text-slate-400 uppercase font-black tracking-[0.3em] flex items-center gap-2">
+            <span class="w-2 h-2 bg-cyan-500 rounded-full shadow-[0_0_8px_rgba(6,182,212,0.6)]"></span>
+            External Integrations
+          </h3>
+          <span v-if="isAlreadyConfigured" class="text-[9px] px-2 py-1 bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 font-bold rounded-sm animate-pulse">
+            ● LINKED TO WEBEX CLOUD
+          </span>
+        </div>
 
-      <div class="grid grid-cols-1 gap-6">
-        <div class="border border-slate-800 bg-slate-900/30 p-6 rounded-sm flex flex-col md:flex-row gap-8">
-          <div class="flex flex-col items-center justify-center min-w-[120px]">
-            <img src="/logo_webex.png" alt="Cisco Webex" class="w-16 h-16 object-contain mb-4" :class="webexConfig.enabled ? 'grayscale-0' : 'grayscale'">
-            <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Webex API</span>
-          </div>
-
-          <div class="flex-1 space-y-4">
-            <div class="flex justify-between items-center">
-              <h4 class="text-white text-sm font-bold uppercase">Cisco Webex Notifier</h4>
-              <label class="relative inline-flex items-center cursor-pointer">
-                <input type="checkbox" v-model="webexConfig.enabled" class="sr-only peer">
-                <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-cyan-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
-              </label>
+        <div class="grid grid-cols-1 gap-6">
+          <div class="border border-slate-800 bg-slate-900/30 p-6 rounded-sm flex flex-col md:flex-row gap-8">
+            <div class="flex flex-col items-center justify-center min-w-[120px]">
+              <img src="/logo_webex.png" alt="Cisco Webex" class="w-16 h-16 object-contain mb-4" :class="webexConfig.enabled ? 'grayscale-0' : 'grayscale'">
+              <span class="text-[10px] font-bold text-slate-500 uppercase tracking-widest">Webex API</span>
             </div>
 
-            <div v-if="webexConfig.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div class="space-y-1">
-                <label class="text-[9px] text-slate-500 uppercase font-bold">Bot Access Token</label>
-                <input type="password" v-model="webexConfig.token" placeholder="Bearer..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
+            <div class="flex-1 space-y-4">
+              <div class="flex justify-between items-center">
+                <h4 class="text-white text-sm font-bold uppercase">Cisco Webex Notifier</h4>
+                <label class="relative inline-flex items-center cursor-pointer">
+                  <input type="checkbox" v-model="webexConfig.enabled" class="sr-only peer">
+                  <div class="w-11 h-6 bg-slate-800 rounded-full peer peer-checked:after:translate-x-full peer-checked:bg-cyan-600 after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-slate-400 after:rounded-full after:h-5 after:w-5 after:transition-all"></div>
+                </label>
               </div>
-              <div class="space-y-1">
-                <label class="text-[9px] text-slate-500 uppercase font-bold">Target Room ID</label>
-                <input type="text" v-model="webexConfig.room_id" placeholder="Y2lzY29..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
+
+              <div v-if="webexConfig.enabled" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div class="space-y-1">
+                  <label class="text-[9px] text-slate-500 uppercase font-bold">Bot Access Token</label>
+                  <input type="password" v-model="webexConfig.token" placeholder="Bearer..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
+                </div>
+                <div class="space-y-1">
+                  <label class="text-[9px] text-slate-500 uppercase font-bold">Target Room ID</label>
+                  <input type="text" v-model="webexConfig.room_id" placeholder="Y2lzY29..." class="w-full bg-black border border-slate-800 p-2 text-xs text-cyan-400 font-mono focus:border-cyan-500 outline-none">
+                </div>
               </div>
-            </div>
 
               <div class="flex justify-end pt-2">
                 <button 

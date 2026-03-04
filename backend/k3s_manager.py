@@ -2,39 +2,39 @@ from database import v1, apps_client
 import shutil
 import os
 
-# Namespaces à ignorer
+# Namespaces to exclude from security monitoring and dashboard
 SYSTEM_NS = ["kube-system", "kube-public", "kube-node-lease", "local-path-storage", "cert-manager", "ingress-nginx"]
 
 def get_k3s_status():
-    """Récupère l'état de santé des Pods pour le Dashboard"""
+    """Retrieves Pod health status for the Dashboard visualization"""
     if not v1:
-        print("⚠️ K8s Client (v1) non initialisé")
+        print("⚠️ K8s Client (v1) not initialized")
         return []
     
     pod_results = []
     try:
-        # On scanne tous les namespaces (autorisé par le clusterRole RBAC)
+        # Scan all namespaces (authorized by ClusterRole RBAC)
         pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
             ns = pod.metadata.namespace
             
             if ns not in SYSTEM_NS:
-                # 1. Gestion du nom d'affichage vs nom technique unique
+                # 1. Handle display name vs. unique technical name
                 app_label = pod.metadata.labels.get('app')
                 display_name = app_label if app_label else pod.metadata.name.split('-')[0]
                 
-                # 2. Mapping intelligent des statuts pour éviter les fausses alertes
+                # 2. Intelligent status mapping to avoid false alarms
                 phase = pod.status.phase
                 if phase == "Running":
                     status_label = "SECURE"
                 elif phase == "Pending":
-                    status_label = "STABILIZING" # Moins alarmant que ALERT
+                    status_label = "STABILIZING" # Less alarming than ALERT for scaling/updates
                 else:
                     status_label = "ALERT"
 
                 pod_results.append({
-                    "name": display_name,         # Pour l'affichage UI
-                    "pod_name": pod.metadata.name, # Identifiant unique pour les logs
+                    "name": display_name,         # UI Display name
+                    "pod_name": pod.metadata.name, # Unique identifier for logs/actions
                     "namespace": ns,
                     "status": status_label,
                     "ip": pod.status.pod_ip or "N/A",
@@ -43,13 +43,13 @@ def get_k3s_status():
                 })
         return pod_results 
     except Exception as e:
-        print(f"❌ Erreur Health Status: {e}")
+        print(f"❌ Health Status Error: {e}")
         return []
 
 def get_cluster_deployments():
-    """Récupère les déploiements pour l'audit de sécurité (Trivy)"""
+    """Retrieves deployments for security auditing (Trivy discovery)"""
     if not apps_client:
-        print("⚠️ K8s AppsClient non initialisé")
+        print("⚠️ K8s AppsClient not initialized")
         return []
         
     try:
@@ -58,7 +58,7 @@ def get_cluster_deployments():
         for dep in deps.items:
             ns = dep.metadata.namespace
             if ns not in SYSTEM_NS:
-                # On récupère l'image du premier conteneur (standard pour nos apps)
+                # Retrieve the image of the first container (standard for our app architecture)
                 container_image = dep.spec.template.spec.containers[0].image
                 
                 app_list.append({
@@ -74,7 +74,7 @@ def get_cluster_deployments():
         return []
 
 def get_storage_stats():
-    """Vérifie l'espace disque sur les points de montage critiques"""
+    """Checks disk space on critical mount points (PVC / Root)"""
     paths = ["/", "/data/trivy-cache", "/app"]
     stats = {}
     
@@ -90,11 +90,11 @@ def get_storage_stats():
     return stats
 
 def purge_trivy_cache():
-    """Supprime proprement le contenu du cache Trivy sur le PVC"""
+    """Safely removes Trivy cache content on the Persistent Volume (PVC)"""
     cache_path = "/data/trivy-cache"
     try:
         if os.path.exists(cache_path):
-            # On vide le contenu sans supprimer le dossier racine (le point de montage)
+            # Clear directory content without deleting the root folder (mount point)
             for filename in os.listdir(cache_path):
                 file_path = os.path.join(cache_path, filename)
                 if os.path.isfile(file_path) or os.path.islink(file_path):

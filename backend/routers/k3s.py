@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from datetime import datetime
 from kubernetes import client
 
-# Imports internes
+# Internal imports
 from .auth import verify_token
 from database import v1, apps_client, DB_PATH
 from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats
@@ -11,7 +11,6 @@ from metrics_manager import get_pod_metrics
 
 router = APIRouter(prefix="/k3s", tags=["K3s Monitoring"])
 
-# Ajouter cette route dans k3s.py
 @router.get("/health")
 async def k3s_module_health(user: dict = Depends(verify_token)):
     return {"status": "ok", "service": "k3s-manager"}
@@ -31,14 +30,16 @@ async def get_node_capacity(user: dict = Depends(verify_token)):
             "memory_total_ki": int(capacity.get("memory", "0").replace("Ki", ""))
         }
     except Exception:
+        # Default fallback values if Node API is unreachable
         return {"cpu_cores": 1, "memory_total_ki": 8000000}
 
 @router.get("/deployments/all")    
 async def list_all_deployments(user: dict = Depends(verify_token)):
-    """Route de découverte pour la SecurityView (Audit Trivy)"""
+    """Discovery route for SecurityView (Trivy Audit)"""
     try:
         if not apps_client: return []
         all_deps = get_cluster_deployments()
+        # Filter out system namespaces to focus on user applications
         system_ns = ["kube-system", "kube-public", "kube-node-lease", "local-path-storage", "cert-manager", "ingress-nginx"]
         
         return [
@@ -58,11 +59,11 @@ async def list_all_deployments(user: dict = Depends(verify_token)):
 async def get_metrics(namespace: str, user: dict = Depends(verify_token)):
     try:
         data = get_pod_metrics(namespace)
-        # On force le retour d'une liste si get_pod_metrics renvoie None ou autre
+        # Force return as list even if metrics manager returns None
         return data if isinstance(data, list) else []
     except Exception as e:
         print(f"🚨 Metrics Error: {e}")
-        return [] # Le front pourra faire .map() sur une liste vide sans crasher
+        return [] # Prevents Frontend crash during .map() operations
 
 @router.get("/status")
 async def get_cluster_status(user: dict = Depends(verify_token)):
@@ -79,12 +80,12 @@ async def get_cluster_status(user: dict = Depends(verify_token)):
         
         return {
             "cluster_version": getattr(version_info, 'git_version', "Unknown"),
-            "vps_os": f"{getattr(node_info, 'os_image', 'OS Inconnu')}",
+            "vps_os": f"{getattr(node_info, 'os_image', 'Unknown OS')}",
             "uptime": f"{uptime_delta.days} days",
             "status": "Ready" if any(c.type == 'Ready' and c.status == 'True' for c in node.status.conditions) else "NotReady"
         }
     except Exception as e:
-        # Très important : renvoyer un objet avec les mêmes clés pour que le Front ne crash pas
+        # Crucial: Return object with consistent keys to prevent Frontend crashes
         return {
             "cluster_version": "N/A",
             "vps_os": "Error checking OS",
@@ -100,6 +101,7 @@ async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_to
         containers = [c.name for c in pod.spec.containers]
         target_container = containers[0]
         
+        # Heuristic to find the main application container
         for c_name in containers:
             if any(k in c_name.lower() for k in ["backend", "app", "api", "server"]):
                 target_container = c_name
@@ -114,10 +116,10 @@ async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_to
 
 @router.get("/debug/storage")
 async def debug_storage(user: dict = Depends(verify_token)):
-    """Route de diagnostic SRE pour le stockage"""
+    """SRE diagnostic route for storage health"""
     try:
         stats = get_storage_stats()
-        # On vérifie aussi si la DB SQLite est accessible
+        # Verify SQLite database accessibility
         db_exists = os.path.exists(DB_PATH)
         
         return {
@@ -131,9 +133,9 @@ async def debug_storage(user: dict = Depends(verify_token)):
         
 @router.post("/debug/purge-cache")
 async def action_purge_cache(user: dict = Depends(verify_token)):
-    """Route d'action pour libérer de l'espace sur le PVC"""
+    """Maintenance action to free up PVC space"""
     success = purge_trivy_cache()
     if success:
-        return {"status": "success", "message": "Cache Trivy purgé avec succès."}
+        return {"status": "success", "message": "Trivy cache successfully purged."}
     else:
-        raise HTTPException(status_code=500, detail="Échec de la purge du cache.")
+        raise HTTPException(status_code=500, detail="Failed to purge cache.")

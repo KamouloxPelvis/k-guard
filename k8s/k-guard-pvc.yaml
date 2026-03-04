@@ -5,9 +5,9 @@ metadata:
   namespace: k-guard
 spec:
   accessModes:
-    - ReadWriteOnce
-  # 💡 ICI : On ne spécifie PAS de storageClassName.
-  # Le cluster utilisera sa classe par défaut (local-path sur K3s, gp2 sur AWS, etc.)
+    - ReadWriteOnce # Standard for block storage, allows one node to mount the volume
+  # 💡 NOTE: storageClassName is NOT specified here.
+  # The cluster will automatically use its default Provisioner (local-path on K3s, gp2 on AWS, etc.)
   resources:
     requests:
-      storage: 5Gi
+      storage: 5Gi # Sufficient space for Trivy vulnerability DBs and K-Guard scan history

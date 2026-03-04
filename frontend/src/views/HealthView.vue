@@ -14,12 +14,14 @@
 
   interface PodMetrics {
     pod_name: string;
-    cpuUsage: number;    // Changé en number car le backend envoie de l'entier
-    memoryUsage: number; // Idem
+    cpuUsage: number;    // Millicores (m)
+    memoryUsage: number; // MegaBytes (MiB)
   }
 
-  // --- État Réactif ---
+  // --- Reactive State ---
   const apps = ref<PodStatus[]>([]);
+  // Retrieve the username from local storage to fix the "Property does not exist" error
+  const username = ref<string>(localStorage.getItem('admin_username') || 'Operator');
   const metrics = ref<Record<string, PodMetrics>>(
     JSON.parse(localStorage.getItem('kguard_metrics') || '{}')
   );
@@ -36,14 +38,14 @@
     memory_total_ki: 8388608 
   });
 
-  // --- Récupération des données (Utilisation de l'instance 'api') ---
+  // --- Data Fetching Logic ---
   
   const fetchNodeCapacity = async () => {
     try {
       const { data } = await api.get('/k3s/node-capacity');
       nodeCapacity.value = data;
     } catch (error) {
-      console.warn("⚠️ Utilisation du fallback 2 vCPU/8GB");
+      console.warn("⚠️ Node capacity failed, using fallback: 2 vCPU/8GB");
     }
   };
 
@@ -58,7 +60,7 @@
         localStorage.setItem('kguard_metrics', JSON.stringify(metrics.value));
       }
     } catch (e) { 
-      console.error("Metrics error", e); 
+      console.error("Metrics sync error", e); 
     } finally { 
       metricsLoading.value[namespace] = false; 
     }
@@ -76,9 +78,8 @@
         namespaces.forEach(ns => fetchMetrics(ns as string));
       }
     } catch (error: any) {
-      console.error("Cluster data fetch error", error);
+      console.error("Cluster data sync error", error);
     } finally {
-      // Petit délai pour que l'œil humain voit le spinner
       setTimeout(() => {
         loading.value = false;
         isInitialLoad.value = false;
@@ -86,7 +87,7 @@
     }
   };
 
-  // --- Logique métier (Backend déjà converti en Millicores et MiB) ---
+  // --- Calculations ---
   
   const calculateCpuPercent = (raw: any): number => {
     if (!raw) return 0;
@@ -103,12 +104,12 @@
   };
 
   const formatMemory = (raw: any): string => {
-    if (!raw) return '0 Mo';
+    if (!raw) return '0 MB';
     const mibValue = typeof raw === 'string' ? parseInt(raw) : raw;
-    return mibValue < 1024 ? `${mibValue} Mo` : `${(mibValue / 1024).toFixed(2)} Go`;
+    return mibValue < 1024 ? `${mibValue} MB` : `${(mibValue / 1024).toFixed(2)} GB`;
   };
 
-  // --- Actions UI ---
+  // --- UI Actions ---
   
   const openDetails = async (pod: PodStatus) => {
     selectedPod.value = pod;
@@ -116,42 +117,31 @@
     podLogs.value = ">> ESTABLISHING SECURE CONNECTION...";
     try {
       const { data } = await api.get(`/k3s/logs/${pod.namespace}/${pod.pod_name}`);
-      podLogs.value = data.logs || "No logs available.";
+      podLogs.value = data.logs || "No logs available for this instance.";
     } catch (error) { 
-      podLogs.value = "CRITICAL ERROR: Connection lost."; 
+      podLogs.value = "CRITICAL ERROR: Connection refused by API."; 
     }
   };
 
   const restartPod = async (event: Event, pod: PodStatus) => {
-  event.stopPropagation(); 
-  
-  // Message plus "SRE" pour l'utilisateur
-  if (!confirm(`CAUTION: Trigger Rolling Update for ${pod.name}?`)) return;
-
-  try {
-    // 1. On passe en POST (action de création d'un restart)
-    // 2. On utilise pod.name (le nom du deployment) au lieu de pod.pod_name
-    await api.post(`/remediation/restart/${pod.namespace}/${pod.name}`);
-    
-    // Notification de succès "Cyber"
-    console.log(`[K-GUARD] Rolling restart initiated for deployment: ${pod.name}`);
-    
-    // Rafraîchissement immédiat des données
-    fetchClusterData(); 
-  } catch (error) { 
-    console.error("Restart failed", error);
-    alert("Action failed: Could not patch deployment."); 
-  }
-};
+    event.stopPropagation(); 
+    if (!confirm(`CAUTION: Trigger Rolling Update for ${pod.name}?`)) return;
+    try {
+      await api.post(`/remediation/restart/${pod.namespace}/${pod.name}`);
+      fetchClusterData(); 
+    } catch (error) { 
+      alert("Action failed: Could not patch deployment."); 
+    }
+  };
 
   const remediateLoad = async (event: Event, pod: PodStatus) => {
     event.stopPropagation();
-    if (!confirm(`ACTIVATE REMEDIATION: Scale down ${pod.name}?`)) return;
+    if (!confirm(`ACTIVATE SRE REMEDIATION: Scale down ${pod.name}?`)) return;
     try {
       await api.post(`/remediation/remediate/${pod.namespace}/${pod.pod_name}`);
-      alert("Remediation signal sent.");
+      alert("Remediation signal dispatched.");
     } catch (error) { 
-      alert("Remediation failed."); 
+      alert("Remediation failure."); 
     }
   };
 
@@ -165,7 +155,6 @@
   onMounted(() => {
     fetchNodeCapacity();
     fetchClusterData();
-    // Rafraîchissement toutes les 15 secondes pour plus de réactivité
     refreshInterval = setInterval(fetchClusterData, 15000);
   });
 
@@ -209,7 +198,7 @@
         <div class="space-y-6 mb-8">
           <div class="flex flex-col gap-2">
             <div class="flex justify-between text-[11px] uppercase font-bold tracking-widest">
-              <span class="text-slate-500">CPU</span>
+              <span class="text-slate-500">CPU Usage</span>
               <span v-if="metricsLoading[pod.namespace]" class="text-blue-500 animate-pulse">[ SCANNING... ]</span>
               <span class="text-blue-400 font-mono">{{ calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage).toFixed(2) }}%</span>
             </div>
@@ -223,7 +212,7 @@
 
           <div class="flex flex-col gap-2">
             <div class="flex justify-between text-[11px] uppercase font-bold tracking-widest">
-              <span class="text-slate-500">RAM</span>
+              <span class="text-slate-500">RAM Consumption</span>
               <span class="text-indigo-400 font-mono">{{ formatMemory(metrics[pod.pod_name]?.memoryUsage) }}</span>
             </div>
             <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
@@ -234,20 +223,20 @@
         </div>
 
         <div class="flex justify-between items-center bg-black/20 p-2 border border-slate-800/50 mb-4 font-mono">
-          <span class="text-[10px] text-slate-500 uppercase font-bold">IP Address</span>
+          <span class="text-[10px] text-slate-500 uppercase font-bold">Virtual IP</span>
           <span class="text-[12px] text-blue-300">{{ pod.ip }}</span>
         </div>
 
         <div class="flex justify-between items-center pt-4 border-t border-slate-800/30">
           <button @click.stop="(e) => restartPod(e, pod)" class="px-3 py-1.5 text-[10px] font-bold uppercase border border-red-500/40 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-sm">
-            Restart
+            Restart Rollout
           </button>
           <div class="flex gap-2">
-            <button @click.stop="openDetails(pod)" class="btn-action btn-logs">Logs</button>
+            <button @click.stop="openDetails(pod)" class="btn-action btn-logs">Live Logs</button>
             <button v-if="calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage) > 30" 
                     @click.stop="(e) => remediateLoad(e, pod)" 
                     class="btn-action btn-remediate">
-              Remediate
+              SRE Remediation
             </button>
           </div>
         </div>
@@ -258,7 +247,7 @@
       <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm">
           <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[10px] font-mono text-blue-400 uppercase tracking-widest">Console // {{ selectedPod?.pod_name }}</span>
+            <span class="text-[10px] font-mono text-blue-400 uppercase tracking-widest">Secure Console // {{ selectedPod?.pod_name }}</span>
             <button @click="showModal = false" class="text-slate-500 hover:text-white text-2xl">&times;</button>
           </div>
           <div class="flex-1 p-6 overflow-y-auto font-mono text-[12px] text-blue-100/80 bg-black/40">
@@ -266,7 +255,7 @@
           </div>
           <div class="p-3 border-t border-slate-900 bg-black/40 flex justify-between items-center">
             <span class="text-[8px] text-slate-600 uppercase font-bold">K-Guard Terminal v2.0</span>
-            <span class="text-[8px] text-blue-900 font-mono">Kamal @ VPS-</span>
+            <span class="text-[8px] text-blue-900 font-mono">Operator @ {{ username }}</span>
           </div>
         </div>
       </div>

@@ -3,23 +3,24 @@ import sqlite3
 import json
 import os
 
-# --- CONFIGURATION DES CHEMINS ---
-# Ce dossier est monté via le 'subPath: database' sur trivy-cache-pvc
+# --- PATH CONFIGURATION ---
+# This directory is mounted via 'subPath: database' on the trivy-cache-pvc
 DB_DIR = "/app/backend/data"
 DB_PATH = os.path.join(DB_DIR, "kguard.db")
 
-# Initialisation des variables globales pour K8s
+# Global variables initialization for K8s clients
 v1 = None
 apps_client = None
 custom_client = None
 
 def init_k8s():
+    """Initializes Kubernetes API clients (Local or In-Cluster context)"""
     global v1, apps_client, custom_client
     if v1 is not None:
         return
 
     try:
-        # Tente de charger la config (Locale ou In-Cluster)
+        # Attempt to load configuration (Local Kubeconfig or In-Cluster Service Account)
         try:
             config.load_kube_config()
             print("✅ K3s Config: Local Kubeconfig loaded")
@@ -27,7 +28,7 @@ def init_k8s():
             config.load_incluster_config()
             print("✅ K3s Config: In-Cluster Service Account loaded")
 
-        # Initialisation des clients API
+        # API Clients initialization
         v1 = client.CoreV1Api()
         apps_client = client.AppsV1Api()
         custom_client = client.CustomObjectsApi()
@@ -39,8 +40,8 @@ def init_k8s():
         custom_client = None
 
 def init_db():
-    """Initialise les tables de sécurité et d'intégrations dans le stockage persistant"""
-    # 1. S'assurer que le dossier de destination existe
+    """Initializes security and integration tables in persistent storage"""
+    # 1. Ensure the destination directory exists (for PVC mounting)
     if not os.path.exists(DB_DIR):
         print(f"📁 Creating database directory: {DB_DIR}")
         os.makedirs(DB_DIR, exist_ok=True)
@@ -50,7 +51,7 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # Table des Scans (Persistance des rapports d'audit)
+    # Scans Table (Persisting audit reports for historical analysis)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS security_scans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -61,7 +62,7 @@ def init_db():
         )
     ''')
 
-    # Table des Intégrations (Cisco Webex, etc.)
+    # Integrations Table (Cisco Webex, etc.)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS integrations (
             name TEXT PRIMARY KEY,
@@ -72,17 +73,17 @@ def init_db():
         )
     ''')
     
-    # Insertion par défaut pour Webex si inexistante
+    # Insert default Webex record if it doesn't exist
     cursor.execute("INSERT OR IGNORE INTO integrations (name, enabled) VALUES ('webex', 0)")
     
     conn.commit()
     conn.close()
-    print("✅ Base de données K-Guard initialisée et persistante.")
+    print("✅ K-Guard database initialized and persistent.")
 
-# --- FONCTIONS UTILITAIRES ---
+# --- UTILITY FUNCTIONS ---
 
 def get_integration_settings(name):
-    """Récupère la config d'intégration pour le Notifier"""
+    """Retrieves integration configuration for the Notifier service"""
     if not os.path.exists(DB_PATH):
         return None
         
@@ -95,7 +96,7 @@ def get_integration_settings(name):
     return dict(row) if row else None
 
 def update_scan_status(image, status, report=None):
-    """Archive un résultat de scan dans la DB persistante"""
+    """Archives a scan result into the persistent database"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     report_json = json.dumps(report) if report else None
@@ -107,6 +108,6 @@ def update_scan_status(image, status, report=None):
     conn.commit()
     conn.close()
 
-# Initialisation au chargement du module
+# Automatic initialization on module load
 init_k8s()
 init_db()

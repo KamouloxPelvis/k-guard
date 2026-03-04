@@ -1,11 +1,16 @@
-  <script setup>
-  // Pas de logique ici pour l'instant
-  </script>
+<script setup>
+/**
+ * Main Entry Point Component.
+ * The logic is handled within specific views and the router.
+ */
+</script>
 
 <template>
   <router-view />
 </template>
 
 <style>
-/* On laisse style.css gérer le global pour éviter les conflits */
+/* * Global styles are managed via style.css to prevent scoped conflicts 
+ * and maintain consistent branding across the SPA.
+ */
 </style>
