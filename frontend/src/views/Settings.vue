@@ -28,28 +28,34 @@
 
  const fetchSettings = async () => {
   loading.value = true;
-  try {
-    // 1. Fetch Storage Info
-    const storageRes = await api.get('/k3s/debug/storage');
-    debugData.value = storageRes.data;
+  
+  // 1. Appel asynchrone NON-BLOQUANT pour le stockage
+  // On ne met pas de "await" ici pour ne pas bloquer le reste si le backend est lent
+  api.get('/k3s/debug/storage')
+    .then(res => {
+      debugData.value = res.data;
+    })
+    .catch(err => {
+      // On utilise la variable 'err' ici
+      console.warn("⚠️ Infrastructure Storage unreachable:", err.message);
+    });
 
-    // 2. Fetch Webex Config
+  // 2. Appel pour la config Webex
+  try {
     const webexRes = await api.get('/settings/integrations/webex');
     
-    // Si 'configured' est vrai (depuis l'endpoint GET qu'on a créé ensemble)
     if (webexRes.data && webexRes.data.configured) {
       isAlreadyConfigured.value = true;
       webexConfig.value = {
         enabled: webexRes.data.enabled,
-        // On affiche le preview du token si tu l'as envoyé, sinon vide pour la saisie
         token: '', 
-        room_id: webexRes.data.room_id || ''
+        room_id: webexRes.data.target_id || ''
       };
     } else {
       isAlreadyConfigured.value = false;
     }
   } catch (error) {
-    console.error("Failed to fetch settings", error);
+    console.error("❌ Failed to fetch Webex config", error);
   } finally {
     loading.value = false;
   }
