@@ -29,33 +29,24 @@
  const fetchSettings = async () => {
   loading.value = true;
   
-  // 1. Appel asynchrone NON-BLOQUANT pour le stockage
-  // On ne met pas de "await" ici pour ne pas bloquer le reste si le backend est lent
+  // 1. On lance l'infra en arrière-plan sans bloquer
   api.get('/k3s/debug/storage')
-    .then(res => {
-      debugData.value = res.data;
-    })
-    .catch(err => {
-      // On utilise la variable 'err' ici
-      console.warn("⚠️ Infrastructure Storage unreachable:", err.message);
-    });
+    .then(res => { debugData.value = res.data; })
+    .catch(_ => { console.warn("Infrastructure stats unavailable"); });
 
-  // 2. Appel pour la config Webex
+  // 2. On gère Webex de manière isolée
   try {
     const webexRes = await api.get('/settings/integrations/webex');
-    
     if (webexRes.data && webexRes.data.configured) {
       isAlreadyConfigured.value = true;
       webexConfig.value = {
         enabled: webexRes.data.enabled,
         token: '', 
-        room_id: webexRes.data.target_id || ''
+        room_id: webexRes.data.room_id || ''
       };
-    } else {
-      isAlreadyConfigured.value = false;
     }
   } catch (error) {
-    console.error("❌ Failed to fetch Webex config", error);
+    console.error("Webex sync error", error);
   } finally {
     loading.value = false;
   }
