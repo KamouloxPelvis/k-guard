@@ -1,10 +1,3 @@
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: k-guard
-
----
-
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -13,7 +6,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate # Préférable car on utilise un socket Docker et un cache local
+    type: Recreate 
   selector:
     matchLabels:
       app: k-guard
@@ -29,7 +22,7 @@ spec:
 
       securityContext:
         fsGroup: 1000
-        supplementalGroups: [988] # ID du groupe docker sur ton VPS Kamatera
+        supplementalGroups: [988] 
 
       volumes:
         - name: docker-socket
@@ -38,11 +31,12 @@ spec:
             type: Socket
         - name: trivy-cache
           persistentVolumeClaim:
-            claimName: trivy-cache-pvc
+            claimName: trivy-cache-pvc # On utilise ton PVC existant
       
       initContainers:
       - name: init-permissions
         image: busybox
+        # On s'assure que l'utilisateur 1000 a les droits sur tout le volume
         command: ["sh", "-c", "chown -R 1000:1000 /data/trivy-cache"]
         volumeMounts:
         - name: trivy-cache
@@ -61,6 +55,10 @@ spec:
             name: docker-socket
           - mountPath: /data/trivy-cache
             name: trivy-cache
+          # ON MONTE LE MÊME PVC ICI POUR LA DB (via un sous-répertoire)
+          - mountPath: /app/backend/data
+            name: trivy-cache
+            subPath: database 
         envFrom:
           - secretRef:
               name: k-guard-secrets
