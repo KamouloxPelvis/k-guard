@@ -2,8 +2,7 @@ import subprocess
 import json
 import shutil
 import os
-# --- 1. IMPORTATION DU NOTIFICATEUR ---
-from service.cisco_notifier import CiscoWebexNotifier
+from services.cisco_notifier import CiscoWebexNotifier
 
 def run_trivy_scan(image_name: str):
     print(f"🔍 [K-GUARD ENGINE] Starting security audit for: {image_name}")
