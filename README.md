@@ -59,7 +59,7 @@
 
 ## 🛠️ <a name="-installation--setup"></a>Installation & Setup
 
-![K-Guard System Overview](frontend/public/screenshots/install.png)
+![K-Guard System Overview](frontend/public/screenshots/kguard-0.png)
 
 ### <a name="1-cli-installer-go"></a>1. CLI Installer (Go)
 Déploiement de la stack complète via un installateur spécialisé en **Go** :
@@ -107,6 +107,8 @@ Transformez vos audits de sécurité techniques en alertes opérationnelles en t
 3.  **Validate**: Les paramètres sont persistés dans la base SQLite `kguard.db` uniquement après un test de connectivité réussi.
 
 ![K-Guard System Overview](frontend/public/screenshots/kguard-9.png)
+
+![K-Guard System Overview](frontend/public/screenshots/kguard-12.png)
 
 ---
 

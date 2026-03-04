@@ -3,17 +3,18 @@ import sqlite3
 import json
 import os
 
-# Initialisation des variables globales
+# --- CONFIGURATION DES CHEMINS ---
+# Ce dossier est monté via le 'subPath: database' sur trivy-cache-pvc
+DB_DIR = "/app/backend/data"
+DB_PATH = os.path.join(DB_DIR, "kguard.db")
+
+# Initialisation des variables globales pour K8s
 v1 = None
 apps_client = None
 custom_client = None
 
-BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-DB_PATH = os.path.join(BASE_DIR, "kguard.db")
-
 def init_k8s():
     global v1, apps_client, custom_client
-    
     if v1 is not None:
         return
 
@@ -37,14 +38,19 @@ def init_k8s():
         apps_client = None
         custom_client = None
 
-init_k8s()
-
 def init_db():
-    """Initialise les tables de sécurité et d'intégrations au démarrage"""
+    """Initialise les tables de sécurité et d'intégrations dans le stockage persistant"""
+    # 1. S'assurer que le dossier de destination existe
+    if not os.path.exists(DB_DIR):
+        print(f"📁 Creating database directory: {DB_DIR}")
+        os.makedirs(DB_DIR, exist_ok=True)
+
+    print(f"🗄️ Database Path: {DB_PATH}")
+    
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    # 1. Table des Scans
+    # Table des Scans (Persistance des rapports d'audit)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS security_scans (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -55,8 +61,7 @@ def init_db():
         )
     ''')
 
-    # 2. Table des Intégrations (orientée Cisco DevNet)
-    # On utilise 'name' comme clé primaire pour l'idempotence
+    # Table des Intégrations (Cisco Webex, etc.)
     cursor.execute('''
         CREATE TABLE IF NOT EXISTS integrations (
             name TEXT PRIMARY KEY,
@@ -67,17 +72,22 @@ def init_db():
         )
     ''')
     
-    # Insertion par défaut pour Webex
+    # Insertion par défaut pour Webex si inexistante
     cursor.execute("INSERT OR IGNORE INTO integrations (name, enabled) VALUES ('webex', 0)")
     
     conn.commit()
     conn.close()
-    print("✅ Base de données K-Guard (Scans + Integrations) initialisée.")
+    print("✅ Base de données K-Guard initialisée et persistante.")
 
-# Fonction utilitaire pour récupérer la config Webex lors d'un scan
+# --- FONCTIONS UTILITAIRES ---
+
 def get_integration_settings(name):
+    """Récupère la config d'intégration pour le Notifier"""
+    if not os.path.exists(DB_PATH):
+        return None
+        
     conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row # Pour accéder par nom de colonne
+    conn.row_factory = sqlite3.Row 
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM integrations WHERE name = ?", (name,))
     row = cursor.fetchone()
@@ -85,12 +95,11 @@ def get_integration_settings(name):
     return dict(row) if row else None
 
 def update_scan_status(image, status, report=None):
-    """Met à jour ou insère un résultat de scan"""
+    """Archive un résultat de scan dans la DB persistante"""
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     report_json = json.dumps(report) if report else None
     
-    # On insère un nouveau scan (on garde l'historique)
     cursor.execute(
         "INSERT INTO security_scans (image, status, report) VALUES (?, ?, ?)",
         (image, status, report_json)
@@ -98,4 +107,6 @@ def update_scan_status(image, status, report=None):
     conn.commit()
     conn.close()
 
+# Initialisation au chargement du module
+init_k8s()
 init_db()
