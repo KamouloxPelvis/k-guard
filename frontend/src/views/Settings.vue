@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref } from 'vue';
+  import { ref, onMounted } from 'vue';
   import api from '@/services/api';
 
   interface DiskInfo {
@@ -51,6 +51,10 @@
     loading.value = false;
   }
 };
+
+onMounted(() => {
+  fetchSettings();
+});
 
 const handleSaveWebex = async () => {
   savingWebex.value = true;

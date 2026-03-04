@@ -1,5 +1,6 @@
 {
   "dependencies": {
-    "curl": "^0.1.4"
+    "curl": "^0.1.4",
+    "nslookup": "^1.1.1"
   }
 }
