@@ -81,3 +81,11 @@ async def serve_spa(full_path: str):
         return FileResponse(index_file)
     
     return {"error": "Frontend not found", "path": full_path}
+
+# --- 5. MIDDLEWARE MODE 'VERBEUX'---
+@app.middleware("http")
+async def log_requests(request, call_next):
+    print(f"DEBUG: Incoming {request.method} to {request.url.path}")
+    response = await call_next(request)
+    print(f"DEBUG: Response status: {response.status_code}")
+    return response
