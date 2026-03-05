@@ -24,7 +24,7 @@
             policyTypes: ["Ingress", "Egress"]
       loop: "{{ protected_namespaces }}"
 
-    # --- LAYER 2: CORE INFRASTRUCTURE & DNS ---
+    # --- LAYER 3: CORE INFRASTRUCTURE & DNS ---
     - name: "🔌 Infrastructure: Allow DNS Resolution"
       kubernetes.core.k8s:
         state: present
@@ -48,8 +48,30 @@
                   - protocol: TCP
                     port: 53
       loop: "{{ protected_namespaces }}"
+    
+    # --- LAYER 4: KUBERNETES API SERVER ACCESS ---
+    - name: "🏛️ Infrastructure: Allow Access to K8s API"
+      kubernetes.core.k8s:
+        state: present
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: sentinel-allow-k8s-api
+            namespace: "{{ item }}"
+          spec:
+            podSelector: {}
+            policyTypes: ["Egress"]
+            egress:
+              - to:
+                - ipBlock:
+                    cidr: 10.43.0.1/32 
+                ports:
+                  - protocol: TCP
+                    port: 443
+      loop: "{{ protected_namespaces }}"
 
-    # --- LAYER 3: EXTERNAL CLOUD FLOWS (BLOG -> MONGODB & GOOGLE) ---
+    # --- LAYER 5: EXTERNAL CLOUD FLOWS (BLOG -> MONGODB & GOOGLE) ---
     - name: "🌐 Cloud: Allow Blog Egress -> DNS & External APIs"
       kubernetes.core.k8s:
         state: present
@@ -74,7 +96,7 @@
                   - protocol: TCP
                     port: 27017 # Required for MongoDB Atlas connectivity
     
-    # --- LAYER 3.5: K-GUARD EXTERNAL FLOWS (WEBEX CHATOPS) ---
+    # --- LAYER 6: K-GUARD EXTERNAL FLOWS (WEBEX CHATOPS) ---
     - name: "🌐 Cloud: Allow K-Guard Egress -> Webex APIs"
       kubernetes.core.k8s:
         state: present
@@ -97,7 +119,7 @@
                   - protocol: TCP
                     port: 443   # Required for outbound Cisco Webex Bot notifications
 
-    # --- LAYER 4: MONITORING & HEALTH PROBES ---
+    # --- LAYER 7: MONITORING & HEALTH PROBES ---
     - name: "📊 Sentinel: Allow Monitoring Traffic & Health Probes"
       kubernetes.core.k8s:
         state: present
@@ -118,7 +140,7 @@
                     cidr: 10.42.0.0/16 # Allow internal Pod-to-Pod monitoring traffic
       loop: "{{ protected_namespaces }}"
     
-    # --- LAYER 4.5: PROM/GRAFANA CROSS-COMMUNICATION ---
+    # --- LAYER 8: PROM/GRAFANA CROSS-COMMUNICATION ---
     - name: "📊 Sentinel: Allow Prometheus Egress & Grafana Access"
       kubernetes.core.k8s:
         state: present
@@ -141,7 +163,7 @@
                     port: 9090 # default Prometheus port
       loop: "{{ protected_namespaces }}"
 
-    # --- LAYER 5: INGRESS MANAGEMENT (WEB TRAFFIC) ---
+    # --- LAYER 9: INGRESS MANAGEMENT (WEB TRAFFIC) ---
     - name: "🔓 Connectivity: Allow Ingress Controller -> Applications"
       kubernetes.core.k8s:
         state: present
@@ -172,7 +194,7 @@
                     port: 8443 
       loop: "{{ protected_namespaces }}"
 
-    # --- LAYER 6: VPS HOST -> K-GUARD SECURE ACCESS ---
+    # --- LAYER 10: VPS HOST -> K-GUARD SECURE ACCESS ---
     - name: "🛡️ Sentinel: Allow VPS Host (Local Nginx) -> K-Guard Access"
       kubernetes.core.k8s:
         state: present
