@@ -1,9 +1,37 @@
-blog-devopsnotes/
-portfolio-portal/
-app-devopsnotes/
-*.tar
-.env
-node_modules/
+# --- K-GUARD MASTER GITIGNORE ---
+
+# Python & Virtual Envs
+venv/
+.venv/
+env/
+ENV/
 __pycache__/
+*.py[cod]
+
+# Go Binaries
+installer/kguard-installer
+installer/uninstaller/kguard-uninstaller
+/bin/
+*.exe
+
+# Secrets & Cloud Credentials (CRITIQUE)
+*.key
+*.pem
+*.pub
+kubeconfig
+.env
+.env.*
+
+# Databases & Persistence
+*.db
+*.sqlite3
+backend/data/
+
+# Frontend & Node
+node_modules/
 dist/
-EOF
+.eslintcache
+
+# Scories OS
+.DS_Store
+Thumbs.db
