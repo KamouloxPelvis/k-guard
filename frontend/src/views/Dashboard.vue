@@ -94,7 +94,7 @@
 
     <aside :class="[
       isMenuOpen ? 'translate-x-0' : '-translate-x-full',
-      'fixed lg:relative z-50 h-full bg-[#0d0e12] border-r border-slate-800/60 flex flex-col shrink-0 transition-all duration-500 ease-in-out w-72 lg:translate-x-0 md:w-20 lg:w-72'
+      'fixed lg:sticky top-0 z-50 h-screen bg-[#0d0e12] border-r border-slate-800/60 flex flex-col shrink-0 transition-all duration-500 ease-in-out w-72 lg:translate-x-0 md:w-20 lg:w-72'
     ]">
       <button @click="isMenuOpen = false" 
             class="lg:hidden absolute top-5 right-5 text-slate-400 hover:text-white p-2 transition-colors cursor-pointer">
