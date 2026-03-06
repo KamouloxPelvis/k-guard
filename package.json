@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "curl": "^0.1.4",
-    "nslookup": "^1.1.1"
+    "nslookup": "^1.1.1",
+    "tough-cookie": "^6.0.0"
   }
 }
