@@ -9,6 +9,7 @@
     namespace: string;
     status: string;
     ip: string;
+    role: string;
     labels: Record<string, string>;
     image?: string; 
   }
