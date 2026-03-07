@@ -210,17 +210,16 @@
     </div>
 
     <div v-if="currentViewMode === 'list'" class="space-y-12">
-      <div v-if="currentViewMode === 'list'" class="space-y-12">
       <div v-for="(nsPods, nsName) in podsByNamespace" :key="nsName" class="space-y-8">
         
         <div class="flex items-center gap-4">
           <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{{ nsName }}</h3>
           <div class="h-[1px] flex-1 bg-slate-800/60"></div>
-          <span class="text-[10px] text-slate-600 font-mono">{{ filteredEdges.length }} Active Flow(s)</span>
+          <span class="text-[10px] text-slate-600 font-mono">{{ nsPods.length }} Node(s) detected</span>
         </div>
 
         <div class="bg-[#111217]/50 border border-slate-800/40 p-6 rounded-sm space-y-4">
-          <div v-for="(edge, index) in filteredEdges" :key="index" 
+          <div v-for="(edge, index) in filteredEdges.filter(e => nsPods.some(p => p.id === e.source))" :key="index" 
               class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border border-slate-800/20 hover:bg-white/[0.02] transition-all group">
             
             <div class="flex-1 w-full bg-[#0d0e12] border border-blue-500/20 p-4 rounded-sm relative transition-all group-hover:border-blue-500/50">
@@ -241,7 +240,6 @@
               <p class="text-[10px] font-black text-white mb-1 uppercase truncate tracking-tighter">{{ edge.target }}</p>
               <p class="text-[9px] font-mono text-orange-400 opacity-70">{{ edge.targetIp }}</p>
             </div>
-
           </div>
         </div>
       </div>
@@ -260,7 +258,6 @@
           </div>
 
           <div class="flex-1 p-6 md:p-10 overflow-y-auto font-mono bg-[#090a0d] custom-scrollbar">
-            
             <div class="mb-10 p-6 bg-blue-500/5 border-l-4 border-blue-600 rounded-r-sm">
               <p class="text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">Detected Security Role</p>
               <p class="text-2xl text-white font-black uppercase tracking-tighter">{{ selectedPod?.role }}</p>
@@ -280,7 +277,7 @@
               </div>
             </div>
 
-            <div v-if="isVulnerable(selectedPod!)" class="mt-12 p-8 bg-red-950/20 border border-red-900/30 rounded-sm">
+            <div v-if="selectedPod && isVulnerable(selectedPod)" class="mt-12 p-8 bg-red-950/20 border border-red-900/30 rounded-sm">
               <div class="flex items-start gap-5">
                 <span class="text-3xl">⚠️</span>
                 <div>
