@@ -1,0 +1,23 @@
+# Dependabot configuration for K-Guard
+version: 2
+updates:
+  # 1. Monitoring Python dependencies (Backend)
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    # Automatically labels PRs for easier triage
+    labels:
+      - "security"
+      - "backend"
+
+  # 2. Monitoring Node.js dependencies (Frontend)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
+    schedule:
+      interval: "daily"
+    open-pull-requests-limit: 5
+    labels:
+      - "security"
+      - "frontend"
