@@ -27,7 +27,7 @@
   const edges = ref<NetworkEdge[]>([]);
   const selectedNS = ref('all-protected');
   const isLoading = ref(false);
-  const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
+  const namespaces = ref(['all-protected']);
 
   // --- UI States ---
   const showRoleModal = ref(false);
@@ -46,7 +46,7 @@
     return edges.value.filter(edge => nsPodIds.includes(edge.source) || nsPodIds.includes(edge.target));
   });
 
-  /**
+    /**
    * Fetches real-time network mapping data from the Sentinel engine.
    */
   const fetchNetworkData = async () => {
@@ -54,17 +54,19 @@
     try {
       const { data } = await api.get('/sentinel/map');
       pods.value = data.nodes || [];
-      const rawEdges = data.edges || [];
       
-      // Enrich edges with IP addresses for visual mapping
+      // Dynamically populate the namespace dropdown
+      if (data.namespaces) {
+        namespaces.value = ['all-protected', ...data.namespaces];
+      }
+
+      const rawEdges = data.edges || [];
       edges.value = rawEdges.map((edge: NetworkEdge) => ({
         ...edge,
         sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
         targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
       }));
     } catch (error) {
-      pods.value = [];
-      edges.value = [];
       console.error("Sentinel UI Sync Error", error);
     } finally {
       isLoading.value = false;
