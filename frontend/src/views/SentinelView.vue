@@ -199,29 +199,37 @@
     </div>
 
     <div v-if="currentViewMode === 'list'" class="space-y-12">
-      <div v-for="(nsPods, ns) in podsByNamespace" :key="ns" class="space-y-6">
+      <div v-for="(nsPods, ns) in podsByNamespace" :key="ns" class="space-y-8">
+        
         <div class="flex items-center gap-4">
           <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{{ ns }}</h3>
           <div class="h-[1px] flex-1 bg-slate-800/60"></div>
-          <span class="text-[10px] text-slate-600 font-mono">{{ nsPods.length }} Workload(s)</span>
+          <span class="text-[10px] text-slate-600 font-mono">{{ filteredEdges.length }} Active Flow(s)</span>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          <div v-for="pod in nsPods" :key="pod.id" @click="openRoleDetails(pod)"
-              :class="['bg-[#0d0e12] border p-6 rounded-sm hover:border-blue-500/40 transition-all group relative overflow-hidden cursor-pointer', isVulnerable(pod) ? 'border-red-600/50' : 'border-slate-800/60']">
-            <div v-if="isVulnerable(pod)" class="absolute top-0 right-0 p-2 bg-red-600/10 text-red-500 text-[8px] font-black uppercase tracking-tighter">Unprotected</div>
+        <div class="bg-[#111217]/50 border border-slate-800/40 p-6 rounded-sm space-y-4">
+          <div v-for="(edge, index) in filteredEdges" :key="index" 
+              class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border border-slate-800/20 hover:bg-white/[0.02] transition-all group">
             
-            <div class="flex items-start justify-between mb-4">
-              <div class="flex flex-col">
-                <span class="text-[9px] font-mono text-blue-400 mb-2">{{ pod.ip }}</span>
-                <div class="p-3 bg-slate-900/50 rounded-sm w-fit border border-slate-800">
-                  <span class="text-xl">{{ isVulnerable(pod) ? '⚠️' : '📦' }}</span>
-                </div>
-              </div>
-              <span :class="['px-2 py-1 text-[8px] font-bold uppercase border rounded-full', getStatusColor(pod.status)]">{{ pod.status }}</span>
+            <div class="flex-1 w-full bg-[#0d0e12] border border-blue-500/20 p-4 rounded-sm relative transition-all group-hover:border-blue-500/50">
+              <p class="text-[10px] font-black text-white mb-1 uppercase truncate tracking-tighter">{{ edge.source }}</p>
+              <p class="text-[9px] font-mono text-blue-400 opacity-70">{{ edge.sourceIp }}</p>
             </div>
-            <h3 class="text-sm font-bold text-white truncate mb-1 uppercase tracking-tight">{{ pod.name }}</h3>
-            <p class="text-[9px] text-slate-500 font-mono uppercase tracking-widest">Role: {{ pod.role }}</p>
+
+            <div class="flex flex-col items-center min-w-[220px] px-2">
+              <p class="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 text-center">
+                Intra-NS Flow <span class="text-slate-600 font-normal">(TCP/443)</span>
+              </p>
+              <div class="w-full h-[1px] bg-gradient-to-r from-blue-500 via-orange-500 to-red-500 relative overflow-hidden">
+                <div class="absolute inset-0 bg-white/40 animate-[flow_2s_linear_infinite]"></div>
+              </div>
+            </div>
+
+            <div class="flex-1 w-full bg-[#0d0e12] border border-orange-900/20 p-4 rounded-sm relative transition-all group-hover:border-orange-500/50">
+              <p class="text-[10px] font-black text-white mb-1 uppercase truncate tracking-tighter">{{ edge.target }}</p>
+              <p class="text-[9px] font-mono text-orange-400 opacity-70">{{ edge.targetIp }}</p>
+            </div>
+
           </div>
         </div>
       </div>
@@ -261,8 +269,30 @@
 </template>
 
 <style scoped>
+@keyframes flow {
+  0% { transform: translateX(-100%); width: 20%; opacity: 0; }
+  50% { opacity: 1; }
+  100% { transform: translateX(400%); width: 20%; opacity: 0; }
+}
+  @keyframes border-pulse { 0%, 100% { border-color: rgba(220, 38, 38, 0.4); } 50% { border-color: rgba(220, 38, 38, 0.9); } }
+
+  @keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+  }
   .custom-scrollbar::-webkit-scrollbar { width: 4px; }
   .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
   .animate-vulnerable { animation: border-pulse 2s infinite; }
-  @keyframes border-pulse { 0%, 100% { border-color: rgba(220, 38, 38, 0.4); } 50% { border-color: rgba(220, 38, 38, 0.9); } }
+
+::-webkit-scrollbar {
+  width: 5px;
+}
+::-webkit-scrollbar-track {
+  background: #0b0c10;
+}
+::-webkit-scrollbar-thumb {
+  background: #1e293b;
+  border-radius: 2px;
+}
+
 </style>
