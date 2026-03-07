@@ -82,6 +82,7 @@ async def get_network_map(ns: Optional[str] = Query(None)):
                     "status": pod.status.phase,
                     "ip": pod.status.pod_ip or "0.0.0.0",
                     "role": role,
+                    "labels": labels,  # On ajoute l'objet complet ici !
                     "is_hardened": len(policies.items) > 0
                 })
 
