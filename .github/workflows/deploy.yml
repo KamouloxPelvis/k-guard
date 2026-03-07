@@ -4,10 +4,6 @@ on:
   push:
     branches:
       - main
-    paths:
-      - 'k8s/**'
-      - 'src/**'
-      - 'Dockerfile'
 
 jobs:
   build_images:
