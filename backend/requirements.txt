@@ -1,6 +1,6 @@
 fastapi==0.135.1
 uvicorn[standard]==0.41.0
-python-dotenv==1.0.1
+python-dotenv==1.2.2
 python-jose[cryptography]>=3.4.0
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
