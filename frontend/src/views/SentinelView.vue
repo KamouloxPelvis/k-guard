@@ -51,17 +51,16 @@
       ? pods.value 
       : pods.value.filter(pod => pod.namespace === selectedNS.value);
     
-    // Sort: Vulnerable pods first
+    // Technical Note: Prioritize vulnerable pods in the display order
     return [...list].sort((a, b) => (isVulnerable(b) ? 1 : 0) - (isVulnerable(a) ? 1 : 0));
   });
 
   const podsByNamespace = computed(() => {
+    // Optimized grouping logic to avoid unused variable errors (TS6133)
     return filteredPods.value.reduce((acc, pod) => {
-      // 1. We ensure the key exists
       if (!acc[pod.namespace]) {
         acc[pod.namespace] = [];
       }
-      // 2. We use the '!' operator to tell TS: "Trust me, it's defined"
       acc[pod.namespace]!.push(pod); 
       return acc;
     }, {} as Record<string, PodNode[]>);
@@ -137,10 +136,6 @@
   onMounted(fetchNetworkData);
   watch(selectedNS, fetchNetworkData);
 
-  const getStatusColor = (status: string) => {
-    if (status === 'Running' || status === 'Succeeded') return 'text-green-500 bg-green-500/10 border-green-500/20';
-    return 'text-red-500 bg-red-500/10 border-red-500/20';
-  };
 </script>
 
 <template>
@@ -215,10 +210,11 @@
     </div>
 
     <div v-if="currentViewMode === 'list'" class="space-y-12">
-      <div v-for="(nsPods, ns) in podsByNamespace" :key="ns" class="space-y-8">
+      <div v-if="currentViewMode === 'list'" class="space-y-12">
+      <div v-for="(nsPods, nsName) in podsByNamespace" :key="nsName" class="space-y-8">
         
         <div class="flex items-center gap-4">
-          <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{{ ns }}</h3>
+          <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{{ nsName }}</h3>
           <div class="h-[1px] flex-1 bg-slate-800/60"></div>
           <span class="text-[10px] text-slate-600 font-mono">{{ filteredEdges.length }} Active Flow(s)</span>
         </div>
@@ -250,7 +246,7 @@
         </div>
       </div>
     </div>
-
+    
     <Teleport to="body">
       <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/90 backdrop-blur-sm">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm shadow-2xl overflow-hidden">
