@@ -83,7 +83,7 @@
 </script>
 
 <template>
-  <div class="min-h-screen bg-[#0b0c10] text-slate-300 font-sans flex overflow-auto">
+  <div class="min-h-screen bg-[#0b0c10] text-slate-300 font-sans flex">
     
     <Transition name="fade">
       <div v-if="isMenuOpen" 
@@ -94,7 +94,7 @@
 
     <aside :class="[
       isMenuOpen ? 'translate-x-0' : '-translate-x-full',
-      'fixed lg:sticky top-0 z-50 h-screen bg-[#0d0e12] border-r border-slate-800/60 flex flex-col shrink-0 transition-all duration-500 ease-in-out w-72 lg:translate-x-0'
+      'fixed lg:relative z-50 h-full bg-[#0d0e12] border-r border-slate-800/60 flex flex-col shrink-0 transition-all duration-500 ease-in-out w-72 lg:translate-x-0'
     ]">
       <button @click="isMenuOpen = false" 
             class="lg:hidden absolute top-5 right-5 text-slate-400 hover:text-white p-2 transition-colors cursor-pointer">
@@ -108,8 +108,9 @@
         </span>
       </div>
       
-      <nav class="flex-1 p-4 md:p-3 lg:p-6 space-y-4 mt-4">
-        <router-link to="/" @click="isMenuOpen = false" class="nav-link" :class="route.path === '/' ? 'nav-active' : 'nav-inactive'">
+      <nav class="flex-1 flex flex-col p-4 md:p-3 lg:p-6 space-y-10 mt-8">
+
+        <router-link to="/" @click="isMenuOpen = false" class="nav-link py-3" :class="route.path === '/' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">📊</span>
           <div class="flex flex-col md:hidden lg:flex">
             <span class="text-[11px] font-bold uppercase tracking-widest">System Overview</span>
@@ -117,7 +118,7 @@
           </div>
         </router-link>
 
-        <router-link to="/security" @click="isMenuOpen = false" class="nav-link" :class="route.path === '/security' ? 'nav-active' : 'nav-inactive'">
+        <router-link to="/security" @click="isMenuOpen = false" class="nav-link py-3" :class="route.path === '/security' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">🔒</span>
           <div class="flex flex-col md:hidden lg:flex">
             <span class="text-[11px] font-bold uppercase tracking-widest">Vulnerabilities</span>
@@ -125,7 +126,7 @@
           </div>
         </router-link>
 
-        <router-link to="/sentinel" @click="isMenuOpen = false" class="nav-link" :class="route.path === '/sentinel' ? 'nav-active' : 'nav-inactive'">
+        <router-link to="/sentinel" @click="isMenuOpen = false" class="nav-link py-3" :class="route.path === '/sentinel' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">🌐</span>
           <div class="flex flex-col md:hidden lg:flex">
             <span class="text-[11px] font-bold uppercase tracking-widest">Network Map</span>
@@ -133,13 +134,15 @@
           </div>
         </router-link>
         
-        <router-link to="/settings" @click="isMenuOpen = false" class="nav-link" :class="route.path === '/settings' ? 'nav-active' : 'nav-inactive'">
+        <router-link to="/settings" @click="isMenuOpen = false" class="nav-link py-3" :class="route.path === '/settings' ? 'nav-active' : 'nav-inactive'">
           <span class="text-xl">⚙️</span>
           <div class="flex flex-col md:hidden lg:flex">
             <span class="text-[11px] font-bold uppercase tracking-widest">Settings</span>
             <span class="text-[8px] text-slate-500 font-mono mt-0.5 uppercase">Infra & Debug</span>
           </div>
         </router-link>
+
+        <div class="flex-1"></div>  
       </nav>
 
       <div class="hidden lg:block p-6 border-t border-slate-800/50 bg-[#0a0b0e]">
@@ -157,7 +160,7 @@
       </div>
     </aside>
 
-    <main class="flex-1 flex flex-col min-w-0 relative">
+    <main class="flex-1 flex flex-col min-w-0 overflow-y-auto relative">
       <div class="absolute inset-0 pointer-events-none flex items-center justify-center z-0">
         <div class="w-[500px] h-[500px] border border-blue-500/5 rounded-full absolute"></div>
         <img src="/logo_background.png" alt="K-Guard" class="w-[450px] opacity-[0.05] pointer-events-none select-none" />

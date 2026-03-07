@@ -134,10 +134,10 @@
   <div class="p-8 relative z-10 font-sans">
     
     <header class="mb-12 flex justify-between items-end border-b border-slate-800/40 pb-8">
-      <p class="text-[12px] text-slate-500 mt-6 uppercase tracking-[0.5em]">Vulnerability Scan & Smart Patch Station</p>
+      <p class="text-[12px] text-slate-500 mt-6 uppercase tracking-[0.5em]">Vulnerability Scan & Automated Patch</p>
     </header>
 
-    <div class="mb-8 p-4 border border-blue-500/20 bg-blue-500/5 text-xs text-slate-400 italic font-mono uppercase tracking-tighter">
+    <div class="mb-8 p-4 border border-blue-500/20 bg-blue-500/5 text-[10px] text-slate-400 font-mono uppercase tracking-tighter max-w-max">
       Tip: Shift + Left Click triggers a scan on an obsolete Nginx 1.18 image (Stress Test Mode).    
     </div>
 

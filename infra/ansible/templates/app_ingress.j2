@@ -1,0 +1,21 @@
+# --- Specific Application Ingress Policy ---
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ app_name }}
+  namespace: {{ namespace }}
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_label }}
+  policyTypes:
+    - Ingress
+  ingress:
+{% for rule in ingress_rules %}
+    - from:
+      - ipBlock:
+          cidr: {{ rule.cidr }}
+      ports:
+        - protocol: {{ rule.protocol | default('TCP') }}
+          port: {{ rule.port }}
+{% endfor %}

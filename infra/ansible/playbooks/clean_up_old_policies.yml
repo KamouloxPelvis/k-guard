@@ -1,0 +1,14 @@
+- name: 🧹 Cleanup Legacy Network Policies
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: "🗑️ Remove old Sentinel policies"
+      kubernetes.core.k8s:
+        state: absent
+        definition:
+          apiVersion: networking.k8s.io/v1
+          kind: NetworkPolicy
+          metadata:
+            name: "{{ item.1 }}"
+            namespace: "{{ item.0 }}"
+      loop: "{{ ['k-guard', 'blog-prod', 'portfolio-prod', 'monitoring', 'cert-manager'] | product(['sentinel-default-deny', 'sentinel-allow-dns', 'sentinel-allow-k8s-api', 'sentinel-allow-blog-egress-fix', 'sentinel-allow-monitoring-probes']) | list }}"
