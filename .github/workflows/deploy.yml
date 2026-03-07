@@ -4,6 +4,10 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'k8s/**'
+      - 'src/**'
+      - 'Dockerfile'
 
 jobs:
   build_images:
@@ -27,13 +31,11 @@ jobs:
         with:
           context: .
           push: true
-          # On utilise ghcr.io (GitHub Packages) pour remplacer GitLab Registry
-          tags: ghcr.io/${{ github.repository_owner }}/kguard-app:latest
+          tags: ghcr.io/kamouloxpelvis/kguard-app:latest
 
   deploy_to_k3s:
     needs: build_images
     runs-on: ubuntu-latest
-    # On appelle l'environnement où se trouve ton VPS_IP
     environment: VPS_KAMATERA_UBUNTU_THINKPAD_E11 
     steps:
       - name: Checkout code
@@ -42,9 +44,9 @@ jobs:
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: ${{ secrets.VPS_IP }}        # Secret d'environnement
-          username: ${{ secrets.VPS_USER }}  # Repository secret
-          key: ${{ secrets.CI_CD_SSH_KEY }}   # Repository secret
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.CI_CD_SSH_KEY }}
           port: 22
           script: |
             echo "🚀 Déploiement/Mise à jour de l'infrastructure sur ${{ secrets.VPS_IP }}..."
