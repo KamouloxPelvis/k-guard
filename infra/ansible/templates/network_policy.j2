@@ -1,5 +1,5 @@
 # --- Baseline: Zero Trust Isolation ---
-# This policy denies all ingress and egress traffic by default.
+# This policy denies all ingress and egress traffic by default for the discovered namespace.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
@@ -12,7 +12,7 @@ spec:
     - Egress
 ---
 # --- Infrastructure: DNS Resolution ---
-# Allows pods to talk to CoreDNS in kube-system.
+# Allows pods to talk to CoreDNS in kube-system for name resolution.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:

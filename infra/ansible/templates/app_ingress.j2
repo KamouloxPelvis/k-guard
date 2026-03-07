@@ -1,4 +1,5 @@
-# --- Specific Application Ingress Policy ---
+# --- Automated Ingress Policy for {{ app_label }} ---
+# This policy is dynamically generated based on discovered app labels.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:

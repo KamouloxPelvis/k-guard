@@ -1,77 +1,57 @@
-- name: 🛡️ K-Guard Sentinel - Dynamic Security Hardening
+- name: "🛡️ K-Guard Sentinel - Full Automated Security"
   hosts: localhost
   connection: local
   gather_facts: no
   vars:
     ansible_python_interpreter: /usr/bin/python3
+    # VPS_IP is retrieved from environment variables for security
+    vps_ip: "{{ lookup('env', 'VPS_IP') | default('127.0.0.1', true) }}"
 
   tasks:
-    # 1. AUTO-DISCOVERY: Get all namespaces except system ones
+    # 1. DISCOVERY: List namespaces and detect monitoring stack
     - name: "🔍 Discovery: List active namespaces"
       kubernetes.core.k8s_info:
         kind: Namespace
       register: ns_list
 
-    - name: "⚙️ Fact: Filter namespaces to protect"
+    - name: "⚙️ Fact: Identify target namespaces"
       set_fact:
         target_namespaces: "{{ ns_list | json_query('resources[*].metadata.name') | reject('match', 'kube-.*') | list }}"
+        monitoring_enabled: "{{ 'monitoring' in ns_list | json_query('resources[*].metadata.name') }}"
 
-    # 2. APPLICATION: Apply the baseline template to each namespace
-    - name: "🔒 Sentinel: Deploy Baseline (Deny-All & DNS)"
-      kubernetes.core.k8s:
-        state: present
-        # On passe directement la liste générée par le template
-        definition: "{{ lookup('template', '../templates/network_policy.j2') | from_yaml_all | list }}"
+    # 2. DISCOVERY: Scan all pods to extract 'app' labels automatically
+    - name: "🔍 Discovery: Get all pods in target namespaces"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ item }}"
       loop: "{{ target_namespaces }}"
+      register: pod_list
 
-    - name: "🛠️ Debug: Show generated YAML"
-      debug:
-        msg: "{{ lookup('template', '../templates/app_egress.j2') }}"
-      vars:
-        app_name: "blog-egress"
-        namespace: "blog-prod"
-        app_label: "blog-devopsnotes"
-        egress_rules:
-          - { cidr: "0.0.0.0/0", port: 443 }
-          - { cidr: "0.0.0.0/0", port: 27017 }
-
-    # 3. SPECIFIC APPS: Apply egress rules if needed (Example for Blog)
-    - name: "🌐 Cloud: Deploy App-Specific Egress"
+    - name: "⚙️ Fact: Map Apps to Namespaces (Auto-Discovery)"
+      set_fact:
+        # We use a simpler query to extract label 'app' and the namespace
+        discovered_apps: "{{ pod_list.results | map(attribute='resources') | flatten | json_query('[*].{name: metadata.labels.app, ns: metadata.namespace}') | unique }}"
+  
+    # 3. BASELINE: Apply Zero Trust isolation (Deny-All)
+    - name: "🔒 Sentinel: Deploy Core Baseline"
       kubernetes.core.k8s:
         state: present
-        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
-      vars:
-        app_name: "blog-egress"
-        namespace: "blog-prod"
-        app_label: "blog-devopsnotes"
-        egress_rules:
-          - { cidr: "0.0.0.0/0", port: 443 } # Google/APISs
-          - { cidr: "0.0.0.0/0", port: 27017 } # MongoDB
-      when: "'blog-prod' in target_namespaces"
-    
-    # --- 4. K-GUARD ACCESS (SAFE INGRESS) ---
-    - name: "🛡️ Sentinel: Allow Ingress to K-Guard UI/API"
+        definition: "{{ lookup('template', '../templates/core_baseline.j2') | from_yaml_all | list }}"
+      loop: "{{ target_namespaces }}"
+      loop_control:
+        loop_var: ns_item
+
+    # 4. AUTOMATIC INGRESS: Open standard ports (443, 8443) for every discovered App
+    - name: "🔓 Connectivity: Allow Ingress to Discovered Apps"
       kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
       vars:
-        app_name: "sentinel-allow-kguard-ingress"
-        namespace: "k-guard"
-        app_label: "k-guard"
-        ingress_rules: 
-          - { cidr: "0.0.0.0/0", port: 8443, protocol: "TCP" }
-          - { cidr: "0.0.0.0/0", port: 8000, protocol: "TCP" }
-      when: "'k-guard' in target_namespaces"
-
-    # --- 5. WEBEX NOTIFICATIONS ---
-    - name: "🌐 Cloud: Allow K-Guard Egress to Webex"
-      kubernetes.core.k8s:
-        state: present
-        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
-      vars:
-        app_name: "sentinel-allow-kguard-webex"
-        namespace: "k-guard"
-        app_label: "k-guard"
-        egress_rules:
-          - { cidr: "0.0.0.0/0", port: 443 } # Sortie vers les APIs Webex
-      when: "'k-guard' in target_namespaces"
+        app_name: "sentinel-{{ item.name }}-ingress"
+        namespace: "{{ item.ns }}"
+        app_label: "{{ item.name }}"
+        ingress_rules:
+          - { cidr: "0.0.0.0/0", port: 443 }
+          - { cidr: "{{ vps_ip }}/32", port: 8443 }
+      loop: "{{ discovered_apps }}"
+      when: "item.name is defined and item.name != None"
