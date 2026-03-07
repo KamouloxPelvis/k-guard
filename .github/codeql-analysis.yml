@@ -6,15 +6,16 @@ on:
   pull_request:
     branches: [ "main" ]
   schedule:
-    - cron: '30 1 * * 6' # Weekly scan every Saturday at 01:30
+    # Weekly scan every Saturday at 01:30 to ensure continuous monitoring
+    - cron: '30 1 * * 6'
 
 jobs:
   analyze:
-    name: Analyze
+    name: Analyze (${{ matrix.language }})
     runs-on: ubuntu-latest
     timeout-minutes: 360
     permissions:
-      # Required permissions to update the Security dashboard with scan results
+      # Necessary permissions to push results to the Security tab
       actions: read
       contents: read
       security-events: write
@@ -22,26 +23,29 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # Scanning both frontend and backend environments
         language: [ 'javascript-typescript', 'python' ]
 
     steps:
     - name: Checkout repository
       uses: actions/checkout@v4
 
-    # Initialize CodeQL tools for the specified languages
+    # Initialize CodeQL tools with stable v3 to minimize network timeouts
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
       with:
         languages: ${{ matrix.language }}
-        # Use extended security queries to detect info leaks and quality issues
+        # Extended queries to catch more vulnerabilities for DevSecOps compliance
         queries: security-extended,security-and-quality
 
-    # Autobuild attempts to compile the code (crucial for frontend/JS environments)
+    # Autobuild attempts to prepare the environment for analysis
     - name: Autobuild
       uses: github/codeql-action/autobuild@v3
 
-    # Execute the actual analysis and upload results to GitHub Security tab
+    # Run the analysis and upload results to GitHub
     - name: Perform CodeQL Analysis
       uses: github/codeql-action/analyze@v3
       with:
         category: "/language:${{ matrix.language }}"
+        # Explicitly enabling upload to help debug potential API connection issues
+        upload: true
