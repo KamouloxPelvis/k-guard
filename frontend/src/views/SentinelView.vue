@@ -101,13 +101,22 @@
   };
 
   const getEdgePath = (edge: NetworkEdge) => {
-    const sourceIdx = pods.value.findIndex(p => p.id === edge.source);
-    const targetIdx = pods.value.findIndex(p => p.id === edge.target);
-    const start = getNodePos(edge.source, sourceIdx, pods.value.length, 'left');
-    const end = getNodePos(edge.target, targetIdx, pods.value.length, 'right');
-    
-    return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
-  };
+  // 1. Locate the pod indices within the FILTERED list (currently rendered on screen)
+  const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
+  const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
+
+  // 2. Safety check: if either pod is not in the selected namespace, do not render the connection
+  if (sourceIdx === -1 || targetIdx === -1) return "";
+
+  const total = filteredPods.value.length;
+
+  // 3. Calculate start and end positions using the same alignment logic as the template nodes
+  const start = getNodePos(edge.source, sourceIdx, total, sourceIdx % 2 === 0 ? 'left' : 'right');
+  const end = getNodePos(edge.target, targetIdx, total, targetIdx % 2 === 0 ? 'left' : 'right');
+  
+  // 4. Generate the SVG Cubic Bezier curve path
+  return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
+};
 
   const openRoleDetails = (pod: PodNode) => {
     selectedPod.value = pod;
@@ -179,20 +188,27 @@
         </defs>
 
         <g v-for="edge in filteredEdges" :key="edge.source + edge.target">
-          <path :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1.5]" marker-end="url(#arrow)" />
-          <circle r="3" fill="#f05a28" class="animate-pulse">
+          <path v-if="getEdgePath(edge)" 
+                :d="getEdgePath(edge)" 
+                fill="none" 
+                class="stroke-slate-800 stroke-[1.5]" 
+                marker-end="url(#arrow)" />
+          
+          <circle v-if="getEdgePath(edge)" r="3" fill="#f05a28" class="animate-pulse">
             <animateMotion :path="getEdgePath(edge)" dur="3s" repeatCount="indefinite" />
           </circle>
         </g>
 
-        <g v-for="(pod, idx) in pods" :key="pod.id" @click="openRoleDetails(pod)" class="cursor-pointer group">
-          <rect :x="getNodePos(pod.id, idx, pods.length, idx % 2 === 0 ? 'left' : 'right').x - 60" 
-                :y="getNodePos(pod.id, idx, pods.length, idx % 2 === 0 ? 'left' : 'right').y - 25" 
+        <g v-for="(pod, idx) in filteredPods" :key="pod.id" @click="openRoleDetails(pod)" class="cursor-pointer group">
+          <rect :x="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').x - 60" 
+                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y - 25" 
                 width="120" height="50" rx="4" 
                 :class="[isVulnerable(pod) ? 'fill-red-950 stroke-red-500' : 'fill-slate-900 stroke-blue-500', 'stroke-[1] transition-all group-hover:stroke-white']" />
-          <text :x="getNodePos(pod.id, idx, pods.length, idx % 2 === 0 ? 'left' : 'right').x" 
-                :y="getNodePos(pod.id, idx, pods.length, idx % 2 === 0 ? 'left' : 'right').y + 5" 
-                text-anchor="middle" class="fill-white text-[9px] font-mono font-bold uppercase">{{ pod.role.length > 15 ? pod.role.substring(0,12)+'...' : pod.role }}</text>
+          <text :x="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').x" 
+                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y + 5" 
+                text-anchor="middle" class="fill-white text-[9px] font-mono font-bold uppercase">
+            {{ pod.role.length > 15 ? pod.role.substring(0,12)+'...' : pod.role }}
+          </text>
         </g>
       </svg>
       <div class="absolute bottom-6 right-6 text-[9px] text-slate-600 uppercase font-mono tracking-widest">Active Discovery Flows: {{ filteredEdges.length }}</div>
@@ -236,31 +252,56 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
-        <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl h-[70vh] flex flex-col rounded-sm shadow-2xl">
-          <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">RBAC Explorer // {{ selectedPod?.name }}</span>
-            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl transition-colors">&times;</button>
-          </div>
-          <div class="flex-1 p-8 overflow-y-auto font-mono text-[11px] bg-black/40 custom-scrollbar">
-            <div class="mb-8 p-4 bg-blue-500/5 border-l-2 border-blue-500 rounded-r-sm">
-              <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">Detected Security Role</p>
-              <p class="text-base text-white font-black uppercase tracking-widest">{{ selectedPod?.role }}</p>
+      <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/90 backdrop-blur-sm">
+        <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm shadow-2xl overflow-hidden">
+          
+          <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#111217]">
+            <div class="flex items-center gap-3">
+              <div class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
+              <span class="text-[11px] font-mono text-orange-400 uppercase tracking-[0.2em]">RBAC & Metadata Explorer // {{ selectedPod?.name }}</span>
             </div>
-            <div class="space-y-1">
-              <p class="text-[9px] text-slate-500 uppercase font-bold mb-4 tracking-[0.2em]">Workload Metadata</p>
-              <div v-for="(val, key) in selectedPod?.labels" :key="key" class="flex items-center gap-4 py-2 border-b border-slate-900 group hover:bg-white/5 px-2">
-                <span class="text-slate-500 min-w-[150px] uppercase font-bold text-[10px]">{{ key }}</span>
-                <span class="text-blue-300 truncate">{{ val }}</span>
+            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-3xl transition-colors leading-none">&times;</button>
+          </div>
+
+          <div class="flex-1 p-6 md:p-10 overflow-y-auto font-mono bg-[#090a0d] custom-scrollbar">
+            
+            <div class="mb-10 p-6 bg-blue-500/5 border-l-4 border-blue-600 rounded-r-sm">
+              <p class="text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">Detected Security Role</p>
+              <p class="text-2xl text-white font-black uppercase tracking-tighter">{{ selectedPod?.role }}</p>
+            </div>
+
+            <div class="space-y-2">
+              <p class="text-[10px] text-slate-500 uppercase font-black mb-6 tracking-[0.3em] flex items-center gap-2">
+                <span class="w-4 h-[1px] bg-slate-700"></span> Workload Metadata & Labels
+              </p>
+              
+              <div class="grid grid-cols-1 gap-1">
+                <div v-for="(val, key) in selectedPod?.labels" :key="key" 
+                    class="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 py-3 border-b border-white/[0.03] group hover:bg-white/[0.02] px-4 transition-colors">
+                  <span class="text-blue-500/80 font-bold text-[10px] uppercase min-w-[250px]">{{ key }}</span>
+                  <span class="text-slate-300 text-[11px] break-all bg-slate-900/50 px-2 py-1 rounded-sm border border-slate-800/50">{{ val }}</span>
+                </div>
               </div>
             </div>
-            <div v-if="isVulnerable(selectedPod!)" class="mt-8 p-6 bg-red-900/10 border border-red-900/30 text-red-500 text-[10px] uppercase font-bold animate-pulse flex items-center gap-4">
-              <span class="text-2xl">⚠️</span>
-              <p>Critical: No NetworkPolicy detected for this workload. It is currently exposed to all traffic in the namespace.</p>
+
+            <div v-if="isVulnerable(selectedPod!)" class="mt-12 p-8 bg-red-950/20 border border-red-900/30 rounded-sm">
+              <div class="flex items-start gap-5">
+                <span class="text-3xl">⚠️</span>
+                <div>
+                  <p class="text-red-500 text-[11px] font-black uppercase tracking-widest mb-2">Security Warning</p>
+                  <p class="text-slate-400 text-xs leading-relaxed">
+                    Critical: No active <span class="text-white">NetworkPolicy</span> detected. 
+                    Traffic segmentation is not enforced for this workload, allowing potential lateral movement.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
-          <div class="p-4 border-t border-slate-800 bg-[#0b0c10] flex justify-end">
-             <button @click="showRoleModal = false" class="px-8 py-3 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all rounded-sm">Close Explorer</button>
+
+          <div class="p-6 border-t border-slate-800 bg-[#0d0e12] flex justify-end">
+            <button @click="showRoleModal = false" class="px-10 py-4 border border-slate-700 text-slate-300 text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-all rounded-sm">
+              Close Explorer
+            </button>
           </div>
         </div>
       </div>
