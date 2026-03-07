@@ -1,0 +1,70 @@
+name: K-GUARD Deployment
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'k8s/**'
+      - 'src/**'
+      - 'Dockerfile'
+
+jobs:
+  build_images:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push K-Guard image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/kamouloxpelvis/kguard-app:latest
+
+  deploy_to_k3s:
+    needs: build_images
+    runs-on: ubuntu-latest
+    environment: VPS_KAMATERA_UBUNTU_THINKPAD_E11 
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to VPS via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VPS_IP }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.CI_CD_SSH_KEY }}
+          port: 22
+          script: |
+            echo "🚀 Déploiement/Mise à jour de l'infrastructure sur ${{ secrets.VPS_IP }}..."
+            mkdir -p /home/kamal/infrastructure/apps/k-guard/k8s/
+            # Note : Pour scp, l'action appleboy/scp-action est souvent préférable, 
+            # mais ici on exécute les commandes kubectl directement sur le VPS.
+            kubectl apply -f /home/kamal/infrastructure/apps/k-guard/k8s/ -n k-guard
+            kubectl rollout restart deployment kguard-deployment -n k-guard
+            kubectl rollout status deployment kguard-deployment -n k-guard --timeout=300s
+
+      - name: Discord Notification
+        if: always() # S'exécute même si le déploiement échoue
+        run: |
+          if [ "${{ job.status }}" == "success" ]; then
+            MESSAGE="🛡️ **K-GUARD** (k3s) : Déploiement réussi par **${{ github.actor }}** ! ✅"
+          else
+            MESSAGE="⚠️ **K-GUARD** (k3s) : Échec critique du déploiement ! ❌"
+          fi
+          curl -X POST -H "Content-Type: application/json" \
+          -d "{\"content\": \"$MESSAGE\"}" \
+          ${{ secrets.DISCORD_WEBHOOK_URL }} # Repository secret

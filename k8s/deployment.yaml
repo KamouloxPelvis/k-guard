@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate # Required to prevent multiple pods from locking the same PVC/SQLite DB
+    type: Recreate 
   selector:
     matchLabels:
       app: k-guard
@@ -15,16 +15,15 @@ spec:
       labels:
         app: k-guard
     spec:
-      # Use the specific ServiceAccount for RBAC permissions (Pod/Deployment/Metrics list)
       serviceAccountName: k-guard-sa
       automountServiceAccountToken: true
+      
       imagePullSecrets:
-        - name: regcred
+        - name: ghcr-secret
 
-      # SecurityContext for volume permissions management
       securityContext:
         fsGroup: 1000
-        supplementalGroups: [988] # Group ID for Docker socket access if needed
+        supplementalGroups: [988]
 
       volumes:
         - name: docker-socket
@@ -33,9 +32,8 @@ spec:
             type: Socket
         - name: trivy-cache
           persistentVolumeClaim:
-            claimName: trivy-cache-pvc # Storing Trivy DBs and K-Guard SQLite
+            claimName: trivy-cache-pvc
       
-      # InitContainer to ensure correct ownership on the Persistent Volume
       initContainers:
       - name: init-permissions
         image: busybox
@@ -46,9 +44,9 @@ spec:
 
       containers:
       - name: kguard-app
-        image: registry.gitlab.com/portfolio-kamal-guidadou/k-guard/kguard-app:latest
+        image: ghcr.io/kamouloxpelvis/kguard-app:latest
         securityContext:
-          runAsUser: 1000 # Running as non-root for security hardening
+          runAsUser: 1000 
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
@@ -57,7 +55,6 @@ spec:
             name: docker-socket
           - mountPath: /data/trivy-cache
             name: trivy-cache
-          # Mounting SQLite database in a sub-directory of the same PVC
           - mountPath: /app/backend/data
             name: trivy-cache
             subPath: database 
@@ -65,7 +62,6 @@ spec:
           - secretRef:
               name: k-guard-secrets
         
-        # Liveness Probe aligned with the FastAPI /health endpoint
         livenessProbe:
           httpGet:
             path: /health
@@ -73,7 +69,6 @@ spec:
           initialDelaySeconds: 45
           periodSeconds: 30
 
-        # SRE Resource Management
         resources:
           limits:
             cpu: "1.5"

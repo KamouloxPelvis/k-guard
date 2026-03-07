@@ -1,0 +1,42 @@
+# --- Baseline: Zero Trust Isolation ---
+# Blocks all traffic by default within the namespace.
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: sentinel-default-deny
+  namespace: {{ ns_item }}
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress", "Egress"]
+---
+# --- Infrastructure: DNS & Monitoring (Conditional) ---
+# Allows essential cluster traffic (DNS, K8s API, and Probes).
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: sentinel-core-infra
+  namespace: {{ ns_item }}
+spec:
+  podSelector: {}
+  policyTypes: ["Egress", "Ingress"]
+  egress:
+    - to: # CoreDNS Access
+      - namespaceSelector:
+          matchLabels: { kubernetes.io/metadata.name: kube-system }
+      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
+    - to: # K8s API Server (K3s Default IP)
+      - ipBlock: { cidr: 10.43.0.1/32 }
+      ports: [{ protocol: TCP, port: 443 }]
+{% if monitoring_enabled %}
+    - to: # Prometheus Access (if monitoring namespace exists)
+      - namespaceSelector:
+          matchLabels: { kubernetes.io/metadata.name: monitoring }
+      ports: [{ protocol: TCP, port: 9090 }]
+{% endif %}
+  ingress:
+{% if monitoring_enabled %}
+    - from: # Allow Health Probes from Monitoring stack
+      - namespaceSelector:
+          matchLabels: { kubernetes.io/metadata.name: monitoring }
+      - ipBlock: { cidr: 10.42.0.0/16 }
+{% endif %}

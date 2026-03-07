@@ -1,0 +1,57 @@
+- name: "🛡️ K-Guard Sentinel - Full Automated Security"
+  hosts: localhost
+  connection: local
+  gather_facts: no
+  vars:
+    ansible_python_interpreter: /usr/bin/python3
+    # VPS_IP is retrieved from environment variables for security
+    vps_ip: "{{ lookup('env', 'VPS_IP') | default('127.0.0.1', true) }}"
+
+  tasks:
+    # 1. DISCOVERY: List namespaces and detect monitoring stack
+    - name: "🔍 Discovery: List active namespaces"
+      kubernetes.core.k8s_info:
+        kind: Namespace
+      register: ns_list
+
+    - name: "⚙️ Fact: Identify target namespaces"
+      set_fact:
+        target_namespaces: "{{ ns_list | json_query('resources[*].metadata.name') | reject('match', 'kube-.*') | list }}"
+        monitoring_enabled: "{{ 'monitoring' in ns_list | json_query('resources[*].metadata.name') }}"
+
+    # 2. DISCOVERY: Scan all pods to extract 'app' labels automatically
+    - name: "🔍 Discovery: Get all pods in target namespaces"
+      kubernetes.core.k8s_info:
+        kind: Pod
+        namespace: "{{ item }}"
+      loop: "{{ target_namespaces }}"
+      register: pod_list
+
+    - name: "⚙️ Fact: Map Apps to Namespaces (Auto-Discovery)"
+      set_fact:
+        # We use a simpler query to extract label 'app' and the namespace
+        discovered_apps: "{{ pod_list.results | map(attribute='resources') | flatten | json_query('[*].{name: metadata.labels.app, ns: metadata.namespace}') | unique }}"
+  
+    # 3. BASELINE: Apply Zero Trust isolation (Deny-All)
+    - name: "🔒 Sentinel: Deploy Core Baseline"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/core_baseline.j2') | from_yaml_all | list }}"
+      loop: "{{ target_namespaces }}"
+      loop_control:
+        loop_var: ns_item
+
+    # 4. AUTOMATIC INGRESS: Open standard ports (443, 8443) for every discovered App
+    - name: "🔓 Connectivity: Allow Ingress to Discovered Apps"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
+      vars:
+        app_name: "sentinel-{{ item.name }}-ingress"
+        namespace: "{{ item.ns }}"
+        app_label: "{{ item.name }}"
+        ingress_rules:
+          - { cidr: "0.0.0.0/0", port: 443 }
+          - { cidr: "{{ vps_ip }}/32", port: 8443 }
+      loop: "{{ discovered_apps }}"
+      when: "item.name is defined and item.name != None"

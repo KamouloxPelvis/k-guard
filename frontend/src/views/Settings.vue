@@ -102,7 +102,6 @@ const handleSaveWebex = async () => {
   <div class="p-8 relative z-10 font-sans h-full overflow-y-auto custom-scrollbar">
     <header class="mb-12 flex justify-between items-end border-b border-slate-800/40 pb-8">
       <div>
-        <h2 class="text-xl font-extralight text-white tracking-tight uppercase">Control Center</h2>
         <p class="text-[12px] text-slate-500 mt-2 uppercase tracking-[0.5em]">SRE Infrastructure Control & Diagnostics</p>
       </div>
       <button @click="fetchSettings" class="bg-blue-600/10 hover:bg-blue-600/20 border border-blue-500/30 px-4 py-2 rounded-sm text-[10px] font-bold text-blue-400 transition-all uppercase cursor-pointer">
@@ -240,7 +239,7 @@ const handleSaveWebex = async () => {
       <div class="mt-12 p-8 border border-red-900/30 bg-red-950/5 rounded-sm flex flex-col md:flex-row items-center justify-between gap-6">
         <div>
           <h3 class="text-sm text-red-500 font-bold uppercase tracking-[0.2em] flex items-center gap-2">
-            <span class="animate-pulse">⚠️</span> Danger Zone
+            <span class="animate-pulse">⚠️</span> WARNING
           </h3>
           <p class="text-[10px] text-slate-500 mt-2 uppercase tracking-wide leading-relaxed">
             Flush security metadata and clear Trivy local databases.

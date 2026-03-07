@@ -9,6 +9,7 @@
     namespace: string;
     status: string;
     ip: string;
+    role: string;
     labels: Record<string, string>;
     image?: string; 
   }
@@ -26,7 +27,7 @@
   const edges = ref<NetworkEdge[]>([]);
   const selectedNS = ref('all-protected');
   const isLoading = ref(false);
-  const namespaces = ['all-protected', 'k-guard', 'blog-prod', 'portfolio-prod'];
+  const namespaces = ref(['all-protected']);
 
   // --- UI States ---
   const showRoleModal = ref(false);
@@ -45,7 +46,7 @@
     return edges.value.filter(edge => nsPodIds.includes(edge.source) || nsPodIds.includes(edge.target));
   });
 
-  /**
+    /**
    * Fetches real-time network mapping data from the Sentinel engine.
    */
   const fetchNetworkData = async () => {
@@ -53,17 +54,19 @@
     try {
       const { data } = await api.get('/sentinel/map');
       pods.value = data.nodes || [];
-      const rawEdges = data.edges || [];
       
-      // Enrich edges with IP addresses for visual mapping
+      // Dynamically populate the namespace dropdown
+      if (data.namespaces) {
+        namespaces.value = ['all-protected', ...data.namespaces];
+      }
+
+      const rawEdges = data.edges || [];
       edges.value = rawEdges.map((edge: NetworkEdge) => ({
         ...edge,
         sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
         targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
       }));
     } catch (error) {
-      pods.value = [];
-      edges.value = [];
       console.error("Sentinel UI Sync Error", error);
     } finally {
       isLoading.value = false;
@@ -116,7 +119,7 @@
   <div class="p-6 lg:p-10 space-y-8 relative">
     
     <div class="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-6 border border-slate-800/60 rounded-sm">
-      <div><p class="text-[12px] text-slate-500 uppercase tracking-[0.5em] leading-none">IDS & Traffic Mapping</p></div>
+      <div><p class="text-[12px] text-slate-500 uppercase tracking-[0.5em] leading-none">Micro-segmentation & Traffic Mapping</p></div>
       
       <div class="flex flex-wrap items-center gap-4">
         <div class="inline-flex p-1 bg-[#0b0c10] border border-slate-700 rounded-sm mr-4">
@@ -220,19 +223,52 @@
     <Teleport to="body">
       <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl h-[60vh] flex flex-col rounded-sm">
+          
           <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">RBAC Explorer // {{ selectedPod?.name }}</span>
-            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl cursor-pointer">&times;</button>
+            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">
+              RBAC Explorer // {{ selectedPod?.name }}
+            </span>
+            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl cursor-pointer transition-colors">&times;</button>
           </div>
+
           <div class="flex-1 p-6 overflow-y-auto font-mono text-[11px] bg-black/40 custom-scrollbar">
-            <div v-for="(val, key) in selectedPod?.labels" :key="key" class="mb-2 flex gap-4 border-b border-slate-900 pb-1">
-              <span class="text-slate-500 min-w-[120px] uppercase font-bold">{{ key }}</span>
-              <span class="text-blue-300">{{ val }}</span>
+            
+            <div class="mb-6 p-4 bg-blue-500/5 border-l-2 border-blue-500 rounded-r-sm">
+              <p class="text-[9px] text-slate-500 uppercase font-bold mb-1">Detected Security Role</p>
+              <p class="text-sm text-white font-black uppercase tracking-widest">{{ selectedPod?.role }}</p>
             </div>
-            <div v-if="isVulnerable(selectedPod!)" class="mt-8 p-4 bg-red-900/10 border border-red-900/30 text-red-500 text-[10px] uppercase font-bold animate-pulse">
-              [ SECURITY ALERT ] : Potential vulnerability detected. Review NetworkPolicies.
+
+            <div class="space-y-1">
+              <p class="text-[9px] text-slate-500 uppercase font-bold mb-3 tracking-[0.2em]">Metadata & Labels</p>
+              
+              <div v-for="(val, key) in selectedPod?.labels" :key="key" 
+                   class="flex items-center gap-4 py-2 border-b border-slate-900 group hover:bg-white/5 px-2 transition-colors">
+                <span class="text-slate-500 min-w-[140px] uppercase font-bold text-[10px]">{{ key }}</span>
+                <span class="text-blue-300 truncate">{{ val }}</span>
+              </div>
+
+              <div v-if="!selectedPod?.labels || Object.keys(selectedPod.labels).length === 0" class="text-slate-600 italic py-4">
+                No metadata labels found for this workload.
+              </div>
+            </div>
+
+            <div v-if="isVulnerable(selectedPod!)" 
+                 class="mt-8 p-4 bg-red-900/10 border border-red-900/30 text-red-500 text-[10px] uppercase font-bold animate-pulse flex items-center gap-3">
+              <span class="text-lg">⚠️</span>
+              <div>
+                <p>[ SECURITY ALERT ]</p>
+                <p class="font-normal opacity-80 mt-1 uppercase">Potential vulnerability detected. Review active NetworkPolicies for this namespace.</p>
+              </div>
             </div>
           </div>
+
+          <div class="p-4 border-t border-slate-800 bg-[#0b0c10] flex justify-end">
+             <button @click="showRoleModal = false" 
+                     class="px-6 py-2 border border-slate-700 text-slate-400 text-[10px] font-bold uppercase tracking-widest hover:bg-slate-800 transition-all rounded-sm">
+               Close Explorer
+             </button>
+          </div>
+
         </div>
       </div>
     </Teleport>
