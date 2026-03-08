@@ -66,8 +66,7 @@ jobs:
             
             # SRE Kill-Switch: Force the deployment to use the specific immutable image SHA
             # This bypasses the K3s 'latest' image cache problem.
-            kubectl set image deployment/kguard-deployment kguard-container=ghcr.io/${{ github.repository_owner }}/kguard-app:${{ github.sha }} -n k-guard
-            
+            kubectl set image deployment/kguard-deployment kguard-app=ghcr.io/${{ github.repository_owner }}/kguard-app:${{ github.sha }} -n k-guard            
             # Verify deployment health
             kubectl rollout status deployment kguard-deployment -n k-guard --timeout=300s
 
