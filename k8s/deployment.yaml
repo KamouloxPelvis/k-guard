@@ -45,6 +45,7 @@ spec:
       containers:
       - name: kguard-app
         image: ghcr.io/kamouloxpelvis/kguard-app:latest
+        imagePullPolicy: Always
         securityContext:
           runAsUser: 1000 
           allowPrivilegeEscalation: false
