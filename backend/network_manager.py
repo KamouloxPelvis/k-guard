@@ -3,12 +3,14 @@ from typing import Optional
 from kubernetes import client, config
 import os
 import subprocess
+import logging
 
 router = APIRouter(tags=["Network Sentinel"])
 
 # --- DYNAMIC CONFIGURATION ---
-# No hardcoded namespaces or labels. Everything is discovered via K8s API.
-ANSIBLE_PATH = os.getenv("KGUARD_ANSIBLE_PATH", "/app/infra/ansible/playbooks/harden_policies.yml")
+# Correcting paths: Using relative roots to match your SRE directory structure.
+ANSIBLE_PATH = os.getenv("KGUARD_ANSIBLE_PATH", "infra/ansible/playbooks/harden_policies.yml")
+TEST_SCRIPT_PATH = os.getenv("KGUARD_TEST_SCRIPT_PATH", "test/check_connectivity.sh")
 
 def load_k8s_config():
     """Loads K8s configuration with auto-detection."""
@@ -35,7 +37,6 @@ async def get_network_map():
     discovered_ns = []
 
     try:
-        # 1. DISCOVERY: List all namespaces except internal system ones
         all_ns = v1.list_namespace(timeout_seconds=5)
         target_ns = [
             n.metadata.name for n in all_ns.items 
@@ -43,7 +44,6 @@ async def get_network_map():
         ]
         discovered_ns = target_ns
 
-        # 2. SCAN: Inventory pods and policies
         for namespace in target_ns:
             policies = net_v1.list_namespaced_network_policy(namespace)
             pods = v1.list_namespaced_pod(namespace)
@@ -51,8 +51,6 @@ async def get_network_map():
             for pod in pods.items:
                 pod_name = pod.metadata.name
                 labels = pod.metadata.labels or {}
-                
-                # Dynamic Role Detection: use 'app' label or fallback to first available label
                 role = labels.get("app", labels.get("k8s-app", next(iter(labels.values()), "generic")))
                 
                 nodes.append({
@@ -62,11 +60,10 @@ async def get_network_map():
                     "status": pod.status.phase,
                     "ip": pod.status.pod_ip or "0.0.0.0",
                     "role": role,
-                    "labels": labels, # Injected for the Frontend Modal [cite: 2026-03-03]
+                    "labels": labels,
                     "is_hardened": len(policies.items) > 0
                 })
 
-        # 3. EDGE GENERATION: Logical mapping based on namespace shared context
         for i, node_a in enumerate(nodes):
             for node_b in nodes[i+1:]:
                 if node_a["namespace"] == node_b["namespace"]:
@@ -79,19 +76,20 @@ async def get_network_map():
         return {
             "nodes": nodes,
             "edges": edges,
-            "namespaces": discovered_ns # Dynamic list for the Frontend dropdown
+            "namespaces": discovered_ns
         }
     except Exception as e:
-        return {"error": str(e)}
+        # Security: Logging full error server-side while returning generic message [cite: 2026-03-07]
+        logging.exception("Error generating network map")
+        return {"error": "Internal SRE Discovery failure"}
 
-@router.post("/sentinel/harden")
-async def apply_hardening():
+@router.post("/sentinel/activate")
+async def activate_hardening():
     """Triggers the automated Ansible hardening playbook."""
     if not os.path.exists(ANSIBLE_PATH):
         return {"status": "ERROR", "details": f"Playbook not found at {ANSIBLE_PATH}"}
     
     try:
-        # Execution of the Auto-Discovery Playbook
         result = subprocess.run(
             ["ansible-playbook", ANSIBLE_PATH],
             capture_output=True, text=True, check=True
@@ -99,3 +97,31 @@ async def apply_hardening():
         return {"status": "SUCCESS", "message": "Sentinel Strategy Applied"}
     except subprocess.CalledProcessError as e:
         return {"status": "ERROR", "details": e.stderr}
+
+@router.post("/sentinel/deactivate")
+async def deactivate_hardening():
+    """Emergency Kill Switch: Removes K-Guard managed Network Policies."""
+    try:
+        # Using label selector to only remove policies managed by K-Guard
+        result = subprocess.run(
+            ["kubectl", "delete", "netpol", "-l", "managed-by=k-guard-sentinel", "-A"],
+            capture_output=True, text=True, check=True
+        )
+        return {"status": "SUCCESS", "message": "Network policies deactivated."}
+    except subprocess.CalledProcessError as e:
+        return {"status": "ERROR", "details": e.stderr}
+
+@router.post("/sentinel/test")
+async def test_connectivity():
+    """Executes the SRE connectivity diagnostic script."""
+    if not os.path.exists(TEST_SCRIPT_PATH):
+        return {"output": f"❌ ERROR: Test script not found at {TEST_SCRIPT_PATH}"}
+    
+    try:
+        result = subprocess.run(
+            ["bash", TEST_SCRIPT_PATH],
+            capture_output=True, text=True, check=True
+        )
+        return {"output": result.stdout}
+    except subprocess.CalledProcessError as e:
+        return {"output": e.stdout + "\n" + e.stderr}
