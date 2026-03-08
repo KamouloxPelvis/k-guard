@@ -164,43 +164,48 @@
 </script>
 
 <template>
-  <div class="p-8 relative z-10">
-    <header class="mb-12 flex justify-between items-end border-b border-slate-800 pb-7">
-      <div><p class="text-[12px] text-slate-500 mt-6 uppercase tracking-[0.5em]">K-Guard SRE Monitor</p></div>
-      <div class="flex gap-4">
-        <button @click="fetchClusterData" class="bg-slate-800/40 hover:bg-blue-600 border border-slate-700 px-5 py-2 rounded-sm transition-all text-[10px] font-bold text-slate-400 hover:text-white uppercase tracking-widest cursor-pointer">ReSync</button>
+  <div class="p-4 lg:p-6 relative z-10">
+    
+    <header class="mb-4 flex justify-between items-center border-b border-slate-800/40 pb-3">
+      <div>
+        <p class="text-[10px] text-slate-500 uppercase tracking-[0.4em]">K-Guard SRE Monitor</p>
+      </div>
+      <div class="flex gap-3">
+        <button @click="fetchClusterData" class="bg-slate-800/40 hover:bg-blue-600 border border-slate-700 px-4 py-1.5 rounded-sm transition-all text-[9px] font-bold text-slate-400 hover:text-white uppercase tracking-widest cursor-pointer">
+          ReSync
+        </button>
       </div>
     </header>
 
-    <div v-if="loading" class="flex flex-col items-center justify-center py-40">
-      <div class="w-10 h-10 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-6"></div>
-      <span class="text-[9px] uppercase tracking-[0.5em] text-blue-500">Scanning Nodes...</span>
+    <div v-if="loading" class="flex flex-col items-center justify-center py-24">
+      <div class="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mb-4"></div>
+      <span class="text-[8px] uppercase tracking-[0.4em] text-blue-500">Scanning Nodes...</span>
     </div>
 
-    <div v-else class="grid grid-cols-1 xl:grid-cols-2 gap-8 max-w-7xl mx-auto">
+    <div v-else class="grid grid-cols-1 xl:grid-cols-2 gap-4 max-w-7xl mx-auto">
       <div v-for="pod in apps" :key="pod.pod_name" @click="openDetails(pod)"
-          class="group relative bg-[#181b1f]/60 backdrop-blur-sm border border-slate-800 p-6 rounded-sm hover:border-blue-500/40 transition-all cursor-pointer">
+          class="group relative bg-[#181b1f]/60 backdrop-blur-sm border border-slate-800 p-4 rounded-sm hover:border-blue-500/40 transition-all cursor-pointer">
         
         <div class="absolute top-0 left-0 w-1 h-full" 
             :class="pod.status === 'SECURE' || pod.status === 'RUNNING' ? 'bg-green-500' : 'bg-red-500'">
         </div>
         
-        <div class="flex justify-between items-start mb-6">
+        <div class="flex justify-between items-start mb-4">
           <div class="flex flex-col">
-            <h3 class="text-lg font-bold text-white uppercase leading-tight">{{ pod.name }}</h3>
-            <p class="text-[10px] text-slate-400 font-mono mt-0.5 opacity-80">Namespace: {{ pod.namespace }}</p>
+            <h3 class="text-md font-bold text-white uppercase leading-tight tracking-tight">{{ pod.name }}</h3>
+            <p class="text-[9px] text-slate-400 font-mono opacity-80">NS: {{ pod.namespace }}</p>
           </div>
-          <span :class="getStatusClass(pod.status)" class="text-[8px] font-black px-2 py-1 border rounded-sm uppercase">
+          <span :class="getStatusClass(pod.status)" class="text-[7px] font-black px-1.5 py-0.5 border rounded-sm uppercase">
             {{ pod.status }}
           </span>
         </div>
 
-        <div class="space-y-6 mb-8">
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between text-[11px] uppercase font-bold tracking-widest">
+        <div class="space-y-3 mb-4">
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-[9px] uppercase font-bold tracking-wider">
               <span class="text-slate-500">CPU Usage</span>
               <span v-if="metricsLoading[pod.namespace]" class="text-blue-500 animate-pulse">[ SCANNING... ]</span>
-              <span class="text-blue-400 font-mono">{{ calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage).toFixed(2) }}%</span>
+              <span class="text-blue-400 font-mono">{{ calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage).toFixed(1) }}%</span>
             </div>
             <div class="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
               <div class="h-full transition-all duration-1000"
@@ -210,10 +215,10 @@
             </div>
           </div>
 
-          <div class="flex flex-col gap-2">
-            <div class="flex justify-between text-[11px] uppercase font-bold tracking-widest">
-              <span class="text-slate-500">RAM Consumption</span>
-              <span class="text-indigo-400 font-mono">{{ formatMemory(metrics[pod.pod_name]?.memoryUsage) }}</span>
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between text-[9px] uppercase font-bold tracking-wider">
+              <span class="text-slate-500">RAM</span>
+              <span class="text-indigo-400 font-mono text-[10px]">{{ formatMemory(metrics[pod.pod_name]?.memoryUsage) }}</span>
             </div>
             <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <div class="h-full bg-indigo-500 transition-all duration-1000" 
@@ -222,21 +227,21 @@
           </div>
         </div>
 
-        <div class="flex justify-between items-center bg-black/20 p-2 border border-slate-800/50 mb-4 font-mono">
-          <span class="text-[10px] text-slate-500 uppercase font-bold">Virtual IP</span>
-          <span class="text-[12px] text-blue-300">{{ pod.ip }}</span>
+        <div class="flex justify-between items-center bg-black/20 p-1.5 border border-slate-800/50 mb-3 font-mono">
+          <span class="text-[9px] text-slate-500 uppercase font-bold">Virtual IP</span>
+          <span class="text-[11px] text-blue-300">{{ pod.ip }}</span>
         </div>
 
-        <div class="flex justify-between items-center pt-4 border-t border-slate-800/30">
-          <button @click.stop="(e) => restartPod(e, pod)" class="px-3 py-1.5 text-[10px] font-bold uppercase border border-red-500/40 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-sm">
-            Restart Rollout
+        <div class="flex justify-between items-center pt-3 border-t border-slate-800/30">
+          <button @click.stop="(e) => restartPod(e, pod)" class="px-2 py-1 text-[9px] font-bold uppercase border border-red-500/40 text-red-500 hover:bg-red-500 hover:text-white transition-all rounded-sm">
+            Restart
           </button>
           <div class="flex gap-2">
-            <button @click.stop="openDetails(pod)" class="btn-action btn-logs">Live Logs</button>
+            <button @click.stop="openDetails(pod)" class="text-[9px] px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 uppercase font-bold transition-all border border-slate-700">Logs</button>
             <button v-if="calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage) > 30" 
                     @click.stop="(e) => remediateLoad(e, pod)" 
-                    class="btn-action btn-remediate">
-              SRE Remediation
+                    class="text-[9px] px-2 py-1 bg-orange-500/10 hover:bg-orange-600 text-orange-500 hover:text-white uppercase font-bold transition-all border border-orange-500/30">
+              SRE
             </button>
           </div>
         </div>
@@ -244,18 +249,18 @@
     </div>
 
     <Teleport to="body">
-      <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/95 backdrop-blur-md">
+      <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm">
-          <div class="p-4 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[10px] font-mono text-blue-400 uppercase tracking-widest">Secure Console // {{ selectedPod?.pod_name }}</span>
-            <button @click="showModal = false" class="text-slate-500 hover:text-white text-2xl">&times;</button>
+          <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
+            <span class="text-[9px] font-mono text-blue-400 uppercase tracking-widest">Secure Console // {{ selectedPod?.pod_name }}</span>
+            <button @click="showModal = false" class="text-slate-500 hover:text-white text-xl">&times;</button>
           </div>
-          <div class="flex-1 p-6 overflow-y-auto font-mono text-[12px] text-blue-100/80 bg-black/40">
+          <div class="flex-1 p-4 overflow-y-auto font-mono text-[11px] text-blue-100/80 bg-black/40">
             <pre class="whitespace-pre-wrap">{{ podLogs }}</pre>
           </div>
-          <div class="p-3 border-t border-slate-900 bg-black/40 flex justify-between items-center">
-            <span class="text-[8px] text-slate-600 uppercase font-bold">K-Guard Terminal v2.0</span>
-            <span class="text-[8px] text-blue-900 font-mono">Operator @ {{ username }}</span>
+          <div class="p-2 border-t border-slate-900 bg-black/40 flex justify-between items-center">
+            <span class="text-[7px] text-slate-600 uppercase font-bold">K-Guard Terminal v2.0</span>
+            <span class="text-[7px] text-blue-900 font-mono">Operator @ {{ username }}</span>
           </div>
         </div>
       </div>

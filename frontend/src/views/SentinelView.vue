@@ -139,106 +139,89 @@
 </script>
 
 <template>
-  <div class="p-6 lg:p-10 space-y-8 relative max-w-[1600px] mx-auto">
+  <div class="p-4 lg:p-6 space-y-4 relative max-w-[1600px] mx-auto">
     
-    <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-      <div class="lg:col-span-3 flex flex-col md:flex-row md:items-center justify-between gap-6 bg-[#111217] p-8 border border-slate-800/60 rounded-sm">
+    <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
+      <div class="lg:col-span-3 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#111217] p-5 border border-slate-800/60 rounded-sm">
         <div>
-          <p class="text-[10px] text-slate-500 uppercase tracking-[0.5em] mb-2">Automated Micro-segmentation</p>
-          <h2 class="text-xl font-black text-white uppercase tracking-tighter">Network Sentinel <span class="text-blue-500">v2.0</span></h2>
+          <p class="text-[9px] text-slate-500 uppercase tracking-[0.4em] mb-1">Automated Micro-segmentation</p>
+          <h2 class="text-lg font-black text-white uppercase tracking-tighter">Network Sentinel <span class="text-blue-500">v2.0</span></h2>
         </div>
         
-        <div class="flex flex-wrap items-center gap-4">
+        <div class="flex flex-wrap items-center gap-3">
           <div class="inline-flex p-1 bg-[#0b0c10] border border-slate-700 rounded-sm">
-            <button @click="currentViewMode = 'list'" :class="currentViewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-500'" class="px-4 py-1 text-[9px] font-black uppercase tracking-widest rounded-sm transition-all">List</button>
-            <button @click="currentViewMode = 'topology'" :class="currentViewMode === 'topology' ? 'bg-orange-600 text-white' : 'text-slate-500'" class="px-4 py-1 text-[9px] font-black uppercase tracking-widest rounded-sm transition-all">Topology</button>
+            <button @click="currentViewMode = 'list'" :class="currentViewMode === 'list' ? 'bg-blue-600 text-white' : 'text-slate-500'" class="px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-sm transition-all">List</button>
+            <button @click="currentViewMode = 'topology'" :class="currentViewMode === 'topology' ? 'bg-orange-600 text-white' : 'text-slate-500'" class="px-3 py-1 text-[8px] font-black uppercase tracking-widest rounded-sm transition-all">Topology</button>
           </div>
-          <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[10px] text-slate-300 px-4 py-2 rounded-sm uppercase font-bold tracking-widest cursor-pointer">
+          <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[9px] text-slate-300 px-3 py-1.5 rounded-sm uppercase font-bold tracking-widest cursor-pointer">
             <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
           </select>
-          <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-6 py-2 rounded-sm text-[10px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
+          <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
         </div>
       </div>
 
-      <div class="bg-[#111217] border border-slate-800/60 p-6 rounded-sm flex flex-col items-center justify-center">
-        <p class="text-[9px] text-slate-500 uppercase font-bold mb-2">Cluster Security Score</p>
+      <div class="bg-[#111217] border border-slate-800/60 p-4 rounded-sm flex flex-col items-center justify-center">
+        <p class="text-[8px] text-slate-500 uppercase font-bold mb-1">Security Score</p>
         <div class="relative flex items-center justify-center">
-          <svg class="w-20 h-20 transform -rotate-90">
-            <circle cx="40" cy="40" r="35" stroke="currentColor" stroke-width="4" fill="transparent" class="text-slate-800" />
-            <circle cx="40" cy="40" r="35" stroke="currentColor" stroke-width="4" fill="transparent" :stroke-dasharray="220" :stroke-dashoffset="220 - (220 * securityStats.score) / 100" :class="securityStats.score < 50 ? 'text-red-500' : 'text-blue-500'" />
+          <svg class="w-16 h-16 transform -rotate-90">
+            <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3" fill="transparent" class="text-slate-800" />
+            <circle cx="32" cy="32" r="28" stroke="currentColor" stroke-width="3" fill="transparent" :stroke-dasharray="175" :stroke-dashoffset="175 - (175 * securityStats.score) / 100" :class="securityStats.score < 50 ? 'text-red-500' : 'text-blue-500'" />
           </svg>
-          <span class="absolute text-xl font-black text-white">{{ securityStats.score }}%</span>
+          <span class="absolute text-md font-black text-white">{{ securityStats.score }}%</span>
         </div>
       </div>
     </div>
 
-    <div v-if="currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-4 rounded-sm relative min-h-[650px] overflow-hidden flex items-center justify-center">
-      <div class="absolute inset-0 opacity-10" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 30px 30px;"></div>
+    <div v-if="currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-2 rounded-sm relative min-h-[500px] overflow-hidden flex items-center justify-center">
+      <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 20px 20px;"></div>
       
-      <svg viewBox="0 0 1000 600" class="w-full h-full max-w-5xl relative z-10">
-        <defs>
-          <marker id="arrow" viewBox="0 0 10 10" refX="10" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-            <path d="M 0 0 L 10 5 L 0 10 z" fill="#334155" />
-          </marker>
-        </defs>
-
+      <svg viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
         <g v-for="edge in filteredEdges" :key="edge.source + edge.target">
-          <path v-if="getEdgePath(edge)" 
-                :d="getEdgePath(edge)" 
-                fill="none" 
-                class="stroke-slate-800 stroke-[1.5]" 
-                marker-end="url(#arrow)" />
-          
-          <circle v-if="getEdgePath(edge)" r="3" fill="#f05a28" class="animate-pulse">
-            <animateMotion :path="getEdgePath(edge)" dur="3s" repeatCount="indefinite" />
-          </circle>
+          <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1]" marker-end="url(#arrow)" />
         </g>
 
         <g v-for="(pod, idx) in filteredPods" :key="pod.id" @click="openRoleDetails(pod)" class="cursor-pointer group">
-          <rect :x="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').x - 60" 
-                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y - 25" 
-                width="120" height="50" rx="4" 
+          <rect :x="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').x - 50" 
+                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y - 20" 
+                width="100" height="40" rx="2" 
                 :class="[isVulnerable(pod) ? 'fill-red-950 stroke-red-500' : 'fill-slate-900 stroke-blue-500', 'stroke-[1] transition-all group-hover:stroke-white']" />
           <text :x="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').x" 
-                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y + 5" 
-                text-anchor="middle" class="fill-white text-[9px] font-mono font-bold uppercase">
-            {{ pod.role.length > 15 ? pod.role.substring(0,12)+'...' : pod.role }}
+                :y="getNodePos(pod.id, idx, filteredPods.length, idx % 2 === 0 ? 'left' : 'right').y + 4" 
+                text-anchor="middle" class="fill-white text-[8px] font-mono font-bold uppercase">
+            {{ pod.role.length > 12 ? pod.role.substring(0,10)+'...' : pod.role }}
           </text>
         </g>
       </svg>
-      <div class="absolute bottom-6 right-6 text-[9px] text-slate-600 uppercase font-mono tracking-widest">Active Discovery Flows: {{ filteredEdges.length }}</div>
+      <div class="absolute bottom-3 right-4 text-[8px] text-slate-700 uppercase font-mono tracking-widest italic">Flows: {{ filteredEdges.length }}</div>
     </div>
 
-    <div v-if="currentViewMode === 'list'" class="space-y-12">
-      <div v-for="(nsPods, nsName) in podsByNamespace" :key="nsName" class="space-y-8">
+    <div v-if="currentViewMode === 'list'" class="space-y-6">
+      <div v-for="(nsPods, nsName) in podsByNamespace" :key="nsName" class="space-y-3">
         
-        <div class="flex items-center gap-4">
-          <h3 class="text-xs font-black text-slate-500 uppercase tracking-[0.3em]">{{ nsName }}</h3>
-          <div class="h-[1px] flex-1 bg-slate-800/60"></div>
-          <span class="text-[10px] text-slate-600 font-mono">{{ nsPods.length }} Node(s) detected</span>
+        <div class="flex items-center gap-3">
+          <h3 class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">{{ nsName }}</h3>
+          <div class="h-[1px] flex-1 bg-slate-800/40"></div>
         </div>
 
-        <div class="bg-[#111217]/50 border border-slate-800/40 p-6 rounded-sm space-y-4">
+        <div class="bg-[#111217]/50 border border-slate-800/30 p-4 rounded-sm space-y-2">
           <div v-for="(edge, index) in filteredEdges.filter(e => nsPods.some(p => p.id === e.source))" :key="index" 
-              class="flex flex-col md:flex-row items-center justify-between gap-4 p-4 border border-slate-800/20 hover:bg-white/[0.02] transition-all group">
+              class="flex flex-col md:flex-row items-center justify-between gap-2 p-2 border border-slate-800/10 hover:bg-white/[0.01] transition-all group">
             
-            <div class="flex-1 w-full bg-[#0d0e12] border border-blue-500/20 p-4 rounded-sm relative transition-all group-hover:border-blue-500/50">
-              <p class="text-[10px] font-black text-white mb-1 uppercase truncate tracking-tighter">{{ edge.source }}</p>
-              <p class="text-[9px] font-mono text-blue-400 opacity-70">{{ edge.sourceIp }}</p>
+            <div class="flex-1 w-full bg-[#0d0e12] border border-blue-500/10 p-2 rounded-sm transition-all group-hover:border-blue-500/30">
+              <p class="text-[9px] font-bold text-white uppercase truncate">{{ edge.source }}</p>
+              <p class="text-[8px] font-mono text-blue-500/60">{{ edge.sourceIp }}</p>
             </div>
 
-            <div class="flex flex-col items-center min-w-[220px] px-2">
-              <p class="text-[8px] font-black text-slate-500 uppercase tracking-[0.2em] mb-2 text-center">
-                Intra-NS Flow <span class="text-slate-600 font-normal">(TCP/443)</span>
-              </p>
-              <div class="w-full h-[1px] bg-gradient-to-r from-blue-500 via-orange-500 to-red-500 relative overflow-hidden">
-                <div class="absolute inset-0 bg-white/40 animate-[flow_2s_linear_infinite]"></div>
+            <div class="flex flex-col items-center min-w-[150px] px-2">
+              <p class="text-[7px] font-bold text-slate-600 uppercase tracking-tighter mb-1">TCP/443</p>
+              <div class="w-full h-[1px] bg-slate-800 relative overflow-hidden">
+                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-[flow_2s_linear_infinite]"></div>
               </div>
             </div>
 
-            <div class="flex-1 w-full bg-[#0d0e12] border border-orange-900/20 p-4 rounded-sm relative transition-all group-hover:border-orange-500/50">
-              <p class="text-[10px] font-black text-white mb-1 uppercase truncate tracking-tighter">{{ edge.target }}</p>
-              <p class="text-[9px] font-mono text-orange-400 opacity-70">{{ edge.targetIp }}</p>
+            <div class="flex-1 w-full bg-[#0d0e12] border border-orange-900/10 p-2 rounded-sm transition-all group-hover:border-orange-500/30">
+              <p class="text-[9px] font-bold text-white uppercase truncate">{{ edge.target }}</p>
+              <p class="text-[8px] font-mono text-orange-500/60">{{ edge.targetIp }}</p>
             </div>
           </div>
         </div>
@@ -246,55 +229,29 @@
     </div>
     
     <Teleport to="body">
-      <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 md:p-10 bg-black/90 backdrop-blur-sm">
-        <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm shadow-2xl overflow-hidden">
-          
-          <div class="p-5 border-b border-slate-800 flex justify-between items-center bg-[#111217]">
-            <div class="flex items-center gap-3">
-              <div class="w-2 h-2 bg-orange-500 rounded-full animate-pulse"></div>
-              <span class="text-[11px] font-mono text-orange-400 uppercase tracking-[0.2em]">RBAC & Metadata Explorer // {{ selectedPod?.name }}</span>
-            </div>
-            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-3xl transition-colors leading-none">&times;</button>
+      <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+        <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[80vh] flex flex-col rounded-sm shadow-2xl overflow-hidden">
+          <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#111217]">
+            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">Metadata Explorer // {{ selectedPod?.name }}</span>
+            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl transition-colors">&times;</button>
           </div>
 
-          <div class="flex-1 p-6 md:p-10 overflow-y-auto font-mono bg-[#090a0d] custom-scrollbar">
-            <div class="mb-10 p-6 bg-blue-500/5 border-l-4 border-blue-600 rounded-r-sm">
-              <p class="text-[10px] text-slate-500 uppercase font-black mb-2 tracking-widest">Detected Security Role</p>
-              <p class="text-2xl text-white font-black uppercase tracking-tighter">{{ selectedPod?.role }}</p>
+          <div class="flex-1 p-5 md:p-8 overflow-y-auto font-mono bg-[#090a0d] custom-scrollbar">
+            <div class="mb-6 p-4 bg-blue-500/5 border-l-2 border-blue-600">
+              <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Detected Role</p>
+              <p class="text-xl text-white font-black uppercase tracking-tight">{{ selectedPod?.role }}</p>
             </div>
 
-            <div class="space-y-2">
-              <p class="text-[10px] text-slate-500 uppercase font-black mb-6 tracking-[0.3em] flex items-center gap-2">
-                <span class="w-4 h-[1px] bg-slate-700"></span> Workload Metadata & Labels
+            <div class="space-y-1">
+              <p class="text-[9px] text-slate-500 uppercase font-black mb-4 tracking-widest flex items-center gap-2">
+                <span class="w-3 h-[1px] bg-slate-700"></span> Metadata
               </p>
-              
-              <div class="grid grid-cols-1 gap-1">
-                <div v-for="(val, key) in selectedPod?.labels" :key="key" 
-                    class="flex flex-col md:flex-row md:items-center gap-2 md:gap-6 py-3 border-b border-white/[0.03] group hover:bg-white/[0.02] px-4 transition-colors">
-                  <span class="text-blue-500/80 font-bold text-[10px] uppercase min-w-[250px]">{{ key }}</span>
-                  <span class="text-slate-300 text-[11px] break-all bg-slate-900/50 px-2 py-1 rounded-sm border border-slate-800/50">{{ val }}</span>
-                </div>
+              <div v-for="(val, key) in selectedPod?.labels" :key="key" 
+                  class="flex flex-col md:flex-row md:items-center gap-2 py-2 border-b border-white/[0.02] px-2">
+                <span class="text-blue-500/70 font-bold text-[9px] uppercase min-w-[200px]">{{ key }}</span>
+                <span class="text-slate-400 text-[10px] break-all bg-slate-900/30 px-2 py-0.5 rounded border border-slate-800/40">{{ val }}</span>
               </div>
             </div>
-
-            <div v-if="selectedPod && isVulnerable(selectedPod)" class="mt-12 p-8 bg-red-950/20 border border-red-900/30 rounded-sm">
-              <div class="flex items-start gap-5">
-                <span class="text-3xl">⚠️</span>
-                <div>
-                  <p class="text-red-500 text-[11px] font-black uppercase tracking-widest mb-2">Security Warning</p>
-                  <p class="text-slate-400 text-xs leading-relaxed">
-                    Critical: No active <span class="text-white">NetworkPolicy</span> detected. 
-                    Traffic segmentation is not enforced for this workload, allowing potential lateral movement.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div class="p-6 border-t border-slate-800 bg-[#0d0e12] flex justify-end">
-            <button @click="showRoleModal = false" class="px-10 py-4 border border-slate-700 text-slate-300 text-[11px] font-black uppercase tracking-widest hover:bg-slate-800 hover:text-white transition-all rounded-sm">
-              Close Explorer
-            </button>
           </div>
         </div>
       </div>
@@ -303,30 +260,11 @@
 </template>
 
 <style scoped>
+/* Animations identiques mais optimisées pour la fluidité */
 @keyframes flow {
-  0% { transform: translateX(-100%); width: 20%; opacity: 0; }
-  50% { opacity: 1; }
-  100% { transform: translateX(400%); width: 20%; opacity: 0; }
-}
-  @keyframes border-pulse { 0%, 100% { border-color: rgba(220, 38, 38, 0.4); } 50% { border-color: rgba(220, 38, 38, 0.9); } }
-
-  @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
-  }
-  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-  .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 10px; }
-  .animate-vulnerable { animation: border-pulse 2s infinite; }
-
-::-webkit-scrollbar {
-  width: 5px;
 }
-::-webkit-scrollbar-track {
-  background: #0b0c10;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e293b;
-  border-radius: 2px;
-}
-
+.custom-scrollbar::-webkit-scrollbar { width: 3px; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
 </style>

@@ -1,10 +1,13 @@
 # --- Specific Application Egress Policy ---
-# This policy is dynamically applied to allow specific outbound traffic.
+# Controls outbound traffic for a specific pod to prevent data exfiltration 
+# and ensure Zero Trust connectivity between services.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
   name: {{ app_name }}
   namespace: {{ namespace }}
+  labels:
+    managed-by: k-guard-sentinel
 spec:
   podSelector:
     matchLabels:
@@ -14,8 +17,16 @@ spec:
   egress:
 {% for rule in egress_rules %}
     - to:
+{% if rule.to_app is defined %}
+      # Service-to-Service: Restrict egress to a specific destination app
+      - podSelector:
+          matchLabels:
+            app: {{ rule.to_app }}
+{% else %}
+      # Network-level: Allow egress to a specific CIDR (e.g., internal cluster subnet)
       - ipBlock:
           cidr: {{ rule.cidr }}
+{% endif %}
       ports:
         - protocol: {{ rule.protocol | default('TCP') }}
           port: {{ rule.port }}

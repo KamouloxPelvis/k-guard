@@ -41,7 +41,7 @@
       loop_control:
         loop_var: ns_item
 
-    # 4. AUTOMATIC INGRESS: Open standard ports (443, 8443) for every discovered App
+    # 4. AUTOMATIC INGRESS: Grant access for both internal cluster traffic and external requests
     - name: "🔓 Connectivity: Allow Ingress to Discovered Apps"
       kubernetes.core.k8s:
         state: present
@@ -51,7 +51,40 @@
         namespace: "{{ item.ns }}"
         app_label: "{{ item.name }}"
         ingress_rules:
+          # External: Public HTTPS traffic from the internet
           - { cidr: "0.0.0.0/0", port: 443 }
+          # Management: Secure access from your specific VPS IP
           - { cidr: "{{ vps_ip }}/32", port: 8443 }
+          # Internal Fix: Authorize the Ingress Controller (Traefik/Nginx) 
+          # to reach pods on their service ports (80, 3000, 5000, 8080)
+          - { cidr: "10.42.0.0/16", port: 80 }
+          - { cidr: "10.42.0.0/16", port: 3000 }
+          - { cidr: "10.42.0.0/16", port: 5000 }
+          - { cidr: "10.42.0.0/16", port: 8080 }
       loop: "{{ discovered_apps }}"
       when: "item.name is defined and item.name != None"
+
+    # 5. SERVICE MESH: Enable East-West traffic for the Blog stack
+    # This step resolves the issue where the frontend cannot reach the backend.
+    - name: "🔗 Connectivity: Allow Frontend to access Backend (Ingress)"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
+      vars:
+        app_name: "sentinel-blog-backend-internal"
+        namespace: "blog-prod"
+        app_label: "blog-backend" # The target pod receiving requests
+        ingress_rules:
+          - { from_app: "blog-frontend", port: 5000 } # Port used by your API/Backend
+
+    - name: "📡 Connectivity: Allow Frontend outbound to Cluster (Egress)"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
+      vars:
+        app_name: "sentinel-blog-frontend-egress"
+        namespace: "blog-prod"
+        app_label: "blog-frontend" # The source pod initiating the request
+        egress_rules:
+          # Allowing egress to the internal pod network (K3s default: 10.42.0.0/16)
+          - { cidr: "10.42.0.0/16", port: 5000 }

@@ -33,7 +33,7 @@ def init_k8s():
         apps_client = client.AppsV1Api()
         custom_client = client.CustomObjectsApi()
         
-    except Exception as e:
+    except Exception as e: 
         print(f"❌ Critical: Failed to load K8s config: {e}")
         v1 = None
         apps_client = None
