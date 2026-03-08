@@ -34,6 +34,11 @@
   const showRoleModal = ref(false);
   const selectedPod = ref<PodNode | null>(null);
   const currentViewMode = ref('list'); 
+  
+  // --- New UI States: Terminal & Sentinel Actions ---
+  const showTestModal = ref(false);
+  const isTesting = ref(false);
+  const testTerminalOutput = ref('');
 
   // --- Logic: Vulnerability Detection & Scoring ---
   const isVulnerable = (pod: PodNode) => !pod.is_hardened;
@@ -100,36 +105,59 @@
   };
 
   const getEdgePath = (edge: NetworkEdge) => {
-  // 1. Locate the pod indices within the FILTERED list (currently rendered on screen)
-  const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
-  const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
+    const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
+    const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
 
-  // 2. Safety check: if either pod is not in the selected namespace, do not render the connection
-  if (sourceIdx === -1 || targetIdx === -1) return "";
+    if (sourceIdx === -1 || targetIdx === -1) return "";
 
-  const total = filteredPods.value.length;
-
-  // 3. Calculate start and end positions using the same alignment logic as the template nodes
-  const start = getNodePos(edge.source, sourceIdx, total, sourceIdx % 2 === 0 ? 'left' : 'right');
-  const end = getNodePos(edge.target, targetIdx, total, targetIdx % 2 === 0 ? 'left' : 'right');
-  
-  // 4. Generate the SVG Cubic Bezier curve path
-  return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
-};
+    const total = filteredPods.value.length;
+    const start = getNodePos(edge.source, sourceIdx, total, sourceIdx % 2 === 0 ? 'left' : 'right');
+    const end = getNodePos(edge.target, targetIdx, total, targetIdx % 2 === 0 ? 'left' : 'right');
+    
+    return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
+  };
 
   const openRoleDetails = (pod: PodNode) => {
     selectedPod.value = pod;
     showRoleModal.value = true;
   };
 
+  // --- Sentinel Actions ---
   const triggerHarden = async () => {
     if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
     try {
-      await api.post('/sentinel/harden');
+      await api.post('/sentinel/activate');
       alert("🛡️ Network Sentinel strategy applied successfully!");
       fetchNetworkData();
     } catch (e) {
       alert("❌ Error: Ansible Playbook execution failed.");
+    }
+  };
+
+  const triggerDeactivate = async () => {
+    if (!confirm("⚠️ WARNING: You are about to drop all Zero-Trust Network Policies. The cluster will be OPEN. Proceed?")) return;
+    try {
+      await api.post('/sentinel/deactivate');
+      alert("🔓 Policies deactivated. Cluster is now open.");
+      fetchNetworkData();
+    } catch (e) {
+      alert("❌ Error: Deactivation failed.");
+    }
+  };
+
+  const runConnectivityTest = async () => {
+    showTestModal.value = true;
+    isTesting.value = true;
+    testTerminalOutput.value = "⏳ Deploying ephemeral diagnostic pod (nicolaka/netshoot)...\n";
+    
+    try {
+      // Assuming your backend reads the shell script execution stdout
+      const { data } = await api.post('/sentinel/test');
+      testTerminalOutput.value = data.output;
+    } catch (error) {
+      testTerminalOutput.value += "\n<span style='color: #ef4444;'>❌ FATAL: Backend communication failed. Check K-Guard API logs.</span>";
+    } finally {
+      isTesting.value = false;
     }
   };
 
@@ -156,6 +184,9 @@
           <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[9px] text-slate-300 px-3 py-1.5 rounded-sm uppercase font-bold tracking-widest cursor-pointer">
             <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
           </select>
+          
+          <button @click="runConnectivityTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Connectivity</button>
+          <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deactivate Hardening</button>
           <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
         </div>
       </div>
@@ -176,8 +207,12 @@
       <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 20px 20px;"></div>
       
       <svg viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
-        <g v-for="edge in filteredEdges" :key="edge.source + edge.target">
-          <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1]" marker-end="url(#arrow)" />
+        <g v-for="edge in filteredEdges" :key="'base-' + edge.source + edge.target">
+          <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1]" />
+        </g>
+        
+        <g v-for="edge in filteredEdges" :key="'flow-' + edge.source + edge.target">
+          <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-blue-500 stroke-[1.5] opacity-60 animate-dash-flow" stroke-dasharray="4 8" />
         </g>
 
         <g v-for="(pod, idx) in filteredPods" :key="pod.id" @click="openRoleDetails(pod)" class="cursor-pointer group">
@@ -256,15 +291,53 @@
         </div>
       </div>
     </Teleport>
+
+    <Teleport to="body">
+      <div v-if="showTestModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
+        <div class="bg-[#0b0c10] border border-slate-700 w-full max-w-4xl h-[70vh] flex flex-col rounded-sm shadow-2xl overflow-hidden font-mono shadow-blue-900/20">
+          
+          <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#15161b]">
+            <div class="flex items-center gap-2">
+              <div class="w-3 h-3 rounded-full bg-red-500"></div>
+              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
+              <div class="w-3 h-3 rounded-full bg-green-500"></div>
+              <span class="ml-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest">k-guard@sentinel ~ connectivity_test.sh</span>
+            </div>
+            <button @click="showTestModal = false" class="text-slate-500 hover:text-red-400 text-xl leading-none transition-colors">&times;</button>
+          </div>
+
+          <div class="flex-1 p-6 overflow-y-auto text-xs md:text-sm text-slate-300 leading-relaxed custom-scrollbar whitespace-pre-wrap">
+            <div v-html="testTerminalOutput"></div>
+            <div v-if="isTesting" class="mt-4 flex items-center gap-2 text-blue-400">
+              <span class="animate-pulse">_</span>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+    </Teleport>
+
   </div>
 </template>
 
 <style scoped>
-/* Animations identiques mais optimisées pour la fluidité */
+/* Base Animations */
 @keyframes flow {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
-.custom-scrollbar::-webkit-scrollbar { width: 3px; }
-.custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; }
+
+/* SVG Topology Flow Animation */
+@keyframes dash-flow {
+  from { stroke-dashoffset: 24; }
+  to { stroke-dashoffset: 0; }
+}
+.animate-dash-flow {
+  animation: dash-flow 1.5s linear infinite;
+}
+
+/* Custom Scrollbars */
+.custom-scrollbar::-webkit-scrollbar { width: 4px; }
+.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+.custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
 </style>

@@ -1,141 +1,144 @@
+from fastapi import APIRouter, Query
+from typing import Optional
+from kubernetes import client, config
 import os
-from fastapi import APIRouter, Depends, HTTPException
-from datetime import datetime
-from kubernetes import client
+import subprocess
 
-# Internal imports
-from .auth import verify_token
-from database import v1, apps_client, DB_PATH
-from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats
-from metrics_manager import get_pod_metrics
+router = APIRouter(tags=["Network Sentinel"])
 
-router = APIRouter(prefix="/k3s", tags=["K3s Monitoring"])
+# --- DYNAMIC CONFIGURATION ---
+# No hardcoded namespaces or labels. Everything is discovered via K8s API.
+ANSIBLE_PATH = os.getenv("KGUARD_ANSIBLE_PATH", "/app/infra/ansible/playbooks/harden_policies.yml")
+# Set the correct path based on your SRE directory structure
+TEST_SCRIPT_PATH = os.getenv("KGUARD_TEST_SCRIPT_PATH", "/app/test/connectivity_test.sh")
 
-@router.get("/health")
-async def k3s_module_health(user: dict = Depends(verify_token)):
-    return {"status": "ok", "service": "k3s-manager"}
-
-@router.get("/cluster-status")
-async def get_cluster_health(user: dict = Depends(verify_token)):
-    return get_k3s_status()
-
-@router.get("/node-capacity")
-async def get_node_capacity(user: dict = Depends(verify_token)):
+def load_k8s_config():
+    """Loads K8s configuration with auto-detection."""
     try:
-        nodes = v1.list_node()
-        node = nodes.items[0]
-        capacity = node.status.capacity
-        return {
-            "cpu_cores": int(capacity.get("cpu", 1)),
-            "memory_total_ki": int(capacity.get("memory", "0").replace("Ki", ""))
-        }
-    except Exception:
-        # Default fallback values if Node API is unreachable
-        return {"cpu_cores": 1, "memory_total_ki": 8000000}
+        if os.path.exists("/etc/rancher/k3s/k3s.yaml"):
+            config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
+        else:
+            config.load_incluster_config()
+    except Exception as e:
+        print(f"⚠️ Kubernetes configuration error: {e}")
 
-@router.get("/deployments/all")    
-async def list_all_deployments(user: dict = Depends(verify_token)):
-    """Discovery route for SecurityView (Trivy Audit)"""
+load_k8s_config()
+
+@router.get("/sentinel/map")
+async def get_network_map():
+    """
+    Generates a dynamic map of network flows using Full Auto-Discovery.
+    """
+    v1 = client.CoreV1Api()
+    net_v1 = client.NetworkingV1Api()
+    
+    nodes = []
+    edges = []
+    discovered_ns = []
+
     try:
-        if not apps_client: return []
-        all_deps = get_cluster_deployments()
-        # Filter out system namespaces to focus on user applications
-        system_ns = ["kube-system", "kube-public", "kube-node-lease", "local-path-storage", "cert-manager", "ingress-nginx"]
-        
-        return [
-            {
-                "id": dep.get('id'),
-                "name": dep.get('name'),
-                "namespace": dep.get('namespace'),
-                "image": dep.get('image'),
-                "status": "Active"
-            } for dep in all_deps if dep['namespace'] not in system_ns
+        # 1. DISCOVERY: List all namespaces except internal system ones
+        all_ns = v1.list_namespace(timeout_seconds=5)
+        target_ns = [
+            n.metadata.name for n in all_ns.items 
+            if not n.metadata.name.startswith(("kube-", "local-path-", "node-lease"))
         ]
-    except Exception as e:
-        print(f"❌ Discovery Error: {str(e)}")
-        return []
+        discovered_ns = target_ns
 
-@router.get("/metrics/{namespace}")
-async def get_metrics(namespace: str, user: dict = Depends(verify_token)):
-    try:
-        data = get_pod_metrics(namespace)
-        # Force return as list even if metrics manager returns None
-        return data if isinstance(data, list) else []
-    except Exception as e:
-        print(f"🚨 Metrics Error: {e}")
-        return [] # Prevents Frontend crash during .map() operations
+        # 2. SCAN: Inventory pods and policies
+        for namespace in target_ns:
+            policies = net_v1.list_namespaced_network_policy(namespace)
+            pods = v1.list_namespaced_pod(namespace)
+            
+            for pod in pods.items:
+                pod_name = pod.metadata.name
+                labels = pod.metadata.labels or {}
+                
+                # Dynamic Role Detection: use 'app' label or fallback to first available label
+                role = labels.get("app", labels.get("k8s-app", next(iter(labels.values()), "generic")))
+                
+                nodes.append({
+                    "id": pod_name,
+                    "name": pod_name,
+                    "namespace": namespace,
+                    "status": pod.status.phase,
+                    "ip": pod.status.pod_ip or "0.0.0.0",
+                    "role": role,
+                    "labels": labels,
+                    "is_hardened": len(policies.items) > 0
+                })
 
-@router.get("/status")
-async def get_cluster_status(user: dict = Depends(verify_token)):
-    try:
-        if not v1: raise HTTPException(status_code=500, detail="K8s client not initialized")
-        version_info = client.VersionApi().get_code()
-        nodes = v1.list_node()
-        if not nodes.items: return {"status": "Error", "detail": "No nodes found"}
-        
-        node = nodes.items[0]
-        node_info = node.status.node_info
-        creation_time = node.metadata.creation_timestamp
-        uptime_delta = datetime.utcnow().replace(tzinfo=None) - creation_time.replace(tzinfo=None)
-        
+        # 3. EDGE GENERATION: Logical mapping based on namespace shared context
+        for i, node_a in enumerate(nodes):
+            for node_b in nodes[i+1:]:
+                if node_a["namespace"] == node_b["namespace"]:
+                    edges.append({
+                        "source": node_a["id"],
+                        "target": node_b["id"],
+                        "label": "Intra-NS Flow"
+                    })
+                
         return {
-            "cluster_version": getattr(version_info, 'git_version', "Unknown"),
-            "vps_os": f"{getattr(node_info, 'os_image', 'Unknown OS')}",
-            "uptime": f"{uptime_delta.days} days",
-            "status": "Ready" if any(c.type == 'Ready' and c.status == 'True' for c in node.status.conditions) else "NotReady"
+            "nodes": nodes,
+            "edges": edges,
+            "namespaces": discovered_ns
         }
     except Exception as e:
-        # Crucial: Return object with consistent keys to prevent Frontend crashes
-        return {
-            "cluster_version": "N/A",
-            "vps_os": "Error checking OS",
-            "uptime": "0 days",
-            "status": "Error"
-        }
+        return {"error": str(e)}
 
-@router.get("/logs/{namespace}/{pod_name}")
-async def get_logs(namespace: str, pod_name: str, user: dict = Depends(verify_token)):
+# --- NEW SRE CONTROL PLANE ROUTES ---
+
+@router.post("/sentinel/activate")
+async def activate_hardening():
+    """
+    Triggers the automated Ansible hardening playbook.
+    Enforces Zero-Trust Micro-segmentation across the cluster.
+    """
+    if not os.path.exists(ANSIBLE_PATH):
+        return {"status": "ERROR", "details": f"Playbook not found at {ANSIBLE_PATH}"}
+    
     try:
-        if v1 is None: return {"logs": "K8s client not initialized"}
-        pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
-        containers = [c.name for c in pod.spec.containers]
-        target_container = containers[0]
-        
-        # Heuristic to find the main application container
-        for c_name in containers:
-            if any(k in c_name.lower() for k in ["backend", "app", "api", "server"]):
-                target_container = c_name
-                break
-
-        logs = v1.read_namespaced_pod_log(
-            name=pod_name, namespace=namespace, container=target_container, tail_lines=100
+        result = subprocess.run(
+            ["ansible-playbook", ANSIBLE_PATH],
+            capture_output=True, text=True, check=True
         )
-        return {"logs": logs}
-    except Exception as e:
-        return {"logs": f"ERROR: {str(e)}"}
+        return {"status": "SUCCESS", "message": "Sentinel Strategy Applied"}
+    except subprocess.CalledProcessError as e:
+        return {"status": "ERROR", "details": e.stderr}
 
-@router.get("/debug/storage")
-async def debug_storage(user: dict = Depends(verify_token)):
-    """SRE diagnostic route for storage health"""
+@router.post("/sentinel/deactivate")
+async def deactivate_hardening():
+    """
+    Emergency Kill Switch: Deactivates all Network Policies managed by K-Guard.
+    Restores the cluster to an Allow-All state for debugging.
+    """
     try:
-        stats = get_storage_stats()
-        # Verify SQLite database accessibility
-        db_exists = os.path.exists(DB_PATH)
-        
-        return {
-            "status": "success",
-            "disks": stats,
-            "database_present": db_exists,
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        return {"status": "error", "message": str(e)}
-        
-@router.post("/debug/purge-cache")
-async def action_purge_cache(user: dict = Depends(verify_token)):
-    """Maintenance action to free up PVC space"""
-    success = purge_trivy_cache()
-    if success:
-        return {"status": "success", "message": "Trivy cache successfully purged."}
-    else:
-        raise HTTPException(status_code=500, detail="Failed to purge cache.")
+        # Deletes only policies created by K-Guard to avoid breaking core K8s CNI rules
+        result = subprocess.run(
+            ["kubectl", "delete", "netpol", "-l", "managed-by=k-guard-sentinel", "-A"],
+            capture_output=True, text=True, check=True
+        )
+        return {"status": "SUCCESS", "message": "Network policies deactivated. Cluster is OPEN."}
+    except subprocess.CalledProcessError as e:
+        return {"status": "ERROR", "details": e.stderr}
+
+@router.post("/sentinel/test")
+async def test_connectivity():
+    """
+    Executes the SRE Netshoot diagnostic script.
+    Captures stdout to display the live audit results in the frontend terminal.
+    """
+    if not os.path.exists(TEST_SCRIPT_PATH):
+        return {"output": f"❌ ERROR: Test script not found at {TEST_SCRIPT_PATH}. Please check the path."}
+    
+    try:
+        # Run the bash script and capture the output
+        result = subprocess.run(
+            ["bash", TEST_SCRIPT_PATH],
+            capture_output=True, text=True, check=True
+        )
+        return {"output": result.stdout}
+    except subprocess.CalledProcessError as e:
+        # If the script exits with an error code (e.g., due to 'set -e' and a failed ping), 
+        # we still want to return the output so the admin sees the failure logs in the UI.
+        return {"output": e.stdout + "\n" + e.stderr}
