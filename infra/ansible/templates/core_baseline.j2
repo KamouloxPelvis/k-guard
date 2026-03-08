@@ -1,36 +1,49 @@
 # --- Baseline: Zero Trust Isolation ---
-# Blocks all traffic by default within the namespace.
+# Blocks all traffic by default to enforce a "Deny-All" security posture.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
   name: sentinel-default-deny
   namespace: {{ ns_item }}
+  labels:
+    managed-by: k-guard-sentinel
 spec:
-  podSelector: {}
+  podSelector: {} # Targets all pods within this namespace
   policyTypes: ["Ingress", "Egress"]
 ---
-# --- Infrastructure: DNS & Monitoring (Conditional) ---
-# Allows essential cluster traffic (DNS, K8s API, and Probes).
+# --- Infrastructure: Essential Services ---
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
   name: sentinel-core-infra
   namespace: {{ ns_item }}
+  labels:
+    managed-by: k-guard-sentinel
 spec:
   podSelector: {}
   policyTypes: ["Egress", "Ingress"]
   egress:
-    - to: # CoreDNS Access
+    - to: # CoreDNS Resolution
       - namespaceSelector:
           matchLabels: { kubernetes.io/metadata.name: kube-system }
-      ports: [{ protocol: UDP, port: 53 }, { protocol: TCP, port: 53 }]
-    - to: # K8s API Server (K3s Default IP)
-      - ipBlock: { cidr: 10.43.0.1/32 }
- 
+      ports:
+        - { protocol: UDP, port: 53 }
+        - { protocol: TCP, port: 53 }
+        
+    - to: # Allow Internal Pod-to-Pod Communication
+      - ipBlock: { cidr: 10.42.0.0/16 }
+      
+    - to: # FIX [2/4]: K8s API & External Secure APIs
+      - ipBlock: { cidr: 0.0.0.0/0 }
+      ports:
+        - { protocol: TCP, port: 443 }  # Standard HTTPS (ex: Webex Webhooks)
+        - { protocol: TCP, port: 6443 } # Standard K3s API 
+        - { protocol: TCP, port: 8443 } # Custom VPS HTTPS & K-Guard Port
   ingress:
 {% if monitoring_enabled %}
-    - from: # Allow Health Probes from Monitoring stack
+    - from: # Observability: Allow Prometheus/Grafana probes
       - namespaceSelector:
           matchLabels: { kubernetes.io/metadata.name: monitoring }
+      # Allow metrics scraping from the node network
       - ipBlock: { cidr: 10.42.0.0/16 }
 {% endif %}

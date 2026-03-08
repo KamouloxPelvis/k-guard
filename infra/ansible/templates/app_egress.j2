@@ -1,6 +1,6 @@
 # --- Specific Application Egress Policy ---
-# Controls outbound traffic for a specific pod to prevent data exfiltration 
-# and ensure Zero Trust connectivity between services.
+# Restricts outbound connections to prevent unauthorized data exfiltration
+# and enforce Zero Trust connectivity between microservices.
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
@@ -18,12 +18,12 @@ spec:
 {% for rule in egress_rules %}
     - to:
 {% if rule.to_app is defined %}
-      # Service-to-Service: Restrict egress to a specific destination app
+      # Service Discovery: Restrict communication to a specific target app
       - podSelector:
           matchLabels:
             app: {{ rule.to_app }}
 {% else %}
-      # Network-level: Allow egress to a specific CIDR (e.g., internal cluster subnet)
+      # Connectivity: Permit egress to a verified CIDR (Internal Cluster Subnet)
       - ipBlock:
           cidr: {{ rule.cidr }}
 {% endif %}

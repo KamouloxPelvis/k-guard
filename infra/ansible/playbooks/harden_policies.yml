@@ -1,90 +1,57 @@
-- name: "🛡️ K-Guard Sentinel - Full Automated Security"
+- name: "🛡️ K-Guard Sentinel - Universal Dynamic Security"
   hosts: localhost
   connection: local
   gather_facts: no
   vars:
+    # International standard comments in English
     ansible_python_interpreter: /usr/bin/python3
-    # VPS_IP is retrieved from environment variables for security
     vps_ip: "{{ lookup('env', 'VPS_IP') | default('127.0.0.1', true) }}"
 
   tasks:
-    # 1. DISCOVERY: List namespaces and detect monitoring stack
-    - name: "🔍 Discovery: List active namespaces"
+    # 1. SCOPING: Discover all user namespaces (excluding system ones)
+    - name: "🔍 Discovery: List target namespaces"
       kubernetes.core.k8s_info:
         kind: Namespace
+        label_selectors:
+          - "kubernetes.io/metadata.name notin (kube-system, kube-public, kube-node-lease)"
       register: ns_list
 
-    - name: "⚙️ Fact: Identify target namespaces"
-      set_fact:
-        target_namespaces: "{{ ns_list | json_query('resources[*].metadata.name') | reject('match', 'kube-.*') | list }}"
-        monitoring_enabled: "{{ 'monitoring' in ns_list | json_query('resources[*].metadata.name') }}"
-
-    # 2. DISCOVERY: Scan all pods to extract 'app' labels automatically
-    - name: "🔍 Discovery: Get all pods in target namespaces"
+    # 2. APP DISCOVERY: Find all pods and their actual container ports
+    - name: "🔍 Discovery: Extract Apps and Ports"
       kubernetes.core.k8s_info:
         kind: Pod
-        namespace: "{{ item }}"
-      loop: "{{ target_namespaces }}"
-      register: pod_list
+        namespace: "{{ item.metadata.name }}"
+      loop: "{{ ns_list.resources }}"
+      register: pod_results
 
-    - name: "⚙️ Fact: Map Apps to Namespaces (Auto-Discovery)"
+    - name: "⚙️ Fact: Build Dynamic App Map"
       set_fact:
-        # We use a simpler query to extract label 'app' and the namespace
-        discovered_apps: "{{ pod_list.results | map(attribute='resources') | flatten | json_query('[*].{name: metadata.labels.app, ns: metadata.namespace}') | unique }}"
-  
-    # 3. BASELINE: Apply Zero Trust isolation (Deny-All)
-    - name: "🔒 Sentinel: Deploy Core Baseline"
+        # Extracts app label, namespace, and FIRST container port found (dynamic)
+        discovered_workloads: "{{ pod_results.results | map(attribute='resources') | flatten | json_query('[*].{app: metadata.labels.app, ns: metadata.namespace, port: spec.containers[0].ports[0].containerPort}') | unique }}"
+
+    # 3. BASELINE: Apply Zero Trust (Default Deny) to all discovered namespaces
+    - name: "🔒 Sentinel: Deploy Idempotent Baseline"
       kubernetes.core.k8s:
         state: present
-        definition: "{{ lookup('template', '../templates/core_baseline.j2') | from_yaml_all | list }}"
-      loop: "{{ target_namespaces }}"
-      loop_control:
-        loop_var: ns_item
+        definition: "{{ lookup('template', '../templates/core_baseline.j2') }}"
+      vars:
+        ns_item: "{{ item.metadata.name }}"
+        monitoring_enabled: "{{ 'monitoring' in (ns_list.resources | map(attribute='metadata.name') | list) }}"
+      loop: "{{ ns_list.resources }}"
 
-    # 4. AUTOMATIC INGRESS: Grant access for both internal cluster traffic and external requests
-    - name: "🔓 Connectivity: Allow Ingress to Discovered Apps"
+    # 4. UNIVERSAL INGRESS: Link Ingress Controller to Apps automatically
+    - name: "🔓 Connectivity: Dynamic Ingress Authorization"
       kubernetes.core.k8s:
         state: present
         definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
       vars:
-        app_name: "sentinel-{{ item.name }}-ingress"
+        app_name: "sentinel-{{ item.app }}-ingress"
         namespace: "{{ item.ns }}"
-        app_label: "{{ item.name }}"
+        app_label: "{{ item.app }}"
         ingress_rules:
-          # External: Public HTTPS traffic from the internet
+          # Perimeter: Public HTTPS (Port constraint applied)
           - { cidr: "0.0.0.0/0", port: 443 }
-          # Management: Secure access from your specific VPS IP
-          - { cidr: "{{ vps_ip }}/32", port: 8443 }
-          # Internal Fix: Authorize the Ingress Controller (Traefik/Nginx) 
-          # to reach pods on their service ports (80, 3000, 5000, 8080)
-          - { cidr: "10.42.0.0/16", port: 80 }
-          - { cidr: "10.42.0.0/16", port: 3000 }
-          - { cidr: "10.42.0.0/16", port: 5000 }
-          - { cidr: "10.42.0.0/16", port: 8080 }
-      loop: "{{ discovered_apps }}"
-      when: "item.name is defined and item.name != None"
-
-    # 5. SERVICE MESH: Enable East-West traffic for the Blog stack
-    # This step resolves the issue where the frontend cannot reach the backend.
-    - name: "🔗 Connectivity: Allow Frontend to access Backend (Ingress)"
-      kubernetes.core.k8s:
-        state: present
-        definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
-      vars:
-        app_name: "sentinel-blog-backend-internal"
-        namespace: "blog-prod"
-        app_label: "blog-backend" # The target pod receiving requests
-        ingress_rules:
-          - { from_app: "blog-frontend", port: 5000 } # Port used by your API/Backend
-
-    - name: "📡 Connectivity: Allow Frontend outbound to Cluster (Egress)"
-      kubernetes.core.k8s:
-        state: present
-        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
-      vars:
-        app_name: "sentinel-blog-frontend-egress"
-        namespace: "blog-prod"
-        app_label: "blog-frontend" # The source pod initiating the request
-        egress_rules:
-          # Allowing egress to the internal pod network (K3s default: 10.42.0.0/16)
-          - { cidr: "10.42.0.0/16", port: 5000 }
+          # Internal: Allow Ingress Controller (10.42.0.0/16) to reach all app ports
+          - { cidr: "10.42.0.0/16" } 
+      loop: "{{ discovered_workloads }}"
+      when: "item.app is defined and item.app != None"

@@ -1,6 +1,6 @@
 # --- Automated Ingress Policy for {{ app_label }} ---
-# This policy is dynamically generated to control inbound traffic.
-# It supports both external CIDR-based access and internal Pod-to-Pod communication.
+# Dynamically regulates inbound traffic from external sources (CIDR)
+# International standards: Compliant with Cisco DevNet
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
@@ -18,16 +18,18 @@ spec:
 {% for rule in ingress_rules %}
     - from:
 {% if rule.from_app is defined %}
-      # Internal Microsegmentation: Allow traffic only from a specific application
+      # Internal Trust: Authorize specific peer pods
       - podSelector:
           matchLabels:
             app: {{ rule.from_app }}
 {% elif rule.cidr is defined %}
-      # Perimeter Security: Allow traffic from specific IP ranges or external LoadBalancer
+      # Network Trust: Authorize specific IP blocks
       - ipBlock:
           cidr: {{ rule.cidr }}
 {% endif %}
+{% if rule.port is defined %}
       ports:
         - protocol: {{ rule.protocol | default('TCP') }}
           port: {{ rule.port }}
+{% endif %}
 {% endfor %}
