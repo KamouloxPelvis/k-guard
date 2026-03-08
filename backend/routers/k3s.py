@@ -3,6 +3,7 @@ from typing import Optional
 from kubernetes import client, config
 import os
 import subprocess
+import logging
 
 router = APIRouter(tags=["Network Sentinel"])
 
@@ -84,7 +85,8 @@ async def get_network_map():
             "namespaces": discovered_ns
         }
     except Exception as e:
-        return {"error": str(e)}
+        logging.exception("Error while generating network map")
+        return {"error": "Failed to generate network map."}
 
 # --- NEW SRE CONTROL PLANE ROUTES ---
 
