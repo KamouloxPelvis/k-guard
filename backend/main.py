@@ -14,7 +14,7 @@ from routers import auth, k3s, scan, remediation, integrations
 
 app = FastAPI(
     title="🛡️ K-Guard API", 
-    version="1.5.0",
+    version="1.0.0",
     description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
 )
 

@@ -10,9 +10,8 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: read
-      packages: write # Required to push to GitHub Container Registry
+      packages: write
     steps:
-      # International SRE Standard: Pinning actions by commit SHA to prevent supply-chain attacks.
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
@@ -28,7 +27,6 @@ jobs:
         with:
           context: .
           push: true
-          # Fixed: repository name must be lowercase to avoid build errors
           tags: ghcr.io/kamouloxpelvis/kguard-app:latest
 
   deploy_to_k3s:
@@ -39,7 +37,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
-      # Securely copy Kubernetes manifests to the VPS before applying them
+      # SRE FIX: Copy manifests to a dedicated sub-directory to avoid root overwriting
       - name: Copy K8s manifests to VPS
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
@@ -47,7 +45,9 @@ jobs:
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.CI_CD_SSH_KEY }}
           source: "k8s/*"
-          target: "/home/kamal/infrastructure/apps/k-guard/"
+          # Targeted path to ensure we don't move or delete DB/Scripts at root
+          target: "/home/kamal/infrastructure/apps/k-guard/k8s/"
+          strip_components: 1 # Prevents creating an extra k8s/k8s/ folder
 
       - name: Deploy to VPS via SSH
         uses: appleboy/ssh-action@029f5b4aeeeb58fdfe1410a5d17f967dacf36262 # v1.0.3
@@ -57,21 +57,20 @@ jobs:
           key: ${{ secrets.CI_CD_SSH_KEY }}
           port: 22
           script: |
-            echo "🚀 Updating infrastructure on ${{ secrets.VPS_IP }}..."
-            # Apply the latest manifests copied to the VPS
+            echo "🚀 Synchronizing Infrastructure on ${{ secrets.VPS_IP }}..."
+            # Apply only the targeted manifests
             kubectl apply -f /home/kamal/infrastructure/apps/k-guard/k8s/ -n k-guard
-            # Force pull the new 'latest' image by restarting the deployment
+            # Force the rollout to pull the fresh image and restart background services
             kubectl rollout restart deployment kguard-deployment -n k-guard
-            # Wait for the deployment to stabilize
             kubectl rollout status deployment kguard-deployment -n k-guard --timeout=300s
 
       - name: Discord Notification
-        if: always() # Ensure notification is sent regardless of previous steps status
+        if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            MESSAGE="🛡️ **K-GUARD** (k3s): Deployment successful by **${{ github.actor }}**! ✅"
+            MESSAGE="🛡️ **K-GUARD** (k3s): Infrastructure recovered and deployed! ✅"
           else
-            MESSAGE="⚠️ **K-GUARD** (k3s): Critical deployment failure! ❌"
+            MESSAGE="⚠️ **K-GUARD** (k3s): Deployment recovery failed! ❌"
           fi
           curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\": \"$MESSAGE\"}" \
