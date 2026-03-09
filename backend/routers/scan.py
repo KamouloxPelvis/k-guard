@@ -40,7 +40,6 @@ async def get_scan_results(image_name: str, user: dict = Depends(verify_token)):
         conn.row_factory = sqlite3.Row
         cursor = conn.cursor()
         
-        # Fetch the most recent report based on creation timestamp
         cursor.execute(
             "SELECT status, report, created_at FROM security_scans WHERE image = ? ORDER BY created_at DESC LIMIT 1",
             (image_name,)
@@ -51,7 +50,6 @@ async def get_scan_results(image_name: str, user: dict = Depends(verify_token)):
         if not row:
             return {"status": "not_found", "message": "No scan results found in database for this image."}
 
-        # Deserialize JSON text from DB into a Python object
         report_data = json.loads(row["report"]) if row["report"] else None
 
         return {
@@ -61,41 +59,38 @@ async def get_scan_results(image_name: str, user: dict = Depends(verify_token)):
             "data": report_data
         }
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database access error: {str(e)}")
+        # SRE Security: Log actual error server-side, do not expose stack trace to client
+        print(f"❌ [DB ERROR] Failed to retrieve scan results: {e}")
+        raise HTTPException(status_code=500, detail="Database access error occurred.")
 
 # 3. Background Processing Logic
 def run_and_store_scan(image: str):
     """Core logic to run Trivy scan, save to DB, and notify via Webex."""
     notifier = CiscoWebexNotifier() 
     try:
-        # 1. Execute Trivy scan via security_manager
         report = run_trivy_scan(image) 
-        
-        # 2. Persist results in SQLite database
         update_scan_status(image, "completed", report) 
         
-        # 3. CHATOPS ALERTING: Send summary to Cisco Webex if integration is active
         if report and "summary" in report:
             print(f"🛰️ [K-GUARD] Sending report to Webex for {image}")
             notifier.send_scan_report(image, report["summary"]) 
 
     except Exception as e:
         print(f"❌ [K-GUARD] Scan/Notify Error: {e}")
-        update_scan_status(image, "error", {"error": str(e)}) 
+        # Note: We store generic error status in DB to prevent leaking execution contexts
+        update_scan_status(image, "error", {"error": "Scan execution failed. Check server logs."}) 
 
 @router.get("/debug-storage")
 async def debug_storage(user: dict = Depends(verify_token)):
     """Diagnostic route for Trivy cache persistence on PVC."""
     cache_path = os.getenv("TRIVY_CACHE_DIR", "/data/trivy-cache")
     try:
-        # Check cache directory content
         files = []
         if os.path.exists(cache_path):
             files = os.listdir(cache_path)
-            # Verify if the 'db' subdirectory exists (Trivy internal database)
             db_exists = os.path.exists(os.path.join(cache_path, "db"))
         else:
-            return {"error": f"The directory {cache_path} does not exist."}
+            return {"error": "Configured cache directory does not exist."}
 
         return {
             "mount_path": cache_path,
@@ -105,4 +100,6 @@ async def debug_storage(user: dict = Depends(verify_token)):
             "message": "If 'db' is present, persistence is operational!"
         }
     except Exception as e:
-        return {"error": str(e)}
+        # SRE Security: Prevent filesystem structure leakage
+        print(f"❌ [STORAGE DEBUG] Filesystem access error: {e}")
+        return {"error": "Internal server error occurred while diagnosing storage."}

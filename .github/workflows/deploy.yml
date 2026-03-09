@@ -5,9 +5,14 @@ on:
     branches:
       - main
 
+# SRE Best Practice: Enforce global least privilege for GitHub Actions
+permissions:
+  contents: read
+
 jobs:
   build_images:
     runs-on: ubuntu-latest
+    # Override for specific job requiring registry push access
     permissions:
       contents: read
       packages: write
@@ -27,7 +32,7 @@ jobs:
         with:
           context: .
           push: true
-          # FIX: Forced lowercase repository name to avoid 'invalid tag' error
+          # SRE Best Practice: Tagging with 'latest' AND a unique 'SHA' to bypass cache
           tags: |
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
@@ -40,6 +45,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
+      # Isolation: Copy manifests to a dedicated sub-directory to protect root persistence (DB/Scripts)
       - name: Copy K8s manifests to VPS
         uses: appleboy/scp-action@917f8b81dfc1ccd331fef9e2d61bdc6c8be94634 # v0.1.7
         with:
@@ -59,11 +65,14 @@ jobs:
           port: 22
           script: |
             echo "🚀 Synchronizing Infrastructure with image SHA: ${{ github.sha }}..."
+            
+            # Apply updated manifests
             kubectl apply -f /home/kamal/infrastructure/apps/k-guard/k8s/ -n k-guard
             
-            # FIX: Using 'kguard-app' (the container name from your deployment.yaml)
+            # SRE Kill-Switch: Force the deployment to use the specific immutable image SHA
             kubectl set image deployment/kguard-deployment kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n k-guard
             
+            # Verify deployment health
             kubectl rollout status deployment kguard-deployment -n k-guard --timeout=300s
 
       - name: Discord Notification
