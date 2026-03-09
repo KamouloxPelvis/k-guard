@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats, purge_trivy_cache
+from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats, purge_trivy_cache, get_node_capacity
 from metrics_manager import get_pod_metrics # Import the SRE metrics module
 from k3s_manager import get_pod_logs # Import the newly added function
 from .auth import verify_token
@@ -19,6 +19,11 @@ async def k3s_pod_logs(namespace: str, pod_name: str, user: dict = Depends(verif
     """Fetches real-time terminal logs for the SRE console modal."""
     logs = get_pod_logs(namespace, pod_name)
     return {"logs": logs}
+
+@router.get("/k3s/node-capacity")
+async def node_capacity(user: dict = Depends(verify_token)):
+    """Expose les capacités réelles du VPS pour les calculs de pourcentages frontend."""
+    return get_node_capacity()
 
 @router.get("/k3s/cluster-status")
 async def k3s_status(user: dict = Depends(verify_token)):
