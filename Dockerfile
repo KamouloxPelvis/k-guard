@@ -12,10 +12,12 @@ RUN npm run build
 FROM python:3.11-slim
 WORKDIR /app
 
-# 1. System Dependencies + Trivy Installation (Portable Method)
-# Installing curl and certificates to fetch the official Trivy security scanner
+# 1. System Dependencies + Trivy & Kubectl Installation
+# Installing curl and certificates, then downloading Trivy and Kubectl binaries
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin \
+    && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
+    && chmod +x kubectl && mv kubectl /usr/local/bin/ \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
 # 2. Dependency Management (Cache Optimization)

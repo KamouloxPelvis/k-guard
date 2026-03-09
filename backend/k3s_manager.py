@@ -120,3 +120,25 @@ def get_pod_logs(namespace: str, pod_name: str):
     except Exception as e:
         print(f"❌ Log Retrieval Error: {str(e)}")
         return f"CRITICAL ERROR: Unable to retrieve logs for {pod_name}."
+
+def get_node_capacity():
+    """SRE Feature: Dynamically retrieves K3s node capacity for precise metrics UI."""
+    if not v1:
+        return {"cpu_cores": 2, "memory_total_ki": 8388608}
+    try:
+        nodes = v1.list_node().items
+        if nodes:
+            allocatable = nodes[0].status.allocatable
+            cpu = allocatable.get("cpu", "2")
+            mem = allocatable.get("memory", "8388608Ki")
+            
+            # Format conversion for frontend calculations
+            cpu_cores = int(cpu) if not str(cpu).endswith('m') else int(str(cpu).replace('m', '')) / 1000
+            mem_ki = int(str(mem).replace('Ki', ''))
+            
+            return {"cpu_cores": cpu_cores, "memory_total_ki": mem_ki}
+    except Exception as e:
+        print(f"❌ Node capacity error: {e}")
+    
+    # Fallback equivalent to a standard Kamatera VPS
+    return {"cpu_cores": 2, "memory_total_ki": 8388608}
