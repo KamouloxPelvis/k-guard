@@ -2,10 +2,23 @@ import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
 from k3s_manager import get_k3s_status, get_cluster_deployments, get_storage_stats, purge_trivy_cache
+from metrics_manager import get_pod_metrics # Import the SRE metrics module
+from k3s_manager import get_pod_logs # Import the newly added function
 from .auth import verify_token
 
 # On crée un routeur dédié à l'infrastructure K3s
 router = APIRouter(tags=["K3s Infrastructure"])
+
+@router.get("/k3s/metrics/{namespace}")
+async def k3s_metrics(namespace: str, user: dict = Depends(verify_token)):
+    """Exposes real-time CPU and RAM metrics from the K8s Metrics Server."""
+    return get_pod_metrics(namespace=namespace)
+
+@router.get("/k3s/logs/{namespace}/{pod_name}")
+async def k3s_pod_logs(namespace: str, pod_name: str, user: dict = Depends(verify_token)):
+    """Fetches real-time terminal logs for the SRE console modal."""
+    logs = get_pod_logs(namespace, pod_name)
+    return {"logs": logs}
 
 @router.get("/k3s/cluster-status")
 async def k3s_status(user: dict = Depends(verify_token)):

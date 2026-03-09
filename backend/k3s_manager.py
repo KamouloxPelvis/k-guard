@@ -6,7 +6,7 @@ import os
 SYSTEM_NS = ["kube-system", "kube-public", "kube-node-lease", "local-path-storage", "cert-manager", "ingress-nginx"]
 
 def get_k3s_status():
-    """Retrieves Pod health status for the Dashboard visualization"""
+    """Retrieves Pod health status for the Dashboard visualization."""
     if not v1:
         print("⚠️ K8s Client (v1) not initialized")
         return []
@@ -47,7 +47,7 @@ def get_k3s_status():
         return []
 
 def get_cluster_deployments():
-    """Retrieves deployments for security auditing (Trivy discovery)"""
+    """Retrieves deployments for security auditing (Trivy discovery)."""
     if not apps_client:
         print("⚠️ K8s AppsClient not initialized")
         return []
@@ -74,7 +74,7 @@ def get_cluster_deployments():
         return []
 
 def get_storage_stats():
-    """Checks disk space on critical mount points (PVC / Root)"""
+    """Checks disk space on critical mount points (PVC / Root)."""
     paths = ["/", "/data/trivy-cache", "/app"]
     stats = {}
     
@@ -90,7 +90,7 @@ def get_storage_stats():
     return stats
 
 def purge_trivy_cache():
-    """Safely removes Trivy cache content on the Persistent Volume (PVC)"""
+    """Safely removes Trivy cache content on the Persistent Volume (PVC)."""
     cache_path = "/data/trivy-cache"
     try:
         if os.path.exists(cache_path):
@@ -106,3 +106,17 @@ def purge_trivy_cache():
     except Exception as e:
         print(f"❌ Purge Error: {e}")
         return False
+
+def get_pod_logs(namespace: str, pod_name: str):
+    """
+    SRE Feature: Retrieves the last 50 lines of logs for a specific pod.
+    """
+    if not v1:
+        return "⚠️ K8s Client not initialized."
+    try:
+        # Fetching logs with a tail limit to prevent heavy payload transfers
+        logs = v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=50)
+        return logs
+    except Exception as e:
+        print(f"❌ Log Retrieval Error: {str(e)}")
+        return f"CRITICAL ERROR: Unable to retrieve logs for {pod_name}."
