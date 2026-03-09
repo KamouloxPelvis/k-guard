@@ -13,28 +13,41 @@ def get_k3s_status():
     
     pod_results = []
     try:
-        # Scan all namespaces (authorized by ClusterRole RBAC)
         pods = v1.list_pod_for_all_namespaces(watch=False)
         for pod in pods.items:
             ns = pod.metadata.namespace
             
             if ns not in SYSTEM_NS:
-                # 1. Handle display name vs. unique technical name
-                app_label = pod.metadata.labels.get('app')
-                display_name = app_label if app_label else pod.metadata.name.split('-')[0]
+                # 1. Smart Name Formatting: Prioritize explicit K8s labels
+                app_label = pod.metadata.labels.get('app.kubernetes.io/name') or pod.metadata.labels.get('app')
                 
-                # 2. Intelligent status mapping to avoid false alarms
+                if app_label:
+                    display_name = str(app_label)
+                else:
+                    # Fallback: Strip deployment hashes or statefulset indexes dynamically
+                    parts = pod.metadata.name.split('-')
+                    if len(parts) > 2 and len(parts[-1]) == 5: 
+                        display_name = '-'.join(parts[:-2])
+                    elif len(parts) > 1 and parts[-1].isdigit():
+                        display_name = '-'.join(parts[:-1])
+                    else:
+                        display_name = '-'.join(parts[:-1]) if len(parts) > 1 else pod.metadata.name
+                
+                # Format to Title Case (e.g., "kube-state-metrics" -> "Kube State Metrics")
+                display_name = display_name.replace('-', ' ').title()
+                
+                # 2. Status mapping
                 phase = pod.status.phase
                 if phase == "Running":
                     status_label = "SECURE"
                 elif phase == "Pending":
-                    status_label = "STABILIZING" # Less alarming than ALERT for scaling/updates
+                    status_label = "STABILIZING" 
                 else:
                     status_label = "ALERT"
 
                 pod_results.append({
-                    "name": display_name,         # UI Display name
-                    "pod_name": pod.metadata.name, # Unique identifier for logs/actions
+                    "name": display_name,         
+                    "pod_name": pod.metadata.name, 
                     "namespace": ns,
                     "status": status_label,
                     "ip": pod.status.pod_ip or "N/A",
@@ -45,6 +58,34 @@ def get_k3s_status():
     except Exception as e:
         print(f"❌ Health Status Error: {e}")
         return []
+
+def get_pod_logs(namespace: str, pod_name: str):
+    """
+    SRE Feature: Retrieves the last 50 lines of logs for a specific pod.
+    Dynamically identifies the primary container to support multi-container pods (Sidecars).
+    """
+    if not v1:
+        return "⚠️ K8s Client not initialized."
+    try:
+        # 1. Fetch the pod metadata to inspect containers
+        pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
+        if not pod.spec.containers:
+            return "CRITICAL ERROR: No containers found in the targeted pod."
+        
+        # 2. Extract the name of the first (primary) container
+        primary_container = pod.spec.containers[0].name
+        
+        # 3. Explicitly request logs for the primary container
+        logs = v1.read_namespaced_pod_log(
+            name=pod_name, 
+            namespace=namespace, 
+            container=primary_container, 
+            tail_lines=50
+        )
+        return logs
+    except Exception as e:
+        print(f"❌ Log Retrieval Error: {str(e)}")
+        return f"CRITICAL ERROR: Unable to retrieve logs for {pod_name}. See K-Guard backend logs."
 
 def get_cluster_deployments():
     """Retrieves deployments for security auditing (Trivy discovery)."""
@@ -106,20 +147,6 @@ def purge_trivy_cache():
     except Exception as e:
         print(f"❌ Purge Error: {e}")
         return False
-
-def get_pod_logs(namespace: str, pod_name: str):
-    """
-    SRE Feature: Retrieves the last 50 lines of logs for a specific pod.
-    """
-    if not v1:
-        return "⚠️ K8s Client not initialized."
-    try:
-        # Fetching logs with a tail limit to prevent heavy payload transfers
-        logs = v1.read_namespaced_pod_log(name=pod_name, namespace=namespace, tail_lines=50)
-        return logs
-    except Exception as e:
-        print(f"❌ Log Retrieval Error: {str(e)}")
-        return f"CRITICAL ERROR: Unable to retrieve logs for {pod_name}."
 
 def get_node_capacity():
     """SRE Feature: Dynamically retrieves K3s node capacity for precise metrics UI."""

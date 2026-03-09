@@ -4,12 +4,10 @@
 set -e
 
 # 0. SRE ENVIRONMENT SETUP
-# Force kubectl to use the internal ServiceAccount identity
 export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
 
 # 1. DYNAMIC SCOPING
-# Discover the first non-system namespace with running workloads
 TARGET_NS=$(kubectl get pods -A --field-selector=status.phase=Running -o jsonpath='{.items[?(@.metadata.namespace!="kube-system")].metadata.namespace}' | tr ' ' '\n' | head -n 1)
 
 if [ -z "$TARGET_NS" ]; then 
@@ -17,7 +15,6 @@ if [ -z "$TARGET_NS" ]; then
     exit 1
 fi
 
-# Select a target pod and extract its network metadata
 TEST_POD=$(kubectl get pods -n "$TARGET_NS" --field-selector=status.phase=Running -o jsonpath='{.items[0].metadata.name}')
 POD_IP=$(kubectl get pod -n "$TARGET_NS" "$TEST_POD" -o jsonpath='{.status.podIP}')
 POD_PORT=$(kubectl get pod -n "$TARGET_NS" "$TEST_POD" -o jsonpath='{.spec.containers[*].ports[*].containerPort}' | awk '{print $1}')
@@ -32,17 +29,16 @@ echo "--------------------------------------------------------"
 # 2. EPHEMERAL DIAGNOSTIC DEPLOYMENT
 echo "⏳ Deploying sentinel-debug pod (Netshoot)..."
 
-# Pre-emptive cleanup to avoid name collisions
 kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1 || true
 
-# Launching the diagnostic container
+# Using IfNotPresent to avoid rate limits and ensuring fast startup
 kubectl run sentinel-debug -n "$TARGET_NS" \
-    --image=nicolaka/netshoot \
+    --image=nicolaka/netshoot:latest \
     --restart=Never \
+    --image-pull-policy=IfNotPresent \
     --overrides='{"spec": {"terminationGracePeriodSeconds": 0}}' \
     -- sleep 60 > /dev/null 2>&1
 
-# Wait for readiness with a strict timeout to prevent UI hang
 if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --timeout=30s > /dev/null 2>&1; then
     echo "❌ FATAL: Diagnostic pod failed to initialize (Check ImagePullBackOff or Resources)."
     kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1
