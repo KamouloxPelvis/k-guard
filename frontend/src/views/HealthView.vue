@@ -67,25 +67,22 @@
   };
 
   const fetchClusterData = async () => {
-    loading.value = true; 
-    apps.value = [];
     
     try {
       const { data } = await api.get('/k3s/cluster-status');
+      
       if (Array.isArray(data)) {
-        apps.value = data;
+        apps.value = data; 
         const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
         namespaces.forEach(ns => fetchMetrics(ns as string));
       }
     } catch (error: any) {
       console.error("Cluster data sync error", error);
     } finally {
-      setTimeout(() => {
         loading.value = false;
         isInitialLoad.value = false;
-      }, 500);
     }
-  };
+};
 
   // --- Calculations ---
   

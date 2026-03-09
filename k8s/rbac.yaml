@@ -20,7 +20,7 @@ rules:
   # 2. POD MANAGEMENT: Read-Only + Log streaming
   - apiGroups: [""]
     resources: ["pods", "pods/log"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "create", "list", "watch", "delete"]
 
   # 3. REMEDIATION ACTIONS: Specifically allows deletion for pod restarts
   - apiGroups: [""]
