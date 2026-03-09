@@ -7,12 +7,12 @@ K-Guard is currently in active development. Security updates are provided for th
 | Version | Supported          |
 | ------- | ------------------ |
 | latest  | :white_check_mark: |
-| < 1.0   | :x:                |
+| 1.0.0   | :x:                |
 
 ## Reporting a Vulnerability
 
 I take the security of K-Guard seriously. If you discover a security vulnerability, please do not open a public issue. Instead:
-1. Contact me directly via GitHub (pseudo: **pseudo**) or through my professional links.
+1. Contact me directly via GitHub (pseudo: **KamouloxPelvis**) or through my professional links.
 2. Provide a detailed description of the vulnerability and steps to reproduce it.
 
 I will acknowledge your report within 48 hours and provide a timeline for the fix.
