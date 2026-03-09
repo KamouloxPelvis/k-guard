@@ -2,7 +2,14 @@
 
 # 🛡️ <a name="french"></a>K-Guard: DevSecOps & SRE Orchestrator
 
+⚠️ Avertissement : Clause de non-responsabilité
+
+*K-Guard a été conçu dans le respect des standards de sécurité de l'industrie et répond aux exigences de la norme [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+
+*Bien que la sécurité fasse l'objet d'une attention toute particulière, ce logiciel est fourni en tant que Produit Minimum Viable (MVP) personnel et expérimental et ne saurait être considéré exempt de défauts ou de vulnérabilités. Il est conçu comme un outil de recherche pour explorer les architectures de sécurité DevSecOps. K-Guard a vocation à être amélioré et renforcé par la communauté en tant que projet Open Source.*
+
 **K-Guard** est une plateforme de gouvernance de sécurité et d'observabilité pour clusters K3s. Il automatise le cycle complet de la sécurité : Audit (**Trivy**), Remédiation réseau (**Network Sentinel/Ansible**) et Alerte ChatOps (**Cisco Webex**)
+
 
 ---
 
@@ -140,6 +147,12 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 🇫🇷 [Version Française](#french)
 
 # 🛡️ <a name="english"></a>K-Guard: DevSecOps & SRE Orchestrator
+
+⚠️ Warning: Disclaimer
+
+*K-Guard is engineered in alignment with industry security standards and follows the [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+
+*While security is a core priority, this software is provided as a personal and experimental Minimum Viable Product (MVP). It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
 
 **K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Auditing (**Trivy**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
 
