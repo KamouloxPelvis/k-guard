@@ -23,9 +23,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certifi
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Backend Code Setup
+# 3. Backend & SRE Scripts Setup
 # Copying the local backend source code into the container
 COPY backend/ ./backend/
+# SRE Fix: Explicitly copying infrastructure and test scripts into the container
+COPY test/ /app/test/
+COPY infra/ /app/infra/
 WORKDIR /app/backend
 
 # 4. Persistence Setup (K-Guard SQLite permissions)
