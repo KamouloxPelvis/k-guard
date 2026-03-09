@@ -61,32 +61,34 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
+# Use resolve() to ensure static_path is absolute and clean
 static_path = Path("/app/static").resolve()
 
 @app.get("/{full_path:path}", tags=["Frontend"])
 async def serve_spa(full_path: str):
     """
     Serves static files for the SPA.
-    Security Implementation: CodeQL compliant Path Traversal prevention using 
-    strict input sanitization and commonpath boundary validation.
+    Security Implementation: Strict Path Traversal prevention using 
+    absolute path validation and boundary check.
     """
     # 1. First Line of Defense: Strict Input Sanitization
-    # Blocks directory traversal payloads before any OS-level path resolution
+    # Blocks common traversal payloads and null-byte injections
     if ".." in full_path or "\0" in full_path or full_path.startswith("/"):
-        return {"error": "Security Violation: Invalid path payload"}
+        return {"error": "Security Violation: Invalid path payload"}, 400
 
     # 2. Safe Path Construction
+    # We join and resolve to get the final absolute physical path
     requested_path = (static_path / full_path).resolve()
 
-    # 3. Second Line of Defense: Cryptographic boundary check (CodeQL preferred)
-    try:
-        if os.path.commonpath([str(static_path), str(requested_path)]) != str(static_path):
-            return {"error": "Security Violation: Path escapes safe boundary"}
-    except ValueError:
-        return {"error": "Security Violation: Invalid path resolution"}
+    # 3. Security Boundary Check (The Fix for CodeQL)
+    # Ensure the resolved path is still within our static folder
+    # This is a robust defense-in-depth against path traversal
+    if not str(requested_path).startswith(str(static_path)):
+        return {"error": "Security Violation: Path escapes safe boundary"}, 403
 
     # 4. Serve the physical file if it exists (JS, CSS, Images)
     if requested_path.is_file():
+        # Passing the validated, absolute path as a string
         return FileResponse(str(requested_path))
     
     # 5. SPA Fallback: Serve index.html for all frontend-managed routes
@@ -94,8 +96,8 @@ async def serve_spa(full_path: str):
     if index_file.exists():
         return FileResponse(str(index_file))
     
-    # Security: Do not reflect the raw user input in the error response
-    return {"error": "Frontend assets not found"}
+    # Security: Avoid echoing user input back to prevent XSS/Injection
+    return {"error": "Requested assets could not be found"}, 404
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")

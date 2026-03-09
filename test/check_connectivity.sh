@@ -45,6 +45,11 @@ if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --tim
     exit 1
 fi
 
+# Debug: check who is running the script and if they see the cluster
+echo "DEBUG: User is $(whoami)"
+echo "DEBUG: Kubeconfig is $KUBECONFIG"
+kubectl get nodes > /dev/null 2>&1 || echo "❌ FAIL: No access to cluster"
+
 # 3. SECURITY AUDIT EXECUTION
 echo -n "[1/4] DNS Resolution Check...      "
 if kubectl exec -n "$TARGET_NS" sentinel-debug -- nslookup google.com > /dev/null 2>&1; then echo "✅ OK"; else echo "❌ FAIL"; fi

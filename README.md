@@ -2,21 +2,29 @@
 
 # 🛡️ <a name="french"></a>K-Guard: DevSecOps & SRE Orchestrator
 
+⚠️ Avertissement : Clause de non-responsabilité
+
+*K-Guard a été conçu dans le respect des standards de sécurité de l'industrie et répond aux exigences de la norme [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+
+*Bien que la sécurité fasse l'objet d'une attention toute particulière, ce logiciel est fourni en tant que Produit Minimum Viable (MVP) personnel et expérimental et ne saurait être considéré exempt de défauts ou de vulnérabilités. Il est conçu comme un outil de recherche pour explorer les architectures de sécurité DevSecOps. K-Guard a vocation à être amélioré et renforcé par la communauté en tant que projet Open Source.*
+
 **K-Guard** est une plateforme de gouvernance de sécurité et d'observabilité pour clusters K3s. Il automatise le cycle complet de la sécurité : Audit (**Trivy**), Remédiation réseau (**Network Sentinel/Ansible**) et Alerte ChatOps (**Cisco Webex**)
+
 
 ---
 
 ## 📍 Sommaire
 
-* [🧪 Tech Stack](#-tech-stack)
-* [🚀 Key Features](#-key-features)
-* [🛠️ Installation & Setup](#-installation--setup)
-    * [1. CLI Installer (Go)](#1-cli-installer-go)
-    * [⚠️ Recommandation d'Isolation Réseau](#-recommandation-disolation-réseau-cni)
+* [🧪 Stack Technique](#-tech-stack)
+* [🚀 Fonctionnalités Clés](#-key-features)
+* [📖 Documentation API & Référence](#-documentation-api--référence)
+* [🛠️ Installation & Configuration](#-installation--setup)
+    * [1. Installateur CLI (Go)](#1-cli-installer-go)
+    * [⚠️ Isolation Réseau (CNI)](#-recommandation-disolation-réseau-cni)
     * [2. Auto-check & Dépendances](#2-auto-check--dépendances)
-    * [3. Procédure d'Amorçage Rapide](#3-procédure-damorçage-rapide)
+    * [3. Procédure d'Amorçage](#3-procédure-damorçage-rapide)
     * [4. Infrastructure & RBAC](#4-infrastructure--rbac)
-* [🛰️ Cisco Webex Integration](#-cisco-webex-integration)
+* [🛰️ Intégration Cisco Webex](#-cisco-webex-integration)
 * [🛡️ Network Policy (Network Sentinel)](#-network-policy--network-sentinel)
 * [👤 Contact & Crédits](#-contact--crédits)
 
@@ -141,6 +149,12 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 
 # 🛡️ <a name="english"></a>K-Guard: DevSecOps & SRE Orchestrator
 
+⚠️ Warning: Disclaimer
+
+*K-Guard is engineered in alignment with industry security standards and follows the [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+
+*While security is a core priority, this software is provided as a personal and experimental Minimum Viable Product (MVP). It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
+
 **K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Auditing (**Trivy**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
 
 ---
@@ -149,11 +163,12 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 
 * [🧪 Tech Stack](#en-tech-stack)
 * [🚀 Key Features](#en-key-features)
+* [📖 API Documentation & Reference](#en-api-documentation--reference)
 * [🛠️ Installation & Setup](#en-installation--setup)
     * [1. CLI Installer (Go)](#en-1-cli-installer-go)
-    * [⚠️ Network Isolation Recommendation (CNI)](#en-network-isolation-recommendation)
+    * [⚠️ CNI Recommendation](#en-network-isolation-recommendation)
     * [2. Auto-check & Dependencies](#en-2-auto-check--dependencies)
-    * [3. Quick Start Procedure](#en-3-quick-start-procedure)
+    * [3. Quick Start](#en-3-quick-start-procedure)
     * [4. Infrastructure & RBAC](#en-4-infrastructure--rbac)
 * [🛰️ Cisco Webex Integration](#en-cisco-webex-integration)
 * [🛡️ Network Policy (Network Sentinel)](#en-network-policy--network-sentinel)
@@ -193,6 +208,31 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 ![K-Guard System Overview](frontend/public/screenshots/kguard-1.png)
 
 ![K-Guard System Overview](frontend/public/screenshots/kguard-2.png)
+
+---
+
+## 📖 API Documentation & Reference
+
+K-Guard automatically generates interactive API documentation using **Swagger UI (OpenAPI 3.1)**. This allows developers and security auditors to explore and test all endpoints directly from the browser.
+
+- **Interactive UI:** `https://<your-domain-or-ip>/docs`
+- **Features documented:** - 🔍 K3s Infrastructure Metrics
+  - 🔐 Authentication & Token management
+  - 💓 System Health Checks (Liveness Probes)
+
+> **Note:** Accessing the documentation via HTTPS is required. If using a self-signed certificate, you may need to bypass the browser security warning.
+
+---
+
+K-Guard génère automatiquement une documentation API interactive via **Swagger UI (OpenAPI 3.1)**. Cela permet aux développeurs et aux auditeurs de sécurité d'explorer et de tester tous les points de terminaison (endpoints) directement depuis le navigateur.
+
+- **Interface Interactive :** `https://<votre-domaine-ou-ip>/docs`
+- **Fonctionnalités documentées :**
+    - 🔍 Métriques d'Infrastructure K3s
+    - 🔐 Authentification & Gestion des tokens (JWT)
+    - 💓 Tests de santé système (Liveness Probes)
+
+> **Note :** L'accès à la documentation via HTTPS est obligatoire. Si vous utilisez un certificat auto-signé, vous devrez valider l'exception de sécurité dans votre navigateur pour accéder à l'interface.
 
 ---
 

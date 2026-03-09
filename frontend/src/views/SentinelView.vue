@@ -164,6 +164,12 @@
   onMounted(fetchNetworkData);
   watch(selectedNS, fetchNetworkData);
 
+  const activeAccordion = ref<string | null>(null);
+
+  const toggleAccordion = (id: string) => {
+    activeAccordion.value = activeAccordion.value === id ? null : id;
+  };
+
 </script>
 
 <template>
@@ -232,32 +238,36 @@
 
     <div v-if="currentViewMode === 'list'" class="space-y-6">
       <div v-for="(nsPods, nsName) in podsByNamespace" :key="nsName" class="space-y-3">
-        
         <div class="flex items-center gap-3">
           <h3 class="text-[10px] font-black text-slate-600 uppercase tracking-[0.2em]">{{ nsName }}</h3>
           <div class="h-[1px] flex-1 bg-slate-800/40"></div>
         </div>
 
-        <div class="bg-[#111217]/50 border border-slate-800/30 p-4 rounded-sm space-y-2">
-          <div v-for="(edge, index) in filteredEdges.filter(e => nsPods.some(p => p.id === e.source))" :key="index" 
-              class="flex flex-col md:flex-row items-center justify-between gap-2 p-2 border border-slate-800/10 hover:bg-white/[0.01] transition-all group">
-            
-            <div class="flex-1 w-full bg-[#0d0e12] border border-blue-500/10 p-2 rounded-sm transition-all group-hover:border-blue-500/30">
-              <p class="text-[9px] font-bold text-white uppercase truncate">{{ edge.source }}</p>
-              <p class="text-[8px] font-mono text-blue-500/60">{{ edge.sourceIp }}</p>
-            </div>
-
-            <div class="flex flex-col items-center min-w-[150px] px-2">
-              <p class="text-[7px] font-bold text-slate-600 uppercase tracking-tighter mb-1">TCP/443</p>
-              <div class="w-full h-[1px] bg-slate-800 relative overflow-hidden">
-                <div class="absolute inset-0 bg-gradient-to-r from-transparent via-blue-500 to-transparent animate-[flow_2s_linear_infinite]"></div>
+        <div class="space-y-2">
+          <div v-for="pod in nsPods" :key="pod.id" class="border border-slate-800/60 rounded-sm overflow-hidden">
+            <div 
+              @click="toggleAccordion(pod.id)"
+              class="bg-[#111217] p-3 flex justify-between items-center cursor-pointer hover:bg-[#15171e] transition-colors"
+            >
+              <div class="flex items-center gap-3">
+                <div :class="isVulnerable(pod) ? 'bg-red-500' : 'bg-blue-500'" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                <span class="text-[10px] font-bold text-white uppercase">{{ pod.name }}</span>
               </div>
+              <span class="text-slate-500 text-[10px]">{{ activeAccordion === pod.id ? '−' : '+' }}</span>
             </div>
 
-            <div class="flex-1 w-full bg-[#0d0e12] border border-orange-900/10 p-2 rounded-sm transition-all group-hover:border-orange-500/30">
-              <p class="text-[9px] font-bold text-white uppercase truncate">{{ edge.target }}</p>
-              <p class="text-[8px] font-mono text-orange-500/60">{{ edge.targetIp }}</p>
-            </div>
+            <div v-if="activeAccordion === pod.id" class="bg-[#0b0c10] p-4 border-t border-slate-800/40">
+              <div class="grid grid-cols-2 gap-4 text-[9px]">
+                <div>
+                  <p class="text-slate-500 uppercase font-bold mb-1">IP Address</p>
+                  <p class="text-blue-400 font-mono">{{ pod.ip }}</p>
+                </div>
+                <div>
+                  <p class="text-slate-500 uppercase font-bold mb-1">Status</p>
+                  <p :class="pod.status === 'Running' ? 'text-green-500' : 'text-yellow-500'">{{ pod.status }}</p>
+                </div>
+              </div>
+              </div>
           </div>
         </div>
       </div>
