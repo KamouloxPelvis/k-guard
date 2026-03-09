@@ -3,7 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
 from datetime import datetime
-from pathlib import Path  # Required for secure path handling
+from pathlib import Path
 import os
 
 import database
@@ -47,7 +47,6 @@ async def liveness_probe():
     return {"status": "alive", "timestamp": datetime.utcnow().isoformat()}
 
 # --- 2. ROUTER INCLUSION ---
-# Logic separation: All core features are modularly organized and prefixed with /api.
 app.include_router(auth.router, prefix="/api")         
 app.include_router(k3s.router, prefix="/api")          
 app.include_router(scan.router, prefix="/api")
@@ -62,33 +61,41 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-# Security: Path.resolve() ensures we use an absolute path and prevents navigation outside the static directory.
 static_path = Path("/app/static").resolve()
 
 @app.get("/{full_path:path}", tags=["Frontend"])
 async def serve_spa(full_path: str):
     """
     Serves static files for the SPA.
-    Security Implementation: Strictly prevents Path Traversal attacks by validating that
-    the resolved requested path remains within the designated static directory.
+    Security Implementation: CodeQL compliant Path Traversal prevention using 
+    strict input sanitization and commonpath boundary validation.
     """
-    # 1. Resolve the requested path to eliminate '../' sequences
+    # 1. First Line of Defense: Strict Input Sanitization
+    # Blocks directory traversal payloads before any OS-level path resolution
+    if ".." in full_path or "\0" in full_path or full_path.startswith("/"):
+        return {"error": "Security Violation: Invalid path payload"}
+
+    # 2. Safe Path Construction
     requested_path = (static_path / full_path).resolve()
 
-    # 2. Path Traversal Guard: Check if the resolved path is still within static_path
-    if not str(requested_path).startswith(str(static_path)):
-        return {"error": "Access Denied", "path": full_path}
+    # 3. Second Line of Defense: Cryptographic boundary check (CodeQL preferred)
+    try:
+        if os.path.commonpath([str(static_path), str(requested_path)]) != str(static_path):
+            return {"error": "Security Violation: Path escapes safe boundary"}
+    except ValueError:
+        return {"error": "Security Violation: Invalid path resolution"}
 
-    # 3. Serve the physical file if it exists (JS, CSS, Images)
+    # 4. Serve the physical file if it exists (JS, CSS, Images)
     if requested_path.is_file():
         return FileResponse(str(requested_path))
     
-    # 4. SPA Fallback: Serve index.html for all frontend-managed routes
+    # 5. SPA Fallback: Serve index.html for all frontend-managed routes
     index_file = static_path / "index.html"
     if index_file.exists():
         return FileResponse(str(index_file))
     
-    return {"error": "Frontend assets not found", "path": full_path}
+    # Security: Do not reflect the raw user input in the error response
+    return {"error": "Frontend assets not found"}
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
