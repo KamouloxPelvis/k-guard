@@ -1,0 +1,37 @@
+# --- K-Guard Sentinel: Audit & Diagnostic Exception ---
+# Enables diagnostic pods to verify infrastructure health
+# Standard: Temporary troubleshooting access (Cisco DevNet Best Practice)
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: sentinel-audit-exception
+  namespace: {{ ns_item }}
+  labels:
+    managed-by: k-guard-sentinel
+spec:
+  podSelector:
+    matchLabels:
+      # Targets only the diagnostic/netshoot pods
+      role: debug
+  policyTypes:
+    - Egress
+  egress:
+    # 1. Authorize DNS Resolution (for [1/4] DNS Resolution Check)
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: kube-system
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # 2. Authorize K8s API access (for [2/4] K8s API Access Check)
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 6443 # K3s API
+        - protocol: TCP
+          port: 443  # Standard API
