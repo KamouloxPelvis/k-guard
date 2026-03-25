@@ -1,0 +1,24 @@
+# --- K-Guard Sentinel: Internal Traffic Bridge ---
+# Authorizes the Ingress Controller to reach application pods
+# Standard: Zero Trust Cross-Namespace Communication
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ app_name }}-internal-bridge
+  namespace: {{ namespace }}
+  labels:
+    managed-by: k-guard-sentinel
+spec:
+  podSelector:
+    matchLabels:
+      app: {{ app_label }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: {{ app_port }}

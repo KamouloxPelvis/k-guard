@@ -26,7 +26,7 @@
 
     - name: "⚙️ Fact: Build Dynamic App Map"
       set_fact:
-        # Extracts app label, namespace, and FIRST container port found (dynamic)
+        # Extracts app label, namespace, and container port found dynamically
         discovered_workloads: "{{ pod_results.results | map(attribute='resources') | flatten | json_query('[*].{app: metadata.labels.app, ns: metadata.namespace, port: spec.containers[0].ports[0].containerPort}') | unique }}"
 
     # 3. BASELINE: Apply Zero Trust (Default Deny) to all discovered namespaces
@@ -39,19 +39,40 @@
         monitoring_enabled: "{{ 'monitoring' in (ns_list.resources | map(attribute='metadata.name') | list) }}"
       loop: "{{ ns_list.resources }}"
 
-    # 4. UNIVERSAL INGRESS: Link Ingress Controller to Apps automatically
-    - name: "🔓 Connectivity: Dynamic Ingress Authorization"
+    # 4. UNIVERSAL BRIDGE: Link Ingress Controller to Apps automatically
+    - name: "🔓 Connectivity: Dynamic Internal Bridge"
       kubernetes.core.k8s:
         state: present
-        definition: "{{ lookup('template', '../templates/app_ingress.j2') }}"
+        definition: "{{ lookup('template', '../templates/app_internal_bridge.j2') }}"
       vars:
-        app_name: "sentinel-{{ item.app }}-ingress"
+        app_name: "sentinel-{{ item.app }}"
         namespace: "{{ item.ns }}"
         app_label: "{{ item.app }}"
-        ingress_rules:
-          # Perimeter: Public HTTPS (Port constraint applied)
-          - { cidr: "0.0.0.0/0", port: 443 }
-          # Internal: Allow Ingress Controller (10.42.0.0/16) to reach all app ports
-          - { cidr: "10.42.0.0/16" } 
+        # Use discovered port, fallback to 80 if not found
+        app_port: "{{ item.port | default(80) }}"
       loop: "{{ discovered_workloads }}"
       when: "item.app is defined and item.app != None"
+    
+    # 5. EXTERNAL SERVICES: Database Access for Blog
+    - name: "🔓 Connectivity: MongoDB Atlas Egress for Blog"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
+      vars:
+        app_name: "sentinel-blog-db-access"
+        namespace: "blog-prod"
+        app_label: "blog-devopsnotes"
+        egress_rules:
+          # CIDR 0.0.0.0/0 handles external MongoDB Atlas nodes
+          - { cidr: "0.0.0.0/0", port: 27017, protocol: "TCP" }
+      # Only apply if the blog app was found during discovery
+      when: "'blog-devopsnotes' in (discovered_workloads | map(attribute='app') | list)"
+
+      # 6. AUDIT ENABLER: Deploy diagnostic exceptions
+    - name: "🔍 Sentinel: Enable Diagnostic Path"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/audit_exception.j2') }}"
+      vars:
+        ns_item: "{{ item.metadata.name }}"
+      loop: "{{ ns_list.resources }}"
