@@ -64,6 +64,20 @@ async def api_heartbeat():
 # Use resolve() to ensure static_path is absolute and clean
 static_path = Path("/app/static").resolve()
 
+def _is_within_static_root(path: Path) -> bool:
+    """
+    Returns True if the given path is contained within the static_path directory.
+    Uses Path.is_relative_to when available, otherwise falls back to relative_to.
+    """
+    # Python 3.9+ has Path.is_relative_to
+    if hasattr(path, "is_relative_to"):
+        return path.is_relative_to(static_path)  # type: ignore[attr-defined]
+    try:
+        path.relative_to(static_path)
+        return True
+    except ValueError:
+        return False
+
 @app.get("/{full_path:path}", tags=["Frontend"])
 async def serve_spa(full_path: str):
     """
@@ -83,7 +97,7 @@ async def serve_spa(full_path: str):
     # 3. Security Boundary Check (The Fix for CodeQL)
     # Ensure the resolved path is still within our static folder
     # This is a robust defense-in-depth against path traversal
-    if not str(requested_path).startswith(str(static_path)):
+    if not _is_within_static_root(requested_path):
         return {"error": "Security Violation: Path escapes safe boundary"}, 403
 
     # 4. Serve the physical file if it exists (JS, CSS, Images)
