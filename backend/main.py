@@ -75,9 +75,11 @@ async def serve_frontend(rest_of_path: str):
     target_path = BASE_STATIC_DIR.joinpath(rest_of_path).resolve()
 
     # 2. Security Boundary Check
-    # We compare the resolved target path against the authorized base directory.
-    # This effectively neutralizes ".." or symlink attacks.
-    if not str(target_path).startswith(str(BASE_STATIC_DIR)):
+    # Ensure the resolved target path is strictly within the authorized base directory.
+    # Using Path.relative_to prevents directory traversal and symlink escape attacks.
+    try:
+        target_path.relative_to(BASE_STATIC_DIR)
+    except ValueError:
         return {"error": "Security Violation: Path escapes safe boundary"}, 403
 
     # 3. Serve physical files if they exist (assets like .js, .css, .png)
