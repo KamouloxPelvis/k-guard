@@ -61,45 +61,33 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-# Ensure the static path is absolute and clearly defined
-static_path = os.path.abspath("/app/static")
+# Define and resolve the absolute base directory for static files once
+# This ensures we have a reliable reference point for the security boundary.
+BASE_STATIC_DIR = Path("/app/static").resolve()
 
-@app.get("/{full_path:path}", tags=["Frontend"])
-async def serve_spa(full_path: str):
+@app.get("/{rest_of_path:path}", tags=["Frontend"])
+async def serve_frontend(rest_of_path: str):
     """
-    Serves static files for the SPA.
-    Security Implementation: Standard Path Traversal prevention using 
-    absolute path validation and commonpath boundary check.
+    Serves the Vue.js frontend with robust Path Traversal protection.
     """
-    
-    # 1. Construct the final physical path
-    # Sanitize: Only allow alphanumeric, dots, underscores, and hyphens
-    # This kills common traversal characters before they even reach path logic
-    sanitized_path = "".join(c for c in full_path if c.isalnum() or c in "._-/")
-    
-    # Join and abspath resolve '..' and relative segments
-    unsafe_path = os.path.join(static_path, sanitized_path)
-    safe_path = os.path.abspath(unsafe_path)
+    # 1. Construct and resolve the target path
+    # Path.joinpath() handles the OS-specific separators correctly.
+    target_path = BASE_STATIC_DIR.joinpath(rest_of_path).resolve()
 
-    # 2. SECURITY BOUNDARY CHECK (The Fix for CodeQL)
-    # commonpath ensures that safe_path starts with static_path.
-    # If the common root of [static, safe] is not [static], an escape was attempted.
-    if os.path.commonpath([static_path]) != os.path.commonpath([static_path, safe_path]):
-        # Audit: Log security violation attempts here if needed
+    # 2. Security Boundary Check
+    # We compare the resolved target path against the authorized base directory.
+    # This effectively neutralizes ".." or symlink attacks.
+    if not str(target_path).startswith(str(BASE_STATIC_DIR)):
         return {"error": "Security Violation: Path escapes safe boundary"}, 403
 
-    # 3. Serve the physical file if it exists (JS, CSS, Images)
-    if os.path.isfile(safe_path):
-        return FileResponse(safe_path)
-    
-    # 4. SPA Fallback: Serve index.html for all frontend-managed routes
-    # This allows the Vue/React router to handle the URL
-    index_file = os.path.join(static_path, "index.html")
-    if os.path.exists(index_file):
-        return FileResponse(index_file)
-    
-    # Final fallback if even index.html is missing
-    return {"error": "Requested assets could not be found"}, 404
+    # 3. Serve physical files if they exist (assets like .js, .css, .png)
+    if target_path.is_file():
+        return FileResponse(str(target_path))
+
+    # 4. SPA Fallback: Redirect all other routes to index.html
+    # This allows the Vue Router to handle the URL on the client side.
+    index_path = BASE_STATIC_DIR.joinpath("index.html")
+    return FileResponse(str(index_path))
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
