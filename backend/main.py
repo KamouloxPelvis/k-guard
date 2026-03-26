@@ -1,7 +1,7 @@
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 from datetime import datetime
 from pathlib import Path
 import os
@@ -75,12 +75,15 @@ async def serve_frontend(rest_of_path: str):
     target_path = BASE_STATIC_DIR.joinpath(rest_of_path).resolve()
 
     # 2. Security Boundary Check
-    # Ensure the resolved target path is strictly within the authorized base directory.
-    # Using Path.relative_to prevents directory traversal and symlink escape attacks.
+    # We verify that the resolved target path is within the authorized base directory.
+    # Using Path.relative_to avoids fragile string prefix checks.
     try:
         target_path.relative_to(BASE_STATIC_DIR)
     except ValueError:
-        return {"error": "Security Violation: Path escapes safe boundary"}, 403
+        return JSONResponse(
+            status_code=403,
+            content={"error": "Security Violation: Path escapes safe boundary"},
+        )
 
     # 3. Serve physical files if they exist (assets like .js, .css, .png)
     if target_path.is_file():
