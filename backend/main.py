@@ -73,8 +73,12 @@ async def serve_spa(full_path: str):
     """
     
     # 1. Construct the final physical path
-    # Join and abspath resolve '..' and relative segments to prevent directory traversal
-    unsafe_path = os.path.join(static_path, full_path)
+    # Sanitize: Only allow alphanumeric, dots, underscores, and hyphens
+    # This kills common traversal characters before they even reach path logic
+    sanitized_path = "".join(c for c in full_path if c.isalnum() or c in "._-/")
+    
+    # Join and abspath resolve '..' and relative segments
+    unsafe_path = os.path.join(static_path, sanitized_path)
     safe_path = os.path.abspath(unsafe_path)
 
     # 2. SECURITY BOUNDARY CHECK (The Fix for CodeQL)
