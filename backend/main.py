@@ -61,56 +61,40 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-# Use resolve() to ensure static_path is absolute and clean
-static_path = Path("/app/static").resolve()
-
-def _is_within_static_root(path: Path) -> bool:
-    """
-    Returns True if the given path is contained within the static_path directory.
-    Uses Path.is_relative_to when available, otherwise falls back to relative_to.
-    """
-    # Python 3.9+ has Path.is_relative_to
-    if hasattr(path, "is_relative_to"):
-        return path.is_relative_to(static_path)  # type: ignore[attr-defined]
-    try:
-        path.relative_to(static_path)
-        return True
-    except ValueError:
-        return False
+# Ensure the static path is absolute and clearly defined
+static_path = os.path.abspath("/app/static")
 
 @app.get("/{full_path:path}", tags=["Frontend"])
 async def serve_spa(full_path: str):
     """
     Serves static files for the SPA.
-    Security Implementation: Strict Path Traversal prevention using 
-    absolute path validation and boundary check.
+    Security Implementation: Standard Path Traversal prevention using 
+    absolute path validation and commonpath boundary check.
     """
-    # 1. First Line of Defense: Strict Input Sanitization
-    # Blocks common traversal payloads and null-byte injections
-    if ".." in full_path or "\0" in full_path or full_path.startswith("/"):
-        return {"error": "Security Violation: Invalid path payload"}, 400
+    
+    # 1. Construct the final physical path
+    # Join and abspath resolve '..' and relative segments to prevent directory traversal
+    unsafe_path = os.path.join(static_path, full_path)
+    safe_path = os.path.abspath(unsafe_path)
 
-    # 2. Safe Path Construction
-    # We join and resolve to get the final absolute physical path
-    requested_path = (static_path / full_path).resolve()
-
-    # 3. Security Boundary Check (The Fix for CodeQL)
-    # Ensure the resolved path is still within our static folder
-    # This is a robust defense-in-depth against path traversal
-    if not _is_within_static_root(requested_path):
+    # 2. SECURITY BOUNDARY CHECK (The Fix for CodeQL)
+    # commonpath ensures that safe_path starts with static_path.
+    # If the common root of [static, safe] is not [static], an escape was attempted.
+    if os.path.commonpath([static_path]) != os.path.commonpath([static_path, safe_path]):
+        # Audit: Log security violation attempts here if needed
         return {"error": "Security Violation: Path escapes safe boundary"}, 403
 
-    # 4. Serve the physical file if it exists (JS, CSS, Images)
-    if requested_path.is_file():
-        # Passing the validated, absolute path as a string
-        return FileResponse(str(requested_path))
+    # 3. Serve the physical file if it exists (JS, CSS, Images)
+    if os.path.isfile(safe_path):
+        return FileResponse(safe_path)
     
-    # 5. SPA Fallback: Serve index.html for all frontend-managed routes
-    index_file = static_path / "index.html"
-    if index_file.exists():
-        return FileResponse(str(index_file))
+    # 4. SPA Fallback: Serve index.html for all frontend-managed routes
+    # This allows the Vue/React router to handle the URL
+    index_file = os.path.join(static_path, "index.html")
+    if os.path.exists(index_file):
+        return FileResponse(index_file)
     
-    # Security: Avoid echoing user input back to prevent XSS/Injection
+    # Final fallback if even index.html is missing
     return {"error": "Requested assets could not be found"}, 404
 
 # --- 5. LOGGING MIDDLEWARE ---
