@@ -74,34 +74,32 @@ async def serve_frontend(rest_of_path: str):
     # This explicit check helps the static analyzer recognize the path as safe.
     if ".." in rest_of_path or rest_of_path.startswith("/"):
         return JSONResponse(
-            status_code=403, 
-            content={"error": "Security Violation: Invalid path format"}
+            status_code=403,
+            content={"error": "Security Violation: Invalid path format"},
         )
 
-    # 2. Construct and resolve the target path.
-    # We resolve it to eliminate any hidden symlinks or complex relative structures.
-    target_path = (BASE_STATIC_DIR / rest_of_path).resolve()
+    # 2. Construct a normalized candidate path using os.path.
+    # This removes any remaining relative segments and produces an absolute path.
+    safe_base = str(BASE_STATIC_DIR)
+    candidate = os.path.normpath(os.path.join(safe_base, rest_of_path))
 
     # 3. Security Boundary Check:
-    # We verify that the resolved target path remains within the authorized static directory.
-    try:
-        # This will raise ValueError if target_path is not within BASE_STATIC_DIR.
-        target_path.relative_to(BASE_STATIC_DIR)
-    except ValueError:
+    # Ensure the normalized path stays within the authorized static directory.
+    # os.path.commonpath will return the shared prefix directory.
+    if os.path.commonpath([safe_base, candidate]) != safe_base:
         return JSONResponse(
             status_code=403,
             content={"error": "Security Violation: Path escapes safe boundary"},
         )
 
     # 4. Serve physical files if they exist (assets like .js, .css, .png).
-    # Using .absolute() ensures the response uses a fully qualified path.
-    if target_path.is_file():
-        return FileResponse(str(target_path.absolute()))
+    if os.path.isfile(candidate):
+        return FileResponse(candidate)
 
     # 5. SPA Fallback: Redirect all other routes to index.html.
     # This allows the Vue Router to handle client-side navigation.
-    index_path = (BASE_STATIC_DIR / "index.html").resolve()
-    return FileResponse(str(index_path.absolute()))
+    index_path = os.path.join(safe_base, "index.html")
+    return FileResponse(index_path)
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
