@@ -84,7 +84,10 @@ async def serve_frontend(rest_of_path: str):
 
     # 3. Security Boundary Check:
     # We verify that the resolved target path remains within the authorized static directory.
-    if not str(target_path).startswith(str(BASE_STATIC_DIR)):
+    try:
+        # This will raise ValueError if target_path is not within BASE_STATIC_DIR.
+        target_path.relative_to(BASE_STATIC_DIR)
+    except ValueError:
         return JSONResponse(
             status_code=403,
             content={"error": "Security Violation: Path escapes safe boundary"},
