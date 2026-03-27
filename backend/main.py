@@ -84,7 +84,8 @@ async def serve_frontend(rest_of_path: str):
 
     # 3. Security Boundary Check:
     # Ensure the resolved path stays within the authorized static directory.
-    if BASE_STATIC_DIR != candidate_path and BASE_STATIC_DIR not in candidate_path.parents:
+    is_within_base = candidate_path == BASE_STATIC_DIR or BASE_STATIC_DIR in candidate_path.parents
+    if not is_within_base:
         return JSONResponse(
             status_code=403,
             content={"error": "Security Violation: Path escapes safe boundary"},
@@ -92,12 +93,12 @@ async def serve_frontend(rest_of_path: str):
 
     # 4. Serve physical files if they exist (assets like .js, .css, .png).
     if candidate_path.is_file():
-        return FileResponse(str(candidate_path))
+        return FileResponse(path=candidate_path)
 
     # 5. SPA Fallback: Redirect all other routes to index.html.
     # This allows the Vue Router to handle client-side navigation.
-    index_path = BASE_STATIC_DIR / "index.html"
-    return FileResponse(str(index_path))
+    index_path = (BASE_STATIC_DIR / "index.html").resolve()
+    return FileResponse(path=index_path)
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
