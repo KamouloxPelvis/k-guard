@@ -2,31 +2,56 @@
 
 # 🛡️ <a name="french"></a>K-Guard: DevSecOps & SRE Orchestrator
 
-⚠️ Avertissement : Clause de non-responsabilité
+> [!WARNING]
+> **Avertissement et Invitation à la Communauté**
+>
+> *K-Guard est conçu en alignement avec les standards de sécurité de l'industrie et suit les bonnes pratiques de l'OpenSSF : [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+>
+> *K-Guard respecte les standards de qualité et de documentation exigés par le **Cisco DevNet Code Exchange**, où le projet est officiellement publié et certifié : [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/KamouloxPelvis/K-Guard)*
+>
+> *Le projet est également pré-configuré pour l'**IDE Cloud de Cisco**, permettant une exploration immédiate du code et des scripts d'automatisation sans aucune installation locale : [![Run in Cisco Cloud IDE](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-runable-icon.svg)](https://developer.cisco.com/codeexchange/devenv/KamouloxPelvis/K-Guard/)*
+>
+> *Bien que la sécurité soit une priorité centrale, ce logiciel est fourni en tant que **Produit Minimum Viable (MVP)** personnel et expérimental. Il est conçu comme un outil de recherche pour explorer les architectures de sécurité DevSecOps. En tant que projet Open Source en évolution, K-Guard est sujet à une amélioration continue et à un durcissement communautaire.*
 
-*K-Guard a été conçu dans le respect des standards de sécurité de l'industrie et répond aux exigences de la norme [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+---
 
-*Bien que la sécurité fasse l'objet d'une attention toute particulière, ce logiciel est fourni en tant que Produit Minimum Viable (MVP) personnel et expérimental et ne saurait être considéré exempt de défauts ou de vulnérabilités. Il est conçu comme un outil de recherche pour explorer les architectures de sécurité DevSecOps. K-Guard a vocation à être amélioré et renforcé par la communauté en tant que projet Open Source.*
-
-**K-Guard** est une plateforme de gouvernance de sécurité et d'observabilité pour clusters K3s. Il automatise le cycle complet de la sécurité : Audit (**Trivy**), Remédiation réseau (**Network Sentinel/Ansible**) et Alerte ChatOps (**Cisco Webex**)
+**K-Guard** est une plateforme de gouvernance de sécurité et d'observabilité pour les clusters K3s. Il automatise le cycle complet de la sécurité : 
+* **Audit** : Analyse de vulnérabilités via **Trivy**.
+* **Remédiation Réseau** : Application automatisée de politiques via **Network Sentinel/Ansible**.
+* **Alerte ChatOps** : Notifications d'incidents en temps réel via les **APIs Cisco Webex**.
 
 
 ---
 
 ## 📍 Sommaire
 
-* [🧪 Stack Technique](#-tech-stack)
-* [🚀 Fonctionnalités Clés](#-key-features)
-* [📖 Documentation API & Référence](#-documentation-api--référence)
-* [🛠️ Installation & Configuration](#-installation--setup)
-    * [1. Installateur CLI (Go)](#1-cli-installer-go)
-    * [⚠️ Isolation Réseau (CNI)](#-recommandation-disolation-réseau-cni)
-    * [2. Auto-check & Dépendances](#2-auto-check--dépendances)
-    * [3. Procédure d'Amorçage](#3-procédure-damorçage-rapide)
-    * [4. Infrastructure & RBAC](#4-infrastructure--rbac)
-* [🛰️ Intégration Cisco Webex](#-cisco-webex-integration)
-* [🛡️ Network Policy (Network Sentinel)](#-network-policy--network-sentinel)
-* [👤 Contact & Crédits](#-contact--crédits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator)
+  - [📍 Sommaire](#-sommaire)
+  - [🧪 Tech Stack](#-tech-stack)
+  - [🚀 Key Features](#-key-features)
+  - [🛠️ Installation \& Setup](#️-installation--setup)
+    - [1. CLI Installer (Go)](#1-cli-installer-go)
+    - [⚠️ *Recommandation d'Isolation Réseau (CNI)*](#️-recommandation-disolation-réseau-cni)
+    - [2. Auto-check \& Dépendances](#2-auto-check--dépendances)
+    - [3. Procédure d'Amorçage Rapide](#3-procédure-damorçage-rapide)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel-)
+  - [👤 Contact \& Crédits](#-contact--crédits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator-1)
+  - [📍 Summary](#-summary)
+  - [🧪 Tech Stack](#-tech-stack-1)
+  - [🚀 Key Features](#-key-features-1)
+  - [📖 API Documentation \& Reference](#-api-documentation--reference)
+  - [🛠️ Installation \& Setup](#️-installation--setup-1)
+    - [1. CLI Installer (Go)](#1-cli-installer-go-1)
+    - [⚠️ *Network Isolation Recommendation (CNI)*](#️-network-isolation-recommendation-cni)
+    - [2. Auto-check \& Dependencies](#2-auto-check--dependencies)
+    - [3. Quick Start Procedure](#3-quick-start-procedure)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac-1)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration-1)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel--1)
+  - [👤 Contact \& Credits](#-contact--credits)
 
 ---
 
@@ -149,30 +174,55 @@ K-Guard applique une posture de sécurité Zero-Trust via des playbooks Ansible 
 
 # 🛡️ <a name="english"></a>K-Guard: DevSecOps & SRE Orchestrator
 
-⚠️ Warning: Disclaimer
+> [!WARNING]
+> **Disclaimer & Community Invitation**
+>
+> *K-Guard is engineered in alignment with industry security standards and follows the OpenSSF best practices: [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+>
+> *K-Guard adheres to the quality and documentation standards required by the **Cisco DevNet Code Exchange**, where the project is officially published and certified: [![published](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-published.svg)](https://developer.cisco.com/codeexchange/github/repo/KamouloxPelvis/K-Guard)*
+>
+> *The project is also pre-configured for the **Cisco Cloud IDE**, allowing for immediate exploration of the code and automation scripts without any local installation: [![Run in Cisco Cloud IDE](https://static.production.devnetcloud.com/codeexchange/assets/images/devnet-runable-icon.svg)](https://developer.cisco.com/codeexchange/devenv/KamouloxPelvis/K-Guard/)*
+>
+> *While security is a core priority, this software is provided as a personal and experimental **Minimum Viable Product (MVP)**. It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
 
-*K-Guard is engineered in alignment with industry security standards and follows the [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+---
 
-*While security is a core priority, this software is provided as a personal and experimental Minimum Viable Product (MVP). It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
-
-**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Auditing (**Trivy**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
+**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: 
+* **Auditing**: Vulnerability scanning via **Trivy**.
+* **Network Remediation**: Automated policy enforcement via **Network Sentinel/Ansible**.
+* **ChatOps Alerting**: Real-time incident notifications via **Cisco Webex APIs**.
 
 ---
 
 ## 📍 Summary
 
-* [🧪 Tech Stack](#en-tech-stack)
-* [🚀 Key Features](#en-key-features)
-* [📖 API Documentation & Reference](#en-api-documentation--reference)
-* [🛠️ Installation & Setup](#en-installation--setup)
-    * [1. CLI Installer (Go)](#en-1-cli-installer-go)
-    * [⚠️ CNI Recommendation](#en-network-isolation-recommendation)
-    * [2. Auto-check & Dependencies](#en-2-auto-check--dependencies)
-    * [3. Quick Start](#en-3-quick-start-procedure)
-    * [4. Infrastructure & RBAC](#en-4-infrastructure--rbac)
-* [🛰️ Cisco Webex Integration](#en-cisco-webex-integration)
-* [🛡️ Network Policy (Network Sentinel)](#en-network-policy--network-sentinel)
-* [👤 Contact & Credits](#en-contact--credits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator)
+  - [📍 Sommaire](#-sommaire)
+  - [🧪 Tech Stack](#-tech-stack)
+  - [🚀 Key Features](#-key-features)
+  - [🛠️ Installation \& Setup](#️-installation--setup)
+    - [1. CLI Installer (Go)](#1-cli-installer-go)
+    - [⚠️ *Recommandation d'Isolation Réseau (CNI)*](#️-recommandation-disolation-réseau-cni)
+    - [2. Auto-check \& Dépendances](#2-auto-check--dépendances)
+    - [3. Procédure d'Amorçage Rapide](#3-procédure-damorçage-rapide)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel-)
+  - [👤 Contact \& Crédits](#-contact--crédits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator-1)
+  - [📍 Summary](#-summary)
+  - [🧪 Tech Stack](#-tech-stack-1)
+  - [🚀 Key Features](#-key-features-1)
+  - [📖 API Documentation \& Reference](#-api-documentation--reference)
+  - [🛠️ Installation \& Setup](#️-installation--setup-1)
+    - [1. CLI Installer (Go)](#1-cli-installer-go-1)
+    - [⚠️ *Network Isolation Recommendation (CNI)*](#️-network-isolation-recommendation-cni)
+    - [2. Auto-check \& Dependencies](#2-auto-check--dependencies)
+    - [3. Quick Start Procedure](#3-quick-start-procedure)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac-1)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration-1)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel--1)
+  - [👤 Contact \& Credits](#-contact--credits)
 
 ---
 
