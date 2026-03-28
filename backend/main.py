@@ -60,44 +60,38 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-# Define and resolve the absolute base directory for static files once.
-# Using an absolute path (/app/static) ensures consistency within the Docker container.
 BASE_STATIC_DIR = Path("/app/static").resolve()
 
 @app.get("/{rest_of_path:path}", tags=["Frontend"])
 async def serve_frontend(rest_of_path: str):
     """
     Serves the Vue.js frontend with robust Path Traversal protection.
-    This implementation uses explicit sanitization to satisfy static analysis tools (CodeQL).
+    Optimized for CodeQL static analysis recognition.
     """
-    # 1. Immediate Sanitization: Block obvious traversal attempts.
-    # This explicit check helps the static analyzer recognize the path as safe.
-    if ".." in rest_of_path or rest_of_path.startswith("/"):
-        return JSONResponse(
-            status_code=403,
-            content={"error": "Security Violation: Invalid path format"},
-        )
-
-    # 2. Construct a normalized candidate path using pathlib and resolve it.
-    # This removes any remaining relative segments, resolves symlinks and produces an absolute path.
+    # 1. Validation & Normalization
+    # We resolve the path immediately to neutralize '..' and symlinks.
     candidate_path = (BASE_STATIC_DIR / rest_of_path).resolve()
 
-    # 3. Security Boundary Check:
-    # Ensure the resolved path stays within the authorized static directory.
-    if BASE_STATIC_DIR != candidate_path and BASE_STATIC_DIR not in candidate_path.parents:
+    # 2. Strict Boundary Check
+    # CodeQL prefers direct comparison or .relative_to() within the final check.
+    try:
+        # This check is the gold standard for Path Traversal prevention in Python.
+        # It raises a ValueError if candidate_path is not under BASE_STATIC_DIR.
+        candidate_path.relative_to(BASE_STATIC_DIR)
+    except (ValueError, RuntimeError):
         return JSONResponse(
             status_code=403,
             content={"error": "Security Violation: Path escapes safe boundary"},
         )
 
-    # 4. Serve physical files if they exist (assets like .js, .css, .png).
+    # 3. File existence check
     if candidate_path.is_file():
-        return FileResponse(str(candidate_path))
+        # Passing the Path object directly is the secure standard for FastAPI/Starlette.
+        return FileResponse(path=candidate_path)
 
-    # 5. SPA Fallback: Redirect all other routes to index.html.
-    # This allows the Vue Router to handle client-side navigation.
+    # 4. SPA Fallback
     index_path = BASE_STATIC_DIR / "index.html"
-    return FileResponse(str(index_path))
+    return FileResponse(path=index_path.resolve())
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
