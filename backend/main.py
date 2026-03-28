@@ -74,31 +74,30 @@ async def serve_frontend(rest_of_path: str):
     # This explicit check helps the static analyzer recognize the path as safe.
     if ".." in rest_of_path or rest_of_path.startswith("/"):
         return JSONResponse(
-            status_code=403, 
-            content={"error": "Security Violation: Invalid path format"}
+            status_code=403,
+            content={"error": "Security Violation: Invalid path format"},
         )
 
-    # 2. Construct and resolve the target path.
-    # We resolve it to eliminate any hidden symlinks or complex relative structures.
-    target_path = (BASE_STATIC_DIR / rest_of_path).resolve()
+    # 2. Construct a normalized candidate path using pathlib and resolve it.
+    # This removes any remaining relative segments, resolves symlinks and produces an absolute path.
+    candidate_path = (BASE_STATIC_DIR / rest_of_path).resolve()
 
     # 3. Security Boundary Check:
-    # We verify that the resolved target path remains within the authorized static directory.
-    if not str(target_path).startswith(str(BASE_STATIC_DIR)):
+    # Ensure the resolved path stays within the authorized static directory.
+    if BASE_STATIC_DIR != candidate_path and BASE_STATIC_DIR not in candidate_path.parents:
         return JSONResponse(
             status_code=403,
             content={"error": "Security Violation: Path escapes safe boundary"},
         )
 
     # 4. Serve physical files if they exist (assets like .js, .css, .png).
-    # Using .absolute() ensures the response uses a fully qualified path.
-    if target_path.is_file():
-        return FileResponse(str(target_path.absolute()))
+    if candidate_path.is_file():
+        return FileResponse(str(candidate_path))
 
     # 5. SPA Fallback: Redirect all other routes to index.html.
     # This allows the Vue Router to handle client-side navigation.
-    index_path = (BASE_STATIC_DIR / "index.html").resolve()
-    return FileResponse(str(index_path.absolute()))
+    index_path = BASE_STATIC_DIR / "index.html"
+    return FileResponse(str(index_path))
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
