@@ -34,6 +34,7 @@ kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /de
 # Using IfNotPresent to avoid rate limits and ensuring fast startup
 kubectl run sentinel-debug -n "$TARGET_NS" \
     --image=nicolaka/netshoot:latest \
+    --labels="role=debug,managed-by=k-guard-sentinel" \
     --restart=Never \
     --image-pull-policy=IfNotPresent \
     --overrides='{"spec": {"terminationGracePeriodSeconds": 0}}' \
