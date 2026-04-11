@@ -1,27 +1,43 @@
 ⚠️ Warning: Disclaimer
 
-*K-Guard is engineered in alignment with industry security standards and follows the [![OpenSSF Baseline](https://www.bestpractices.dev/projects/12124/baseline)](https://www.bestpractices.dev/projects/12124)*
+---
 
-*While security is a core priority, this software is provided as a personal and experimental Minimum Viable Product (MVP). It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
-
-**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Auditing (**Trivy**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
+**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: 
+* **Auditing**: Vulnerability scanning via **Trivy**.
+* **Network Remediation**: Automated policy enforcement via **Network Sentinel/Ansible**.
+* **ChatOps Alerting**: Real-time incident notifications via **Cisco Webex APIs**.
 
 ---
 
 ## 📍 Summary
 
-* [🧪 Tech Stack](#en-tech-stack)
-* [🚀 Key Features](#en-key-features)
-* [📖 API Documentation & Reference](#en-api-documentation--reference)
-* [🛠️ Installation & Setup](#en-installation--setup)
-    * [1. CLI Installer (Go)](#en-1-cli-installer-go)
-    * [⚠️ CNI Recommendation](#en-network-isolation-recommendation)
-    * [2. Auto-check & Dependencies](#en-2-auto-check--dependencies)
-    * [3. Quick Start](#en-3-quick-start-procedure)
-    * [4. Infrastructure & RBAC](#en-4-infrastructure--rbac)
-* [🛰️ Cisco Webex Integration](#en-cisco-webex-integration)
-* [🛡️ Network Policy (Network Sentinel)](#en-network-policy--network-sentinel)
-* [👤 Contact & Credits](#en-contact--credits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator)
+  - [📍 Sommaire](#-sommaire)
+  - [🧪 Tech Stack](#-tech-stack)
+  - [🚀 Key Features](#-key-features)
+  - [🛠️ Installation \& Setup](#️-installation--setup)
+    - [1. CLI Installer (Go)](#1-cli-installer-go)
+    - [⚠️ *Recommandation d'Isolation Réseau (CNI)*](#️-recommandation-disolation-réseau-cni)
+    - [2. Auto-check \& Dépendances](#2-auto-check--dépendances)
+    - [3. Procédure d'Amorçage Rapide](#3-procédure-damorçage-rapide)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel-)
+  - [👤 Contact \& Crédits](#-contact--crédits)
+- [🛡️ K-Guard: DevSecOps \& SRE Orchestrator](#️-k-guard-devsecops--sre-orchestrator-1)
+  - [📍 Summary](#-summary)
+  - [🧪 Tech Stack](#-tech-stack-1)
+  - [🚀 Key Features](#-key-features-1)
+  - [📖 API Documentation \& Reference](#-api-documentation--reference)
+  - [🛠️ Installation \& Setup](#️-installation--setup-1)
+    - [1. CLI Installer (Go)](#1-cli-installer-go-1)
+    - [⚠️ *Network Isolation Recommendation (CNI)*](#️-network-isolation-recommendation-cni)
+    - [2. Auto-check \& Dependencies](#2-auto-check--dependencies)
+    - [3. Quick Start Procedure](#3-quick-start-procedure)
+    - [4. Infrastructure \& RBAC](#4-infrastructure--rbac-1)
+  - [🛰️ Cisco Webex Integration](#️-cisco-webex-integration-1)
+  - [🛡️ Network Policy ( Network Sentinel )](#️-network-policy--network-sentinel--1)
+  - [👤 Contact \& Credits](#-contact--credits)
 
 ---
 
