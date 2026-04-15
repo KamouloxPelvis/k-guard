@@ -4,15 +4,13 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    /* Enable support for native Fetch API and Browser environment */
+    /* Supported by modern environments for Fetch and Web APIs */
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     
-    /* 'bundler' is the modern standard for Vite projects to resolve dependencies */
+    /* Modern standard for Vite projects, avoids most deprecation issues */
     "moduleResolution": "bundler",
     
-    /* CRITICAL: Silences deprecation warnings for 'baseUrl' and 'moduleResolution'.
-       This allows the GitHub Actions pipeline to complete without exit code 2.
-    */
+    /* Revert to 5.0 to satisfy your local environment's validation */
     "ignoreDeprecations": "5.0",
     
     "strict": true,
@@ -23,7 +21,8 @@
     "jsx": "preserve",
     "tsBuildInfoFile": "./node_modules/.tmp/tsconfig.app.tsbuildinfo",
     "types": ["node"],
-    "baseUrl": ".",
+    
+    /* We remove baseUrl and update paths to be absolute from root */
     "paths": {
       "@/*": ["./src/*"]
     },
