@@ -1,6 +1,39 @@
-# --- K-Guard Sentinel: Audit & Diagnostic Exception ---
+# --- K-Guard Sentinel: Auditor Identity (RBAC) ---
+# Creates a dedicated identity for diagnostic pods
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sentinel-auditor
+  namespace: {{ ns_item }}
+  labels:
+    managed-by: k-guard-sentinel
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sentinel-auditor-role
+  namespace: {{ ns_item }}
+rules:
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints"]
+    verbs: ["get", "list"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sentinel-auditor-binding
+  namespace: {{ ns_item }}
+subjects:
+  - kind: ServiceAccount
+    name: sentinel-auditor
+    namespace: {{ ns_item }}
+roleRef:
+  kind: Role
+  name: sentinel-auditor-role
+  apiGroup: rbac.authorization.k8s.io
+---
+# --- K-Guard Sentinel: Network Exception ---
 # Enables diagnostic pods to verify infrastructure health
-# Standard: Temporary troubleshooting access (Cisco DevNet Best Practice)
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
@@ -11,12 +44,11 @@ metadata:
 spec:
   podSelector:
     matchLabels:
-      # Targets only the diagnostic/netshoot pods
-      role: debug
+      role: debug # This MUST match the --labels in your script
   policyTypes:
     - Egress
   egress:
-    # 1. Authorize DNS Resolution (for [1/4] DNS Resolution Check)
+    # 1. Authorize DNS Resolution
     - to:
         - namespaceSelector:
             matchLabels:
@@ -26,12 +58,15 @@ spec:
           port: 53
         - protocol: TCP
           port: 53
-    # 2. Authorize K8s API access (for [2/4] K8s API Access Check)
+    # 2. Authorize K8s API access
     - to:
         - ipBlock:
             cidr: 0.0.0.0/0
       ports:
         - protocol: TCP
-          port: 6443 # K3s API
+          port: 6443 # K3s
         - protocol: TCP
-          port: 443  # Standard API
+          port: 443  # HTTPS
+    # 3. Authorize In-Cluster Service Reachability
+    - to:
+        - podSelector: {}

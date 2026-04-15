@@ -76,3 +76,16 @@
       vars:
         ns_item: "{{ item.metadata.name }}"
       loop: "{{ ns_list.resources }}"
+
+      # 7. INTEGRATIONS: Webex API Egress for K-Guard
+    - name: "🔓 Connectivity: Webex API Egress for K-Guard Alerts"
+      kubernetes.core.k8s:
+        state: present
+        definition: "{{ lookup('template', '../templates/app_egress.j2') }}"
+      vars:
+        app_name: "sentinel-webex-access"
+        namespace: "k-guard"
+        app_label: "k-guard-backend"
+        egress_rules:
+          - { cidr: "0.0.0.0/0", port: 443, protocol: "TCP" }
+          - { cidr: "10.43.0.1/32", port: 443, protocol: "TCP" } # K8s API Access (K3s default IP Adress)
