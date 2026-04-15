@@ -37,14 +37,16 @@ const api = {
           }
         }
 
-        // Extract error details to match Axios error structure
         const errorData = await response.json().catch(() => ({}));
         throw { response: { status: response.status, data: errorData } };
       }
 
       // Return data wrapped in an object to maintain compatibility with existing components
       const data = await response.json();
-      return { data };
+      // We return an object that mimics the old Axios structure 
+      // to avoid updating every single Vue component (tonight, tired...) : normally with fetch, we don't need to return response.status 
+      // but only one component... (e.g : data (only))
+      return { data, status: response.status };
     } catch (error) {
       throw error;
     }
