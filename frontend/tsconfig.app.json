@@ -4,13 +4,15 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    /* Enable support for Fetch API and Browser environment */
+    /* Enable support for native Fetch API and Browser environment */
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     
-    /* 'bundler' is the modern standard for Vite-based projects */
+    /* 'bundler' is the modern standard for Vite projects to resolve dependencies */
     "moduleResolution": "bundler",
     
-    /* Suppress warnings for deprecated options to allow CI/CD build */
+    /* CRITICAL: Silences deprecation warnings for 'baseUrl' and 'moduleResolution'.
+       This allows the GitHub Actions pipeline to complete without exit code 2.
+    */
     "ignoreDeprecations": "5.0",
     
     "strict": true,
@@ -26,7 +28,7 @@
       "@/*": ["./src/*"]
     },
 
-    /* --- QUALITY & LINTING --- */
+    /* --- CODE QUALITY & LINTING --- */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
