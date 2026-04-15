@@ -4,17 +4,13 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    /* Required for native Fetch API and Browser environment support */
+    /* Enable support for Fetch API and Browser environment */
     "lib": ["ESNext", "DOM", "DOM.Iterable"],
     
-    /* Using 'Bundler' is the modern standard for Vite/Vue projects. 
-       If using 'Node', use lowercase 'node' to avoid case-sensitivity issues in Linux/Docker.
-    */
+    /* 'bundler' is the modern standard for Vite-based projects */
     "moduleResolution": "bundler",
     
-    /* Silence deprecation warnings for 'baseUrl' and 'moduleResolution' 
-       to ensure CI/CD pipeline completion.
-    */
+    /* Suppress warnings for deprecated options to allow CI/CD build */
     "ignoreDeprecations": "5.0",
     
     "strict": true,
@@ -30,10 +26,9 @@
       "@/*": ["./src/*"]
     },
 
-    /* --- LINTING & CODE QUALITY --- */
+    /* --- QUALITY & LINTING --- */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true,
     "noUncheckedSideEffectImports": true
   },
