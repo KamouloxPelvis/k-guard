@@ -4,8 +4,19 @@
     "target": "ESNext",
     "useDefineForClassFields": true,
     "module": "ESNext",
-    "lib": ["ESNext", "DOM", "DOM.Iterable"], /* CRUCIAL : définit fetch et localStorage */
-    "moduleResolution": "Node",
+    /* Required for native Fetch API and Browser environment support */
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    
+    /* Using 'Bundler' is the modern standard for Vite/Vue projects. 
+       If using 'Node', use lowercase 'node' to avoid case-sensitivity issues in Linux/Docker.
+    */
+    "moduleResolution": "bundler",
+    
+    /* Silence deprecation warnings for 'baseUrl' and 'moduleResolution' 
+       to ensure CI/CD pipeline completion.
+    */
+    "ignoreDeprecations": "5.0",
+    
     "strict": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
@@ -18,7 +29,8 @@
     "paths": {
       "@/*": ["./src/*"]
     },
-    /* Ton setup de Linting habituel... */
+
+    /* --- LINTING & CODE QUALITY --- */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "erasableSyntaxOnly": true,
