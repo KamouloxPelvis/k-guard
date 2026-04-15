@@ -3,12 +3,12 @@ const BASE_URL = '/api';
 /**
  * Custom wrapper to mimic Axios behavior using native Fetch API.
  * Designed to not use Axios anymore !!!! Fatal exploits from it. Never install neither import axios.
- * Fetch is back...
+ * Standardizing to international DevSecOps norms.
  */
 
 const api = {
-  async request(endpoint: string, options: RequestInit = {}) {
-    // --- REQUEST INTERCEPTOR LOGIC ---
+  // Use <T> to allow type arguments like api.get<User>('/profile')
+  async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<{ data: T; status: number }> {
     const token = localStorage.getItem('user_token');
     const headers = new Headers(options.headers);
     
@@ -25,13 +25,10 @@ const api = {
     try {
       const response = await fetch(`${BASE_URL}${endpoint}`, config);
 
-      // --- RESPONSE INTERCEPTOR LOGIC ---
       if (!response.ok) {
-        // Handle 401 Unauthorized (Expired or invalid session)
         if (response.status === 401) {
           console.warn("🔒 Session invalid or expired, cleaning up...");
           localStorage.removeItem('user_token');
-          
           if (!window.location.pathname.endsWith('/login')) {
             window.location.href = '/login';
           }
@@ -41,37 +38,37 @@ const api = {
         throw { response: { status: response.status, data: errorData } };
       }
 
-      // Return data wrapped in an object to maintain compatibility with existing components
       const data = await response.json();
-      // We return an object that mimics the old Axios structure 
-      // to avoid updating every single Vue component (tonight, tired...) : normally with fetch, we don't need to return response.status 
-      // but only one component... (e.g : data (only))
       return { data, status: response.status };
     } catch (error) {
       throw error;
     }
   },
 
-  get(endpoint: string) {
-    return this.request(endpoint, { method: 'GET' });
+  // Added optional 'options' to match expected 2 arguments in some views
+  get<T = any>(endpoint: string, options: RequestInit = {}) {
+    return this.request<T>(endpoint, { ...options, method: 'GET' });
   },
 
-  post(endpoint: string, body: any) {
-    return this.request(endpoint, {
+  // Added optional 'options' and default empty body
+  post<T = any>(endpoint: string, body: any = {}, options: RequestInit = {}) {
+    return this.request<T>(endpoint, {
+      ...options,
       method: 'POST',
       body: JSON.stringify(body)
     });
   },
 
-  put(endpoint: string, body: any) {
-    return this.request(endpoint, {
+  put<T = any>(endpoint: string, body: any = {}, options: RequestInit = {}) {
+    return this.request<T>(endpoint, {
+      ...options,
       method: 'PUT',
       body: JSON.stringify(body)
     });
   },
 
-  delete(endpoint: string) {
-    return this.request(endpoint, { method: 'DELETE' });
+  delete<T = any>(endpoint: string, options: RequestInit = {}) {
+    return this.request<T>(endpoint, { ...options, method: 'DELETE' });
   }
 };
 
