@@ -53,15 +53,22 @@ const api = {
     return this.request<T>(endpoint, { ...options, method: 'GET' });
   },
 
-  // Added optional 'options' and default empty body
+  /**
+   * Sends a POST request to the API.
+   * Handles both JSON and URLSearchParams (OAuth2) payloads.
+   */
   post<T = any>(endpoint: string, body: any = {}, options: RequestInit = {}) {
     const headers = new Headers(options.headers);
     const contentType = headers.get('Content-Type');
 
-    // if not form-urlencoded, we don't stringify, we send the body as it is
-    const finalBody = contentType === 'application/x-www-form-urlencoded' 
-      ? body 
-      : JSON.stringify(body);
+    let finalBody;
+    
+    // Check if the request expects form-urlencoded data (for OAuth2 authentication)
+    if (contentType === 'application/x-www-form-urlencoded') {
+      finalBody = body; // Pass URLSearchParams directly to fetch
+    } else {
+      finalBody = JSON.stringify(body); // Default to JSON serialization
+    }
 
     return this.request<T>(endpoint, {
       ...options,

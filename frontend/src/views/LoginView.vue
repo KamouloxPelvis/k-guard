@@ -19,8 +19,8 @@ const handleLogin = async (): Promise<void> => {
     error.value = '';
 
     try {
-        /** * FastAPI OAuth2 expects data in application/x-www-form-urlencoded format.
-         * The URLSearchParams object is converted to a string to ensure compatibility with Fetch.
+        /** * Construct credentials using URLSearchParams for FastAPI OAuth2 compatibility.
+         * Fetch will automatically handle the boundary and formatting.
          */
         const params = new URLSearchParams();
         params.append('username', username.value);
@@ -28,7 +28,7 @@ const handleLogin = async (): Promise<void> => {
 
         const { data } = await api.post<{ access_token: string }>(
             '/token',    
-            params.toString(), 
+            params, // Send the URLSearchParams object directly
             {
                 headers: {
                     'Content-Type': 'application/x-www-form-urlencoded'
@@ -37,20 +37,14 @@ const handleLogin = async (): Promise<void> => {
         );
         
         if (data.access_token) {
-            /**
-             * Credentials storage for session management and API interceptor.
-             * Redirection to the main dashboard follows successful authentication.
-             */
+            // Persist token and metadata to local storage for session persistence
             localStorage.setItem('user_token', data.access_token);
             localStorage.setItem('admin_username', username.value); 
             await router.push('/');
         }
     } catch (err: any) {
-        /**
-         * Error logging for debugging purposes.
-         * User feedback is provided via a generic access denied message.
-         */
-        console.error("Login Error:", err.response?.status, err.message);
+        // Detailed logging for SRE diagnostics
+        console.error("Authentication failure:", err.response?.status, err.message);
         error.value = "ACCESS DENIED: INVALID CREDENTIALS";
     } finally {
         loading.value = false;
