@@ -38,7 +38,7 @@ async def node_capacity(user: dict = Depends(verify_token)):
     """
     return get_node_capacity()
 
-@router.get("/k3s/status")
+@router.get("/k3s/cluster-status")
 async def k3s_status(user: dict = Depends(verify_token)):
     """
     Provides an inventory of Pod health status for the System Overview dashboard.
