@@ -18,8 +18,9 @@
     * [1. CLI Installer (Go)](#en-1-cli-installer-go)
     * [⚠️ CNI Recommendation](#en-network-isolation-recommendation)
     * [2. Auto-check & Dependencies](#en-2-auto-check--dependencies)
-    * [3. Quick Start](#en-3-quick-start-procedure)
+    * [3. Quick Install](#en-3-quick-start-procedure)
     * [4. Infrastructure & RBAC](#en-4-infrastructure--rbac)
+    * [5. Accessing the Dashboard](#en-accessing-dashboard)
 * [🛰️ Cisco Webex Integration](#en-cisco-webex-integration)
 * [🛡️ Network Policy (Network Sentinel)](#en-network-policy--network-sentinel)
 * [👤 Contact & Credits](#en-contact--credits)
@@ -105,7 +106,7 @@ The assistant launches a "Pre-flight check" script to validate the secure config
 * Docker (`sudo apt install docker.io -y`).
 * Python 3 & Pip.
 
-### <a name="en-3-quick-start-procedure"></a>3. Quick Start Procedure
+### <a name="en-3-quick-start-procedure"></a>3. Quick Install procedure
 ```bash
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
@@ -124,6 +125,16 @@ chmod +x kguard-installer
 * **Persistence**: Uses a 5GB `PersistentVolumeClaim` (PVC) for the Trivy database cache, ensuring ultra-fast recurrent scans.
 * **RBAC Policy**: Granular `ClusterRole` configuration specifically allowing metrics retrieval, Pod remediation, and `NetworkPolicy` management.
 * **Performance**: Resource limits optimized for a Kamatera VPS (Requests: 500m CPU / 1Gi RAM | Limits: 1.5 CPU / 2Gi RAM).
+
+---
+
+### <a name="en-accessing-dashboard"></a>5. Accessing the Dashboard
+Once the deployment is finalized on your K3s cluster, the K-Guard interface is exposed through a secure endpoint.
+
+1. **URL**: Open your browser and navigate to `https://k-guard.local:8443` (or the IP configured in your local `/etc/hosts`).
+2. **Authentication**: Use the administrative credentials defined during the installation process to log in and access the real-time Sentinel topology and security scans.
+
+---
 
 ---
 
