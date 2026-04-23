@@ -40,7 +40,7 @@ rules:
   # 6. NETWORK SENTINEL: Network Policy audit (Ansible Playbook integration)
   - apiGroups: ["networking.k8s.io"] 
     resources: ["networkpolicies"]
-    verbs: ["get", "list", "watch"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 
 ---
 # 3. ClusterRoleBinding (Linking Identity to Permissions)

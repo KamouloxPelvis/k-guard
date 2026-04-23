@@ -295,7 +295,35 @@
         </div>
       </div>
     </div>
-    
+      <Transition name="fade">
+        <div v-if="showTestModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
+          <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl overflow-hidden shadow-2xl">
+            <div class="bg-[#111217] border-b border-slate-800 px-4 py-2 flex justify-between items-center">
+              <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Sentinel Connectivity Audit</span>
+              <button @click="showTestModal = false" class="text-slate-500 hover:text-white transition-colors cursor-pointer">✕</button>
+            </div>
+            
+            <div class="p-6 h-[400px] overflow-y-auto font-mono text-[11px] bg-black/40">
+              <div class="space-y-1">
+                <p v-html="testTerminalOutput" class="whitespace-pre-wrap leading-relaxed text-slate-300"></p>
+                <div v-if="isTesting" class="flex items-center gap-2 mt-2">
+                  <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
+                  <span class="text-blue-500 animate-pulse italic">Auditing cluster isolation...</span>
+                </div>
+              </div>
+            </div>
+
+            <div class="p-4 bg-[#111217] border-t border-slate-800 flex justify-end">
+              <button 
+                @click="showTestModal = false" 
+                :disabled="isTesting"
+                class="px-6 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-[9px] font-bold uppercase tracking-widest transition-all cursor-pointer">
+                Close Console
+              </button>
+            </div>
+          </div>
+        </div>
+      </Transition>
     </div>
 </template>
 
