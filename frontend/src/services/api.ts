@@ -55,10 +55,18 @@ const api = {
 
   // Added optional 'options' and default empty body
   post<T = any>(endpoint: string, body: any = {}, options: RequestInit = {}) {
+    const headers = new Headers(options.headers);
+    const contentType = headers.get('Content-Type');
+
+    // if not form-urlencoded, we don't stringify, we send the body as it is
+    const finalBody = contentType === 'application/x-www-form-urlencoded' 
+      ? body 
+      : JSON.stringify(body);
+
     return this.request<T>(endpoint, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(body)
+      body: finalBody
     });
   },
 
