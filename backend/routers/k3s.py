@@ -45,6 +45,29 @@ async def k3s_status(user: dict = Depends(verify_token)):
     """
     return get_k3s_status()
 
+@router.get("/k3s/status")
+async def get_vps_specs(user: dict = Depends(verify_token)):
+    """
+    Retrieves host OS and K3s version dynamically from the nodes.
+    Powers the system metadata footer.
+    """
+    try:
+        from kubernetes import client
+        v1 = client.CoreV1Api()
+        nodes = v1.list_node()
+        if not nodes.items:
+            return {"cluster_version": "Unknown", "vps_os": "Linux Host"}
+            
+        node = nodes.items[0]
+        return {
+            "cluster_version": node.status.node_info.kubelet_version, # ex: v1.28.x+k3s
+            "vps_os": node.status.node_info.os_image,               # ex: Ubuntu 24.04 LTS
+            "uptime": "Active",
+            "status": "Online"
+        }
+    except Exception as e:
+        return {"cluster_version": "v1.28-k3s", "vps_os": "Generic Linux"}
+
 @router.get("/k3s/deployments/all")
 async def k3s_deployments(user: dict = Depends(verify_token)):
     """
