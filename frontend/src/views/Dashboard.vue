@@ -12,43 +12,53 @@
   
   const systemData = ref<SystemInfo | null>(null);
   const systemLatency = ref<number>(0);
-  const username = ref<string>(localStorage.getItem('admin_username') || 'Admin');
+  const username = ref<string>(localStorage.getItem('admin_username') || 'Authorized User');
   const isMenuOpen = ref(false);
   const route = useRoute();
   const router = useRouter();
   let statsInterval: any = null;
 
   /**
-   * Latency calculation and health check heartbeat.
-   * Pings the /health endpoint to monitor backend availability and response time.
+   * Health check heartbeat and latency measurement.
+   * Calculates the round-trip time (RTT) to the backend health endpoint.
    */
   const updateSystemStats = async () => {
     const start = Date.now();
     try {
+      /**
+       * The api.get method returns both data and status code.
+       * 200 OK confirms backend reachability.
+       */
       const response = await api.get('/health');
       if (response.status === 200) {
         systemLatency.value = Date.now() - start;
       }
     } catch (e) {
       systemLatency.value = 0;
-      console.warn("[K-Guard] Server heartbeat lost");
+      console.warn("[K-Guard] Connectivity lost with backend heartbeat service");
     }
   };
 
   /**
-   * Fetches core cluster information (K3s version, OS, Uptime).
+   * Data retrieval for core infrastructure status.
+   * Fetches K3s cluster version and host OS details.
    */
   const fetchSystemInfo = async () => {
     try {
-      const { data } = await api.get('/k3s/status');
+      const { data } = await api.get<SystemInfo>('/k3s/status');
       systemData.value = data;
     } catch (error) {
-      console.error("Dashboard: Cluster Status Error", error);
+      /**
+       * Errors are logged to the console for infrastructure monitoring.
+       * The UI handles null systemData gracefully via templates.
+       */
+      console.error("Dashboard Service: Failed to retrieve cluster status", error);
     }
   };
 
   /**
-   * Handles user logout by clearing local credentials and redirecting to Login.
+   * Session termination logic.
+   * Clears security tokens and user metadata from local storage before redirecting.
    */
   const handleLogout = () => {
     localStorage.removeItem('user_token');
@@ -57,28 +67,31 @@
   };
 
   onMounted(async () => {
-    // Initial data synchronization
+    // Initial data synchronization sequence
     await fetchSystemInfo();
     await updateSystemStats();
     
-    // Auto-refresh latency and heartbeat status every 20 seconds
+    // Establishing heartbeat interval (20-second cycles)
     statsInterval = setInterval(updateSystemStats, 20000);
   });
 
   onUnmounted(() => {
-    // Cleanup interval to prevent memory leaks in the browser
+    // Memory leak prevention by clearing the polling interval
     if (statsInterval) clearInterval(statsInterval);
   });
 
   /**
-   * Computed page title based on the active router path.
+   * Dynamic view title mapping.
+   * Maps internal routes to human-readable system module names.
    */
   const pageTitle = computed(() => {
-    if (route.path === '/') return 'System Overview';
-    if (route.path === '/security') return 'Vulnerabilities';
-    if (route.path === '/sentinel') return 'Network Sentinel';
-    if (route.path === '/settings') return 'Settings';
-    return 'K-Guard Dashboard';
+    const titles: Record<string, string> = {
+      '/': 'System Overview',
+      '/security': 'Vulnerabilities',
+      '/sentinel': 'Network Sentinel',
+      '/settings': 'Settings'
+    };
+    return titles[route.path] || 'K-Guard Dashboard';
   });
 </script>
 

@@ -2,7 +2,7 @@
   import { ref, computed, onMounted, watch } from 'vue';
   import api from '@/services/api';
 
-  // --- Interfaces ---
+  // --- INTERFACES ---
   interface PodNode {
     id: string;
     name: string;
@@ -23,26 +23,45 @@
     targetIp?: string;
   }
 
-  // --- Reactive State ---
+  /**
+   * API Response structure for the Sentinel Map.
+   */
+  interface SentinelMapResponse {
+    nodes: PodNode[];
+    edges: NetworkEdge[];
+    namespaces: string[];
+  }
+
+  /**
+   * Generic interface for terminal/test outputs.
+   */
+  interface ActionResponse {
+    output: string;
+    status?: string;
+  }
+
+  // --- REACTIVE STATE ---
   const pods = ref<PodNode[]>([]);
   const edges = ref<NetworkEdge[]>([]);
   const selectedNS = ref('all-protected');
   const isLoading = ref(false);
   const namespaces = ref(['all-protected']);
 
-  // --- UI States ---
+  // --- UI STATES ---
   const showRoleModal = ref(false);
   const selectedPod = ref<PodNode | null>(null);
   const currentViewMode = ref('list'); 
-  
-  // --- New UI States: Terminal & Sentinel Actions ---
   const showTestModal = ref(false);
   const isTesting = ref(false);
   const testTerminalOutput = ref('');
+  const activeAccordion = ref<string | null>(null);
 
-  // --- Logic: Vulnerability Detection & Scoring ---
+  // --- LOGIC: SECURITY ANALYSIS ---
   const isVulnerable = (pod: PodNode) => !pod.is_hardened;
 
+  /**
+   * Computes the global security score based on hardened vs vulnerable pods.
+   */
   const securityStats = computed(() => {
     if (pods.value.length === 0) return { score: 100, vulnerableCount: 0 };
     const vulnerable = pods.value.filter(p => isVulnerable(p)).length;
@@ -50,37 +69,47 @@
     return { score, vulnerableCount: vulnerable };
   });
 
-  // --- Computed: Grouped & Filtered Data ---
+  /**
+   * Filters and sorts pods based on the selected namespace.
+   * Vulnerable pods are prioritized in the list for visibility.
+   */
   const filteredPods = computed(() => {
     const list = selectedNS.value === 'all-protected' 
       ? pods.value 
       : pods.value.filter(pod => pod.namespace === selectedNS.value);
     
-    // Technical Note: Prioritize vulnerable pods in the display order
     return [...list].sort((a, b) => (isVulnerable(b) ? 1 : 0) - (isVulnerable(a) ? 1 : 0));
   });
 
+  /**
+   * Groups filtered pods by their respective Kubernetes namespace.
+   */
   const podsByNamespace = computed(() => {
-    // Optimized grouping logic to avoid unused variable errors (TS6133)
     return filteredPods.value.reduce((acc, pod) => {
-      if (!acc[pod.namespace]) {
-        acc[pod.namespace] = [];
-      }
+      if (!acc[pod.namespace]) acc[pod.namespace] = [];
       acc[pod.namespace]!.push(pod); 
       return acc;
     }, {} as Record<string, PodNode[]>);
   });
 
+  /**
+   * Filters network edges to only show connections relevant to the current namespace.
+   */
   const filteredEdges = computed(() => {
     if (selectedNS.value === 'all-protected') return edges.value;
     const nsPodIds = filteredPods.value.map(p => p.id);
     return edges.value.filter(edge => nsPodIds.includes(edge.source) && nsPodIds.includes(edge.target));
   });
 
+  // --- DATA FETCHING ---
+
+  /**
+   * Synchronizes the network map from the Sentinel backend service.
+   */
   const fetchNetworkData = async () => {
     isLoading.value = true;
     try {
-      const { data } = await api.get('/sentinel/map');
+      const { data } = await api.get<SentinelMapResponse>('/sentinel/map');
       pods.value = data.nodes || [];
       if (data.namespaces) namespaces.value = ['all-protected', ...data.namespaces];
 
@@ -91,16 +120,16 @@
         targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
       }));
     } catch (error) {
-      console.error("Sentinel UI Sync Error", error);
+      console.error("[K-Guard] Sentinel UI Sync Failure:", error);
     } finally {
       isLoading.value = false;
     }
   };
 
-  // --- Topology Rendering Logic ---
+  // --- TOPOLOGY HELPERS ---
   const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
     const x = side === 'left' ? 150 : 850;
-    const y = (index + 1) * (600 / (total + 1));
+    const y = (index + 1) * (500 / (total + 1));
     return { x, y };
   };
 
@@ -117,59 +146,57 @@
     return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
   };
 
-  const openRoleDetails = (pod: PodNode) => {
-    selectedPod.value = pod;
-    showRoleModal.value = true;
-  };
+  // --- SENTINEL ACTIONS ---
 
-  // --- Sentinel Actions ---
   const triggerHarden = async () => {
     if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
     try {
-      await api.post('/sentinel/activate');
-      alert("🛡️ Network Sentinel strategy applied successfully!");
+      await api.post('/sentinel/activate', {});
       fetchNetworkData();
     } catch (e) {
-      alert("❌ Error: Ansible Playbook execution failed.");
+      console.error("Hardening failed");
     }
   };
 
   const triggerDeactivate = async () => {
-    if (!confirm("⚠️ WARNING: You are about to drop all Zero-Trust Network Policies. The cluster will be OPEN. Proceed?")) return;
+    if (!confirm("⚠️ Deactivate Zero-Trust Network Policies?")) return;
     try {
-      await api.post('/sentinel/deactivate');
-      alert("🔓 Policies deactivated. Cluster is now open.");
+      await api.post('/sentinel/deactivate', {});
       fetchNetworkData();
     } catch (e) {
-      alert("❌ Error: Deactivation failed.");
+      console.error("Deactivation failed");
     }
   };
 
+  /**
+   * Executes an automated connectivity audit using netshoot ephemeral pods.
+   */
   const runConnectivityTest = async () => {
     showTestModal.value = true;
     isTesting.value = true;
     testTerminalOutput.value = "⏳ Deploying ephemeral diagnostic pod (nicolaka/netshoot)...\n";
     
     try {
-      // Assuming your backend reads the shell script execution stdout
-      const { data } = await api.post('/sentinel/test');
+      const { data } = await api.post<ActionResponse>('/sentinel/test', {});
       testTerminalOutput.value = data.output;
     } catch (error) {
-      testTerminalOutput.value += "\n<span style='color: #ef4444;'>❌ FATAL: Backend communication failed. Check K-Guard API logs.</span>";
+      testTerminalOutput.value += "\n<span style='color: #ef4444;'>❌ FATAL: Communication failure.</span>";
     } finally {
       isTesting.value = false;
     }
   };
 
-  onMounted(fetchNetworkData);
-  watch(selectedNS, fetchNetworkData);
-
-  const activeAccordion = ref<string | null>(null);
-
   const toggleAccordion = (id: string) => {
     activeAccordion.value = activeAccordion.value === id ? null : id;
   };
 
+  const openRoleDetails = (pod: PodNode) => {
+    selectedPod.value = pod;
+    showRoleModal.value = true;
+  };
+
+  onMounted(fetchNetworkData);
+  watch(selectedNS, fetchNetworkData);
 </script>
 
 <template>
@@ -192,7 +219,7 @@
           </select>
           
           <button @click="runConnectivityTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Connectivity</button>
-          <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deactivate Hardening</button>
+          <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deactivate</button>
           <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
         </div>
       </div>
@@ -233,7 +260,6 @@
           </text>
         </g>
       </svg>
-      <div class="absolute bottom-3 right-4 text-[8px] text-slate-700 uppercase font-mono tracking-widest italic">Flows: {{ filteredEdges.length }}</div>
     </div>
 
     <div v-if="currentViewMode === 'list'" class="space-y-6">
@@ -245,12 +271,9 @@
 
         <div class="space-y-2">
           <div v-for="pod in nsPods" :key="pod.id" class="border border-slate-800/60 rounded-sm overflow-hidden">
-            <div 
-              @click="toggleAccordion(pod.id)"
-              class="bg-[#111217] p-3 flex justify-between items-center cursor-pointer hover:bg-[#15171e] transition-colors"
-            >
+            <div @click="toggleAccordion(pod.id)" class="bg-[#111217] p-3 flex justify-between items-center cursor-pointer hover:bg-[#15171e] transition-colors">
               <div class="flex items-center gap-3">
-                <div :class="isVulnerable(pod) ? 'bg-red-500' : 'bg-blue-500'" class="w-1.5 h-1.5 rounded-full shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                <div :class="isVulnerable(pod) ? 'bg-red-500 shadow-[0_0_8px_rgba(239,68,68,0.5)]' : 'bg-blue-500 shadow-[0_0_8px_rgba(59,130,246,0.5)]'" class="w-1.5 h-1.5 rounded-full"></div>
                 <span class="text-[10px] font-bold text-white uppercase">{{ pod.name }}</span>
               </div>
               <span class="text-slate-500 text-[10px]">{{ activeAccordion === pod.id ? '−' : '+' }}</span>
@@ -267,77 +290,16 @@
                   <p :class="pod.status === 'Running' ? 'text-green-500' : 'text-yellow-500'">{{ pod.status }}</p>
                 </div>
               </div>
-              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
     
-    <Teleport to="body">
-      <div v-if="showRoleModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-        <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[80vh] flex flex-col rounded-sm shadow-2xl overflow-hidden">
-          <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#111217]">
-            <span class="text-[10px] font-mono text-orange-400 uppercase tracking-widest">Metadata Explorer // {{ selectedPod?.name }}</span>
-            <button @click="showRoleModal = false" class="text-slate-500 hover:text-white text-2xl transition-colors">&times;</button>
-          </div>
-
-          <div class="flex-1 p-5 md:p-8 overflow-y-auto font-mono bg-[#090a0d] custom-scrollbar">
-            <div class="mb-6 p-4 bg-blue-500/5 border-l-2 border-blue-600">
-              <p class="text-[9px] text-slate-500 uppercase font-black mb-1">Detected Role</p>
-              <p class="text-xl text-white font-black uppercase tracking-tight">{{ selectedPod?.role }}</p>
-            </div>
-
-            <div class="space-y-1">
-              <p class="text-[9px] text-slate-500 uppercase font-black mb-4 tracking-widest flex items-center gap-2">
-                <span class="w-3 h-[1px] bg-slate-700"></span> Metadata
-              </p>
-              <div v-for="(val, key) in selectedPod?.labels" :key="key" 
-                  class="flex flex-col md:flex-row md:items-center gap-2 py-2 border-b border-white/[0.02] px-2">
-                <span class="text-blue-500/70 font-bold text-[9px] uppercase min-w-[200px]">{{ key }}</span>
-                <span class="text-slate-400 text-[10px] break-all bg-slate-900/30 px-2 py-0.5 rounded border border-slate-800/40">{{ val }}</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Teleport>
-
-    <Teleport to="body">
-      <div v-if="showTestModal" class="fixed inset-0 z-[110] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
-        <div class="bg-[#0b0c10] border border-slate-700 w-full max-w-4xl h-[70vh] flex flex-col rounded-sm shadow-2xl overflow-hidden font-mono shadow-blue-900/20">
-          
-          <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#15161b]">
-            <div class="flex items-center gap-2">
-              <div class="w-3 h-3 rounded-full bg-red-500"></div>
-              <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-              <div class="w-3 h-3 rounded-full bg-green-500"></div>
-              <span class="ml-3 text-[10px] text-slate-400 font-bold uppercase tracking-widest">k-guard@sentinel ~ connectivity_test.sh</span>
-            </div>
-            <button @click="showTestModal = false" class="text-slate-500 hover:text-red-400 text-xl leading-none transition-colors">&times;</button>
-          </div>
-
-          <div class="flex-1 p-6 overflow-y-auto text-xs md:text-sm text-slate-300 leading-relaxed custom-scrollbar whitespace-pre-wrap">
-            <div v-html="testTerminalOutput"></div>
-            <div v-if="isTesting" class="mt-4 flex items-center gap-2 text-blue-400">
-              <span class="animate-pulse">_</span>
-            </div>
-          </div>
-          
-        </div>
-      </div>
-    </Teleport>
-
-  </div>
+    </div>
 </template>
 
 <style scoped>
-/* Base Animations */
-@keyframes flow {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(100%); }
-}
-
-/* SVG Topology Flow Animation */
 @keyframes dash-flow {
   from { stroke-dashoffset: 24; }
   to { stroke-dashoffset: 0; }
@@ -345,9 +307,6 @@
 .animate-dash-flow {
   animation: dash-flow 1.5s linear infinite;
 }
-
-/* Custom Scrollbars */
 .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-.custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
 .custom-scrollbar::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 2px; }
 </style>

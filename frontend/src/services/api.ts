@@ -7,12 +7,15 @@ const BASE_URL = '/api';
  */
 
 const api = {
-  // Use <T> to allow type arguments like api.get<User>('/profile')
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<{ data: T; status: number }> {
     const token = localStorage.getItem('user_token');
     const headers = new Headers(options.headers);
     
-    headers.set('Content-Type', 'application/json');
+    // Si le Content-Type n'est pas déjà défini dans les options, on met JSON par défaut
+    if (!headers.has('Content-Type')) {
+      headers.set('Content-Type', 'application/json');
+    }
+
     if (token) {
       headers.set('Authorization', `Bearer ${token}`);
     }
