@@ -10,13 +10,34 @@
     image: string;
   }
 
+  interface Vulnerability {
+    vulnerability_id: string;
+    pkg_name: string;
+    installed_version: string;
+    fixed_version?: string;
+    severity: string;
+    description?: string;
+  }
+
+  interface ScanResult {
+    image: string;
+    status: string;
+    summary?: {
+      critical: number;
+      high: number;
+      medium: number;
+      low: number;
+    };
+    vulnerabilities?: Vulnerability[];
+  }
+
   // --- REACTIVE STATES ---
   const apps = ref<AppDeployment[]>([]); 
   const isLoadingApps = ref(true);
   const loadingApp = ref<string | null>(null);
-  const scanResults = ref<Record<string, any>>({});
+  const scanResults = ref<Record<string, ScanResult>>({});
   const showVulnerabilityModal = ref(false);
-  const selectedAppVulnerabilities = ref<any[]>([]);
+  const selectedAppVulnerabilities = ref<Vulnerability[]>([]);
   const selectedAppName = ref("");
   const patchingApp = ref<string | null>(null);
   const showPatchModal = ref(false);
@@ -24,10 +45,16 @@
   const activePatchApp = ref("");
   let logInterval: any = null;
 
+  /**
+   * Evaluates if a specific deployment is running a legacy image for testing.
+   */
   const isDemoMode = (appId: string): boolean => {
     return scanResults.value[appId]?.image === 'nginx:1.18';
   };
 
+  /**
+   * Opens detailed vulnerability report for an analyzed deployment.
+   */
   const openVulnerabilityDetails = (app: AppDeployment) => {
     const result = scanResults.value[app.id];
     if (result?.vulnerabilities) {
@@ -37,42 +64,57 @@
     }
   };
 
+  /**
+   * Discovers all active deployments across the K3s cluster.
+   */
   const fetchApps = async () => {
     try {
-      const response = await api.get('/k3s/deployments/all');
+      const response = await api.get<AppDeployment[]>('/k3s/deployments/all');
       apps.value = response.data;
     } catch (error) {
-      console.error("🚨 K-Guard Discovery Error:", error);
+      console.error("[K-Guard] Discovery Engine Error:", error);
     } finally {
       isLoadingApps.value = false;
     }
   };
 
+  /**
+   * Triggers a vulnerability scan for a container image.
+   * Implements a polling mechanism to retrieve results once the scan is completed.
+   */
   const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
     loadingApp.value = appId;
     let imageToScan = defaultImage;
+
+    // Secret manual override for demonstration of vulnerable states
     if (event && event.shiftKey) {
       imageToScan = "nginx:1.18";
     }
 
     try {
+      /**
+       * Image scan request targeting the backend's Trivy integration.
+       */
       await api.post('/scan/scan', { image: imageToScan });
+
       const checkInterval = setInterval(async () => {
         try {
-          const { data } = await api.get(`/scan/results/${encodeURIComponent(imageToScan)}`);
+          const { data } = await api.get<any>(`/scan/results/${encodeURIComponent(imageToScan)}`);
+          
           if (data.status === 'completed') {
-            const finalData = { ...data.data };
+            const finalData: ScanResult = { ...data.data };
             if (!finalData.image) finalData.image = imageToScan;
             scanResults.value[appId] = finalData;
+            
             clearInterval(checkInterval);
             loadingApp.value = null;
           } else if (data.status === 'error') {
             clearInterval(checkInterval);
             loadingApp.value = null;
-            alert("Scan failed.");
+            console.error("[K-Guard] Scan analysis failed for image:", imageToScan);
           }
         } catch (pollError) {
-          console.error(pollError);
+          console.error("[K-Guard] Polling service interruption:", pollError);
         }
       }, 5000); 
     } catch (error) {
@@ -80,18 +122,25 @@
     }
   };
 
+  /**
+   * Streams remediation logs from the K3s cluster during a patch operation.
+   */
   const fetchPatchLogs = async (namespace: string, appName: string) => {
     try {
-      const response = await api.get(`/remediation/patch-logs/${namespace}/${appName}`);
-      patchLogs.value = response.data.logs;
+      const { data } = await api.get<{ logs: string }>(`/remediation/patch-logs/${namespace}/${appName}`);
+      patchLogs.value = data.logs;
     } catch (e) {
       patchLogs.value += "\n[SYSTEM] Kubernetes stream connection unstable...";
     }
   };
 
+  /**
+   * Executes an automated remediation by updating the deployment image to a patched version.
+   */
   const patchApplication = async (namespace: string, appName: string, appId: string) => {
     const result = scanResults.value[appId];
-    const suggestion = result?.vulnerabilities?.find((v: any) => v.fixed_version)?.fixed_version;
+    const suggestion = result?.vulnerabilities?.find(v => v.fixed_version)?.fixed_version;
+    
     if (!suggestion || !confirm(`🚀 Trigger automated remediation for ${appName}?`)) return;
 
     showPatchModal.value = true;
@@ -100,29 +149,43 @@
     patchingApp.value = appId;
 
     try {
+      /**
+       * Deployment patch request.
+       * Splits the current image string to inject the recommended version tag.
+       */
+      const baseImage = result.image.split(':')[0];
       await api.post('/remediation/patch-image', {
         namespace: namespace,
         deployment: appName,
-        new_image: `${result.image.split(':')[0]}:${suggestion}` 
+        new_image: `${baseImage}:${suggestion}` 
       });
+
       logInterval = setInterval(() => fetchPatchLogs(namespace, appName), 2000);
     } catch (error: any) {
-      patchLogs.value += `\n❌ Error: ${error.response?.data?.detail || 'Failed'}`;
+      patchLogs.value += `\n❌ Remediator Error: Operation failed`;
     } finally {
       patchingApp.value = null; 
     }
   };
 
+  /**
+   * Closes patch monitoring console and clears background synchronization.
+   */
   const closePatchModal = () => {
     showPatchModal.value = false;
     if (logInterval) clearInterval(logInterval);
   };
 
+  /**
+   * Determines UI status indicators based on critical vulnerability metrics.
+   */
   const getAppStatus = (appId: string) => {
     const result = scanResults.value[appId];
     if (!result) return { text: 'IDLE', class: 'text-slate-500 border-slate-800' };
+    
     const critical = result.summary?.critical || 0;
     if (critical > 0) return { text: 'UPDATE REQUIRED', class: 'text-red-500 border-red-500/50 bg-red-500/5' };
+    
     return { text: 'SECURE', class: 'text-green-500 border-green-500/50 bg-green-500/5' };
   };
 
@@ -162,9 +225,9 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/50">
-                <tr v-for="vuln in selectedAppVulnerabilities" :key="vuln.id">
-                  <td class="py-2 text-[11px] text-blue-400">{{ vuln.id }}</td>
-                  <td class="py-2 text-[11px] text-slate-300">{{ vuln.pkg }}</td>
+                <tr v-for="vuln in selectedAppVulnerabilities" :key="vuln.vulnerability_id">
+                  <td class="py-2 text-[11px] text-blue-400">{{ vuln.vulnerability_id }}</td>
+                  <td class="py-2 text-[11px] text-slate-300">{{ vuln.pkg_name }}</td>
                   <td class="py-2 text-[11px] text-green-400">{{ vuln.fixed_version || '-' }}</td>
                   <td class="py-2 text-right">
                     <span :class="vuln.severity === 'CRITICAL' ? 'text-red-500 bg-red-500/10 border-red-500/30' : 'text-orange-500 bg-orange-500/10 border-orange-500/30'"
@@ -249,7 +312,9 @@
                 class="flex-1 py-1.5 text-[9px] font-bold uppercase border border-slate-700 bg-slate-800/30 text-slate-400 hover:border-blue-500/50 transition-all rounded-sm cursor-pointer">
                 Report
               </button>
-              <button v-if="scanResults[app.id]?.summary?.critical > 0" @click="patchApplication(app.namespace, app.name, app.id)" :disabled="!!patchingApp"
+              <button v-if="scanResults[app.id]?.summary && scanResults[app.id]!.summary!.critical > 0" 
+                @click="patchApplication(app.namespace, app.name, app.id)" 
+                :disabled="!!patchingApp"
                 class="flex-1 py-1.5 text-[9px] font-bold uppercase border border-orange-500/40 bg-orange-500/5 text-orange-500 hover:bg-orange-600 hover:text-white transition-all rounded-sm cursor-pointer">
                 Patch
               </button>

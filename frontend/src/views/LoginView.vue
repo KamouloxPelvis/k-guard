@@ -13,36 +13,50 @@ const router = useRouter();
  * Handles the authentication process.
  * Uses URLSearchParams to comply with FastAPI's OAuth2 Password flow.
  */
+
 const handleLogin = async (): Promise<void> => {
     loading.value = true;
     error.value = '';
 
     try {
-        // FastAPI OAuth2 expects data in application/x-www-form-urlencoded format
+        /** * FastAPI OAuth2 expects data in application/x-www-form-urlencoded format.
+         * The URLSearchParams object is converted to a string to ensure compatibility with Fetch.
+         */
         const params = new URLSearchParams();
         params.append('username', username.value);
         params.append('password', password.value);
 
         const { data } = await api.post<{ access_token: string }>(
             '/token',    
-            params
+            params.toString(), 
+            {
+                headers: {
+                    'Content-Type': 'application/x-www-form-urlencoded'
+                }
+            }
         );
         
         if (data.access_token) {
-            // Store credentials for the session and API interceptor
+            /**
+             * Credentials storage for session management and API interceptor.
+             * Redirection to the main dashboard follows successful authentication.
+             */
             localStorage.setItem('user_token', data.access_token);
             localStorage.setItem('admin_username', username.value); 
-            
-            // Redirect to the main Dashboard
             await router.push('/');
         }
     } catch (err: any) {
+        /**
+         * Error logging for debugging purposes.
+         * User feedback is provided via a generic access denied message.
+         */
         console.error("Login Error:", err.response?.status, err.message);
         error.value = "ACCESS DENIED: INVALID CREDENTIALS";
     } finally {
         loading.value = false;
     }
 };
+
 </script>
 
 <template>
@@ -82,7 +96,7 @@ const handleLogin = async (): Promise<void> => {
 </template>
 
 <style scoped>
-/* CSS remains identical to maintain your specific branding */
+
 .login-wrapper {
   display: flex;
   align-items: center;
@@ -99,8 +113,7 @@ const handleLogin = async (): Promise<void> => {
   max-width: 350px;
   text-align: center;
   box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  border-top: 3px solid #f05a28; /* K-Guard Signature Orange */
+  border-top: 3px solid #f05a28;
 }
 
-/* ... (rest of your styles) */
 </style>

@@ -14,13 +14,21 @@
 
   interface PodMetrics {
     pod_name: string;
-    cpuUsage: number;    // Millicores (m)
-    memoryUsage: number; // MegaBytes (MiB)
+    cpuUsage: number;
+    memoryUsage: number;
+  }
+
+  interface NodeCapacity {
+    cpu_cores: number;
+    memory_total_ki: number;
+  }
+
+  interface LogResponse {
+    logs: string;
   }
 
   // --- Reactive State ---
   const apps = ref<PodStatus[]>([]);
-  // Retrieve the username from local storage to fix the "Property does not exist" error
   const username = ref<string>(localStorage.getItem('admin_username') || 'Operator');
   const metrics = ref<Record<string, PodMetrics>>(
     JSON.parse(localStorage.getItem('kguard_metrics') || '{}')
@@ -33,59 +41,17 @@
   const showModal = ref(false);
   let refreshInterval: any = null;
 
-  const nodeCapacity = ref({ 
+  const nodeCapacity = ref<NodeCapacity>({ 
     cpu_cores: 2, 
     memory_total_ki: 8388608 
   });
 
-  // --- Data Fetching Logic ---
-  
-  const fetchNodeCapacity = async () => {
-    try {
-      const { data } = await api.get('/k3s/node-capacity');
-      nodeCapacity.value = data;
-    } catch (error) {
-      console.warn("⚠️ Node capacity failed, using fallback: 2 vCPU/8GB");
-    }
-  };
+  // --- Logic Helpers (Missing in previous version) ---
 
-  const fetchMetrics = async (namespace: string) => {
-    if (isInitialLoad.value) metricsLoading.value[namespace] = true;
-    try {
-      const { data } = await api.get(`/k3s/metrics/${namespace}`);
-      if (Array.isArray(data)) {
-        data.forEach((m: PodMetrics) => { 
-          metrics.value[m.pod_name] = m; 
-        });
-        localStorage.setItem('kguard_metrics', JSON.stringify(metrics.value));
-      }
-    } catch (e) { 
-      console.error("Metrics sync error", e); 
-    } finally { 
-      metricsLoading.value[namespace] = false; 
-    }
-  };
-
-  const fetchClusterData = async () => {
-    
-    try {
-      const { data } = await api.get('/k3s/cluster-status');
-      
-      if (Array.isArray(data)) {
-        apps.value = data; 
-        const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
-        namespaces.forEach(ns => fetchMetrics(ns as string));
-      }
-    } catch (error: any) {
-      console.error("Cluster data sync error", error);
-    } finally {
-        loading.value = false;
-        isInitialLoad.value = false;
-    }
-};
-
-  // --- Calculations ---
-  
+  /**
+   * Calculates CPU usage percentage based on node capacity.
+   * Standardizes raw millicore data into a 0-100 scale.
+   */
   const calculateCpuPercent = (raw: any): number => {
     if (!raw) return 0;
     const millicores = typeof raw === 'string' ? parseInt(raw) : raw;
@@ -93,6 +59,10 @@
     return (millicores / totalMillicores) * 100;
   };
 
+  /**
+   * Calculates memory usage percentage.
+   * Compares current MiB usage against total node capacity.
+   */
   const calculateMemPercent = (raw: any): number => {
     if (!raw) return 0;
     const mibValue = typeof raw === 'string' ? parseInt(raw) : raw;
@@ -100,53 +70,101 @@
     return Math.min((mibValue / totalMib) * 100, 100);
   };
 
+  /**
+   * Formats memory values for human-readable display.
+   * Converts MiB to GiB if the value exceeds 1024.
+   */
   const formatMemory = (raw: any): string => {
     if (!raw) return '0 MB';
     const mibValue = typeof raw === 'string' ? parseInt(raw) : raw;
     return mibValue < 1024 ? `${mibValue} MB` : `${(mibValue / 1024).toFixed(2)} GB`;
   };
 
-  // --- UI Actions ---
-  
-  const openDetails = async (pod: PodStatus) => {
-    selectedPod.value = pod;
-    showModal.value = true;
-    podLogs.value = ">> ESTABLISHING SECURE CONNECTION...";
-    try {
-      const { data } = await api.get(`/k3s/logs/${pod.namespace}/${pod.pod_name}`);
-      podLogs.value = data.logs || "No logs available for this instance.";
-    } catch (error) { 
-      podLogs.value = "CRITICAL ERROR: Connection refused by API."; 
-    }
-  };
-
-  const restartPod = async (event: Event, pod: PodStatus) => {
-    event.stopPropagation(); 
-    if (!confirm(`CAUTION: Trigger Rolling Update for ${pod.name}?`)) return;
-    try {
-      await api.post(`/remediation/restart/${pod.namespace}/${pod.name}`);
-      fetchClusterData(); 
-    } catch (error) { 
-      alert("Action failed: Could not patch deployment."); 
-    }
-  };
-
-  const remediateLoad = async (event: Event, pod: PodStatus) => {
-    event.stopPropagation();
-    if (!confirm(`ACTIVATE SRE REMEDIATION: Scale down ${pod.name}?`)) return;
-    try {
-      await api.post(`/remediation/remediate/${pod.namespace}/${pod.pod_name}`);
-      alert("Remediation signal dispatched.");
-    } catch (error) { 
-      alert("Remediation failure."); 
-    }
-  };
-
+  /**
+   * Returns specific CSS classes based on pod security and operational status.
+   */
   const getStatusClass = (status: string) => {
     const s = (status || 'UNKNOWN').toUpperCase();
     return (s === 'SECURE' || s === 'RUNNING') 
       ? 'text-green-500 bg-green-500/10 border-green-500/20' 
       : (s === 'STABILIZING' ? 'text-blue-400 bg-blue-500/10 border-blue-500/20' : 'text-red-500 bg-red-500/10 border-red-500/20');
+  };
+
+  // --- API Methods ---
+
+  const fetchNodeCapacity = async () => {
+    try {
+      const { data } = await api.get<NodeCapacity>('/k3s/node-capacity');
+      nodeCapacity.value = data;
+    } catch (error) {
+      console.warn("[K-Guard] Node capacity fallback initialized");
+    }
+  };
+
+  const fetchMetrics = async (namespace: string) => {
+    if (isInitialLoad.value) metricsLoading.value[namespace] = true;
+    try {
+      const { data } = await api.get<PodMetrics[]>(`/k3s/metrics/${namespace}`);
+      if (Array.isArray(data)) {
+        data.forEach((m: PodMetrics) => { metrics.value[m.pod_name] = m; });
+        localStorage.setItem('kguard_metrics', JSON.stringify(metrics.value));
+      }
+    } catch (e) { 
+      console.error("[K-Guard] Metrics sync failure", e); 
+    } finally { 
+      metricsLoading.value[namespace] = false; 
+    }
+  };
+
+  const fetchClusterData = async () => {
+    try {
+      const { data } = await api.get<PodStatus[]>('/k3s/cluster-status');
+      if (Array.isArray(data)) {
+        apps.value = data; 
+        const namespaces = [...new Set(data.map((p: PodStatus) => p.namespace))];
+        namespaces.forEach(ns => fetchMetrics(ns));
+      }
+    } catch (error: any) {
+      console.error("[K-Guard] Cluster sync error", error);
+    } finally {
+        loading.value = false;
+        isInitialLoad.value = false;
+    }
+  };
+
+  // --- UI Actions ---
+
+  const openDetails = async (pod: PodStatus) => {
+    selectedPod.value = pod;
+    showModal.value = true;
+    podLogs.value = ">> ESTABLISHING SECURE CONNECTION...";
+    try {
+      const { data } = await api.get<LogResponse>(`/k3s/logs/${pod.namespace}/${pod.pod_name}`);
+      podLogs.value = data.logs || "No logs available.";
+    } catch (error) { 
+      podLogs.value = "CONNECTION REFUSED BY API."; 
+    }
+  };
+
+  const restartPod = async (event: Event, pod: PodStatus) => {
+    event.stopPropagation(); 
+    if (!confirm(`Trigger Rolling Update for ${pod.name}?`)) return;
+    try {
+      await api.post(`/remediation/restart/${pod.namespace}/${pod.name}`, {});
+      fetchClusterData(); 
+    } catch (error) { 
+      console.error("Action failed");
+    }
+  };
+
+  const remediateLoad = async (event: Event, pod: PodStatus) => {
+    event.stopPropagation();
+    if (!confirm(`Scale down ${pod.name}?`)) return;
+    try {
+      await api.post(`/remediation/remediate/${pod.namespace}/${pod.pod_name}`, {});
+    } catch (error) { 
+      console.error("Remediation failed");
+    }
   };
 
   onMounted(() => {
@@ -202,7 +220,9 @@
             <div class="flex justify-between text-[9px] uppercase font-bold tracking-wider">
               <span class="text-slate-500">CPU Usage</span>
               <span v-if="metricsLoading[pod.namespace]" class="text-blue-500 animate-pulse">[ SCANNING... ]</span>
-              <span class="text-blue-400 font-mono">{{ calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage).toFixed(1) }}%</span>
+              <span class="text-blue-400 font-mono">
+                {{ calculateCpuPercent(metrics[pod.pod_name]?.cpuUsage).toFixed(1) }}%
+              </span>
             </div>
             <div class="w-full bg-slate-900 h-1 rounded-full overflow-hidden">
               <div class="h-full transition-all duration-1000"
@@ -215,11 +235,13 @@
           <div class="flex flex-col gap-1.5">
             <div class="flex justify-between text-[9px] uppercase font-bold tracking-wider">
               <span class="text-slate-500">RAM</span>
-              <span class="text-indigo-400 font-mono text-[10px]">{{ formatMemory(metrics[pod.pod_name]?.memoryUsage) }}</span>
+              <span class="text-indigo-400 font-mono text-[10px]">
+                {{ formatMemory(metrics[pod.pod_name]?.memoryUsage) }}
+              </span>
             </div>
             <div class="w-full h-1 bg-slate-900 rounded-full overflow-hidden">
               <div class="h-full bg-indigo-500 transition-all duration-1000" 
-                  :style="{ width: calculateMemPercent(metrics[pod.pod_name]?.memoryUsage) + '%' }"></div>
+                  :style="{ width: `${calculateMemPercent(metrics[pod.pod_name]?.memoryUsage)}%` }"></div>
             </div>
           </div>
         </div>
@@ -249,7 +271,9 @@
       <div v-if="showModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/95 backdrop-blur-md">
         <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-5xl h-[85vh] flex flex-col rounded-sm">
           <div class="p-3 border-b border-slate-800 flex justify-between items-center bg-[#181b1f]">
-            <span class="text-[9px] font-mono text-blue-400 uppercase tracking-widest">Secure Console // {{ selectedPod?.pod_name }}</span>
+            <span class="text-[9px] font-mono text-blue-400 uppercase tracking-widest">
+              Secure Console // {{ selectedPod?.pod_name }}
+            </span>
             <button @click="showModal = false" class="text-slate-500 hover:text-white text-xl">&times;</button>
           </div>
           <div class="flex-1 p-4 overflow-y-auto font-mono text-[11px] text-blue-100/80 bg-black/40">
