@@ -5,5 +5,5 @@ python-jose[cryptography]==3.5.0
 cryptography==46.0.7
 passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
-kubernetes>=30.0.0
+kubernetes>=35.0.0
 python-multipart>=0.0.18
