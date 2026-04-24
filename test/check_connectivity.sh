@@ -35,10 +35,14 @@ kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /de
 kubectl run sentinel-debug -n "$TARGET_NS" \
     --image=nicolaka/netshoot:latest \
     --labels="role=debug,managed-by=k-guard-sentinel" \
+    --overrides='{
+      "spec": {
+        "serviceAccountName": "sentinel-auditor",
+        "terminationGracePeriodSeconds": 0
+      }
+    }' \
     --restart=Never \
-    --image-pull-policy=IfNotPresent \
-    --overrides='{"spec": {"terminationGracePeriodSeconds": 0}}' \
-    -- sleep 60 > /dev/null 2>&1
+    -- sleep 60
 
 if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --timeout=30s > /dev/null 2>&1; then
     echo "❌ FATAL: Diagnostic pod failed to initialize (Check ImagePullBackOff or Resources)."

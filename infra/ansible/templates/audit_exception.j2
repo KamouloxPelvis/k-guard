@@ -50,9 +50,7 @@ spec:
   egress:
     # 1. Authorize DNS Resolution
     - to:
-        - namespaceSelector:
-            matchLabels:
-              kubernetes.io/metadata.name: kube-system
+        - namespaceSelector:{}
       ports:
         - protocol: UDP
           port: 53
