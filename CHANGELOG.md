@@ -1,46 +1,55 @@
 # Changelog
 
-Toutes les modifications notables de ce projet seront documentées dans ce fichier.
+All notable changes to this project will be documented in this file.
+
+## [1.1.5] - 2026-04-24
+
+### Changed
+- **Sentinel Audit Logic**: Pivoted diagnostics toward strict isolation validation (Zero-Trust) instead of simple connectivity.
+- **Audit UI**: Cleaned up the test terminal to focus exclusively on critical security metrics (Internal Mesh & Egress).
+
+### Fixed
+- **False Negatives**: Removed failures related to external DNS in hardened environments, prioritizing proof of network air-gapping and isolation.
 
 ## [1.1.4] - 2026-04-24
 
 ### Added
-- **Sentinel RBAC Identity**: Déploiement d'une `ServiceAccount` dédiée (`sentinel-auditor`) pour les pods de diagnostic, garantissant des tests de connectivité sécurisés et autorisés.
-- **Enhanced SRE Diagnostics**: Nouvel endpoint backend `/debug-storage` pour surveiller l'état des volumes persistants (PV) et l'intégrité du cache Trivy.
-- **Dynamic Port Mapping**: Le moteur Ansible extrait désormais automatiquement les ports des conteneurs pour maintenir la disponibilité des services pendant le durcissement Zero-Trust.
+- **Sentinel RBAC Identity**: Deployed a dedicated `ServiceAccount` (`sentinel-auditor`) for diagnostic pods, ensuring secure and authorized connectivity checks.
+- **Enhanced SRE Diagnostics**: New `/debug-storage` backend endpoint to monitor Persistent Volume (PV) health and Trivy cache integrity.
+- **Dynamic Port Mapping**: The Ansible engine now automatically extracts container ports to maintain service availability during Zero-Trust hardening.
 
 ### Changed
-- **Webex Resilience**: Refactorisation du `CiscoWebexNotifier` pour supporter plusieurs schémas JSON de rapports, évitant les échecs de notification ChatOps.
-- **Structured Logging**: Remplacement des sorties standards par un système de logs centralisé conforme aux normes SRE (`INFO`, `WARNING`, `ERROR`).
-- **Network Policy Hardening**: Mise à jour de `audit_exception.j2` avec des sélecteurs DNS élargis pour assurer la compatibilité avec toutes les distributions K3s.
+- **Webex Resilience**: Refactored `CiscoWebexNotifier` to support multiple JSON report schemas, preventing ChatOps notification failures.
+- **Structured Logging**: Replaced standard outputs with a centralized SRE-compliant logging system (`INFO`, `WARNING`, `ERROR`).
+- **Network Policy Hardening**: Updated `audit_exception.j2` with broader DNS selectors to ensure compatibility across various K3s distributions.
 
 ### Fixed
-- **Sentinel Audit**: Résolution du statut "All Fails" dans les tests de connectivité en alignant les Network Policies et les ServiceAccounts du pod diagnostic.
-- **Data Persistence**: Correction des crashs de tâches de fond dans `run_and_store_scan` lors de la réception de structures de rapports inattendues.
-- **System Overview**: Correction de la route `cluster-status` pour garantir que le Dashboard affiche correctement la topologie des pods et des nœuds.
+- **Sentinel Audit**: Resolved "All Fails" status in connectivity tests by aligning Network Policies and ServiceAccounts for the diagnostic pod.
+- **Data Persistence**: Fixed background task crashes in `run_and_store_scan` when encountering unexpected report structures.
+- **System Overview**: Fixed the `cluster-status` route to ensure the Dashboard correctly populates pod and node topology.
 
 ## [1.1.0] - 2026-04-23
 
 ### Added
-- Interfaces TypeScript strictes pour les Pods, Nodes et Network Edges.
-- Nouveau terminal de test de connectivité dans l'UI Network Sentinel.
-- Logique de score de sécurité basée sur le statut de micro-segmentation.
+- Strict TypeScript interfaces for Pods, Nodes, and Network Edges.
+- New connectivity test terminal within the Network Sentinel UI.
+- Security scoring logic based on micro-segmentation status.
 
 ### Changed
-- **Major**: Migration de la couche réseau d'Axios vers l'API native Fetch.
-- Refactorisation du service API avec un wrapper personnalisé pour une meilleure gestion des erreurs.
-- Mise à jour de la documentation UI et des commentaires selon les standards SRE internationaux.
+- **Major**: Migrated the entire network layer from Axios to the native Fetch API.
+- Refactored the API service with a custom wrapper for enhanced error handling.
+- Updated UI documentation and comments to international SRE standards.
 
 ### Fixed
-- Correction des crashs UI en production liés aux données nulles de l'API K3s.
-- Correction de la logique de synchronisation de l'intégration Cisco Webex.
-- Stabilisation du rendu de la carte topologique dans SentinelView.
+- Resolved production UI crashes related to null data from the K3s API.
+- Fixed Cisco Webex integration synchronization logic.
+- Stabilized topology map rendering in SentinelView.
 
 ## [1.0.0] - 2026-03-09
 
 ### Added
-- Release initiale du MVP K-Guard.
-- Intégration du moteur de scan de sécurité Trivy.
-- Alertes ChatOps via Cisco Webex.
-- Documentation interactive Swagger UI.
-- Network Sentinel propulsé par Ansible pour les politiques Zero-Trust.
+- Initial release of K-Guard MVP.
+- Trivy security scanning integration.
+- ChatOps alerting via Cisco Webex.
+- Interactive Swagger UI documentation.
+- Network Sentinel powered by Ansible for Zero-Trust policies.
