@@ -169,9 +169,9 @@
   };
 
   /**
-   * Executes an automated connectivity audit using netshoot ephemeral pods.
+   * Executes an automated network isolation audit using netshoot ephemeral pods.
    */
-  const runConnectivityTest = async () => {
+  const runIsolationTest = async () => {
     showTestModal.value = true;
     isTesting.value = true;
     testTerminalOutput.value = "⏳ Deploying ephemeral diagnostic pod (nicolaka/netshoot)...\n";
@@ -218,7 +218,7 @@
             <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
           </select>
           
-          <button @click="runConnectivityTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Connectivity</button>
+          <button @click="runIsolationTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Isolation</button>
           <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deactivate</button>
           <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
         </div>
@@ -299,7 +299,7 @@
         <div v-if="showTestModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
           <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl overflow-hidden shadow-2xl">
             <div class="bg-[#111217] border-b border-slate-800 px-4 py-2 flex justify-between items-center">
-              <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Sentinel Connectivity Audit</span>
+              <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Sentinel Network Isolation Audit</span>
               <button @click="showTestModal = false" class="text-slate-500 hover:text-white transition-colors cursor-pointer">✕</button>
             </div>
             

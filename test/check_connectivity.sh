@@ -55,17 +55,16 @@ echo "DEBUG: User is $(whoami)"
 echo "DEBUG: Kubeconfig is $KUBECONFIG"
 kubectl get nodes > /dev/null 2>&1 || echo "❌ FAIL: No access to cluster"
 
-# 3. SECURITY AUDIT EXECUTION
-echo -n "[1/4] DNS Resolution Check...      "
-if kubectl exec -n "$TARGET_NS" sentinel-debug -- nslookup google.com > /dev/null 2>&1; then echo "✅ OK"; else echo "❌ FAIL"; fi
+# 3. SECURITY AUDIT EXECUTION (Focus: Isolation)
+echo -n "[1/2] Internal Mesh Isolation...   "
+# On teste si le pod de debug est BIEN bloqué pour parler à un autre pod non autorisé
+if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 "$POD_IP:$POD_PORT" > /dev/null 2>&1; then 
+    echo "✅ SECURE (Isolated)"; 
+else 
+    echo "⚠️ WARNING (Open)"; 
+fi
 
-echo -n "[2/4] K8s API Access Check...      "
-if kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -k -s --connect-timeout 2 https://10.43.0.1 > /dev/null 2>&1; then echo "✅ OK"; else echo "❌ FAIL"; fi
-
-echo -n "[3/4] Service Mesh Reachability... "
-if kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 "$POD_IP:$POD_PORT" > /dev/null 2>&1; then echo "✅ OK"; else echo "❌ FAIL"; fi
-
-echo -n "[4/4] Zero-Trust Egress Check...   "
+echo -n "[2/2] Zero-Trust Egress Check...   "
 if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 http://1.1.1.1 > /dev/null 2>&1; then 
     echo "✅ SECURE (Blocked)"
 else 
