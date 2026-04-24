@@ -149,14 +149,30 @@ Transform technical security audits into real-time operational alerts :
 
 ---
 
-## 🛡️ <a name="en-network-policy--network-sentinel"></a>Network Policy ( Network Sentinel )
+## 🛡️ <a name="en-network-policy--network-sentinel"></a>Network Policy (Network Sentinel)
 
-K-Guard enforces a Zero-Trust security posture via idempotent Ansible playbooks :
-* **Default Deny**: Global Ingress and Egress isolation for all protected namespaces (`k-guard`, `blog-prod`, `portfolio-prod`, etc.).
-* **Selective Egress**: Authorized outgoing traffic only to critical APIs (Webex, Google Indexing, MongoDB Atlas) on port 443.
-* **Visual Topology**: Dynamic traffic mapping and visual identification of vulnerable nodes within the cluster.
+K-Guard enforces a **Zero-Trust** security posture by leveraging an automated, idempotent remediation engine powered by **Ansible Core**.
 
-![K-Guard System Overview](frontend/public/screenshots/kguard-6.png)
+### ⚙️ The Hardening Engine (`harden_policies.yml`)
+At the heart of the "Network Sentinel" lies a sophisticated Ansible playbook that orchestrates the cluster security lifecycle:
+* **Auto-Discovery**: Dynamically scans the cluster to identify active namespaces and running workloads (excluding critical system namespaces).
+* **Port Mapping**: Automatically extracts container ports from running pods to ensure that legitimate traffic is never interrupted during hardening.
+* **Idempotent Deployment**: Uses the `kubernetes.core.k8s` module to ensure that the security state is always consistent with the desired policy, preventing configuration drift.
+
+### 📄 Dynamic Templates (Jinja2)
+K-Guard utilizes **Jinja2 templates** to generate context-aware security rules on the fly:
+* **`core_baseline.j2`**: Implements the "Default Deny" foundation (Ingress/Egress isolation).
+* **`app_internal_bridge.j2`**: Automatically links Ingress Controllers to discovered application ports.
+* **`app_egress.j2`**: Hardened outbound rules for specific services (e.g., MongoDB Atlas, Cisco Webex API) using CIDR and Port filtering.
+* **`audit_exception.j2`**: Secure "Diagnostic Corridors" allowing the K-Guard Sentinel to perform health checks without compromising the overall Zero-Trust stance.
+
+### 🚀 UI-Driven Remediation (Settings)
+Through the **"Deploy Hardening"** feature in the Settings panel, users can trigger the Ansible engine with a single click. This bridges the gap between high-level security intent and low-level YAML execution:
+* **Visual Topology**: Real-time identification of vulnerable or isolated nodes.
+* **One-Click Hardening**: Instantly applies the entire Ansible-driven security suite to the cluster.
+* **Diagnostic Sentinel**: Integrated connectivity audit to verify that policies are effective but not disruptive.
+
+![K-Guard Network Sentinel](frontend/public/screenshots/kguard-6.png)
 
 ---
 
