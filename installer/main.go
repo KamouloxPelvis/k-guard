@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"syscall"
@@ -25,7 +26,7 @@ var (
 			Bold(true).
 			BorderStyle(lipgloss.DoubleBorder()).
 			BorderForeground(lipgloss.Color("#f05a28")).
-			Width(55).    
+			Width(55).
 			Align(lipgloss.Center)
 
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
@@ -140,6 +141,11 @@ func (m model) runStep(step int) tea.Cmd {
 		var msg string
 		time.Sleep(800 * time.Millisecond)
 
+		// Récupération du chemin absolu du dossier actuel (installer)
+		currentDir, _ := os.Getwd()
+		// On remonte d'un cran pour atteindre la racine du projet, puis backend
+		absBackendPath := filepath.Join(currentDir, "..", "backend")
+
 		switch step {
 		case 0:
 			msg = "Checking system dependencies"
@@ -163,6 +169,12 @@ func (m model) runStep(step int) tea.Cmd {
 		case 5:
 			msg = "Deploying K-Guard Core Manifests"
 			err = deployK8s()
+		case 6:
+			msg = "Installing Systemd service & 'kguard' command"
+			err = setupSystemdService(absBackendPath)
+			if err == nil {
+				err = setupGlobalCommand(absBackendPath)
+			}
 		default:
 			return successMsg(true)
 		}
@@ -212,7 +224,10 @@ func (m model) View() string {
 
 	if m.quitting {
 		finalMsg := fmt.Sprintf(
-			"Thank you for installing, %s !\n\nK-Guard is ready & accessible via:\n'113.30.191.17:30002'\n\nVisit: https://devopsnotes.org",
+			"Installation Complete, %s !\n\n"+
+				"🚀 Service started: 'systemctl status kguard'\n"+
+				"💻 Quick launch: 'sudo kguard'\n"+
+				"🌐 Accessible at: https://113.30.191.17:8443",
 			m.adminUser,
 		)
 		s += "\n" + footerStyle.Render(finalMsg) + "\n"
@@ -241,37 +256,45 @@ func isStrongPassword(p string) (bool, string) {
 			hasSpecial = true
 		}
 	}
-	if !hasMinLen { return false, "8 characters minimum" }
-	if !hasUpper { return false, "at least one uppercase letter" }
-	if !hasNumber { return false, "at least one number" }
-	if !hasSpecial { return false, "at least one special character" }
+	if !hasMinLen {
+		return false, "8 characters minimum"
+	}
+	if !hasUpper {
+		return false, "at least one uppercase letter"
+	}
+	if !hasNumber {
+		return false, "at least one number"
+	}
+	if !hasSpecial {
+		return false, "at least one special character"
+	}
 	return true, ""
 }
 
 func main() {
-    reader := bufio.NewReader(os.Stdin)
-    var user string
+	reader := bufio.NewReader(os.Stdin)
+	var user string
 
-    for {
-        fmt.Print("👤 Enter the administrator username: ")
-        input, _ := reader.ReadString('\n')
-        user = strings.TrimSpace(input)
+	for {
+		fmt.Print("👤 Enter the administrator username: ")
+		input, _ := reader.ReadString('\n')
+		user = strings.TrimSpace(input)
 
-        // Nouvelle validation : non vide ET au moins 5 caractères
-        if user == "" {
-            fmt.Println(errorStyle.Render("❌ Username cannot be empty."))
-            continue
-        }
-        if len(user) < 5 {
-            fmt.Println(errorStyle.Render("❌ Username must be at least 5 characters long."))
-            continue
-        }
-        break
-    }
+		// Nouvelle validation : non vide ET au moins 5 caractères
+		if user == "" {
+			fmt.Println(errorStyle.Render("❌ Username cannot be empty."))
+			continue
+		}
+		if len(user) < 5 {
+			fmt.Println(errorStyle.Render("❌ Username must be at least 5 characters long."))
+			continue
+		}
+		break
+	}
 
 	var pass string
 	for {
-        // Correction du %s(MISSING) en passant 'user' en argument
+		// Correction du %s(MISSING) en passant 'user' en argument
 		fmt.Printf("🔐 Define the password for %s: ", user)
 		bytePassword, _ := term.ReadPassword(int(syscall.Stdin))
 		fmt.Println()
@@ -313,4 +336,54 @@ func main() {
 		fmt.Printf("Fatal Error: %v", err)
 		os.Exit(1)
 	}
+}
+
+// --- NEW FUNCTIONS FOR SYSTEMD & CLI ---
+
+func setupSystemdService(backendDir string) error {
+	// On utilise SUDO_USER pour que le service appartienne à l'utilisateur réel
+	user := os.Getenv("SUDO_USER")
+	if user == "" {
+		user = os.Getenv("USER")
+	}
+
+	serviceContent := fmt.Sprintf(`[Unit]
+Description=K-Guard Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=%s
+WorkingDirectory=%s
+ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8443
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`, user, backendDir, backendDir)
+
+	err := os.WriteFile("/etc/systemd/system/kguard.service", []byte(serviceContent), 0644)
+	if err != nil {
+		return fmt.Errorf("failed to create service file (try running with sudo): %v", err)
+	}
+
+	exec.Command("systemctl", "daemon-reload").Run()
+	exec.Command("systemctl", "enable", "kguard.service").Run()
+	return exec.Command("systemctl", "restart", "kguard.service").Run()
+}
+
+func setupGlobalCommand(backendDir string) error {
+	wrapperContent := fmt.Sprintf(`#!/bin/bash
+cd %s
+source ./venv/bin/activate
+python3 -m uvicorn main:app --host 0.0.0.0 --port 8443
+`, backendDir)
+
+	binPath := "/usr/local/bin/kguard"
+	err := os.WriteFile(binPath, []byte(wrapperContent), 0755)
+	if err != nil {
+		return fmt.Errorf("failed to create global command: %v", err)
+	}
+	return nil
 }
