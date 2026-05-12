@@ -13,7 +13,7 @@ h11==0.16.0
 httptools==0.7.1
 idna==3.11
 kubernetes==35.0.0
-lxml==6.0.2
+lxml==6.1.0
 markdown-it-py==4.0.0
 mdurl==0.1.2
 oauthlib==3.3.1
@@ -24,8 +24,8 @@ pydantic==2.12.5
 pydantic_core==2.41.5
 Pygments==2.19.2
 python-dateutil==2.9.0.post0
-python-dotenv==1.0.1
-python-multipart==0.0.22
+python-dotenv==1.2.2
+python-multipart==0.0.27
 PyYAML==6.0.3
 requests-oauthlib==2.0.0
 rich==14.3.2
@@ -33,7 +33,7 @@ rsa==4.9.1
 six==1.17.0
 typing-inspection==0.4.2
 typing_extensions==4.15.0
-urllib3==2.6.3
+urllib3==2.7.0
 uvicorn==0.27.1
 uvloop==0.22.1; sys_platform != 'win32'
 watchfiles==1.1.1
