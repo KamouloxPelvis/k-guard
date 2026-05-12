@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.0] - 2026-05-12
+
+### Added
+- **Universal Go Installer**: Implemented a robust binary-based installation engine for one-click deployments.
+- **Automated Frontend Bridge**: The installer now automatically links the Vue.js production build (`dist`) to the FastAPI backend (`static`), ensuring "Zero-Touch" UI availability.
+- **Global CLI Command**: Added the `kguard` command for instant access to logs, status, and Kubernetes diagnostics.
+
+### Changed
+- **Path Resolution**: Migrated from relative execution paths to absolute path detection using `os.Executable()`, making the installer bulletproof regardless of the working directory.
+- **Service Management**: Refactored the Systemd unit logic to ensure a safe and idempotent restart sequence.
+- **Code Standards**: Updated all internal installer comments to international English standards (Cisco/SRE compliant).
+
+### Fixed
+- **Runtime Error**: Resolved the critical "static/index.html not found" error by ensuring the deployment bridge is created before the service starts.
+- **Idempotency**: Fixed "file exists" errors during re-installation by implementing proactive cleanup of legacy symbolic links.
+
 ## [1.1.5] - 2026-04-24
 
 ### Changed
