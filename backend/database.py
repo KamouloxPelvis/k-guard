@@ -1,11 +1,15 @@
+import os
 from kubernetes import client, config
+from pathlib import Path
+from dotenv import load_dotenv
 import sqlite3
 import json
-import os
 
 # --- PATH CONFIGURATION ---
-# This directory is mounted via 'subPath: database' on the trivy-cache-pvc
-DB_DIR = "/app/backend/data"
+base_dir = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=base_dir / ".env")
+
+DB_DIR = os.getenv("DB_DIR", os.path.join(base_dir, "data"))
 DB_PATH = os.path.join(DB_DIR, "kguard.db")
 
 # Global variables initialization for K8s clients

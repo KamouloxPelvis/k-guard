@@ -26,7 +26,7 @@ var (
 			Bold(true).
 			BorderStyle(lipgloss.DoubleBorder()).
 			BorderForeground(lipgloss.Color("#f05a28")).
-			Width(55).
+			Width(60).
 			Align(lipgloss.Center)
 
 	successStyle = lipgloss.NewStyle().Foreground(lipgloss.Color("42")).Bold(true)
@@ -40,7 +40,7 @@ var (
 			BorderStyle(lipgloss.DoubleBorder()).
 			BorderForeground(lipgloss.Color("42")).
 			Padding(0, 1).
-			Width(55).
+			Width(60).
 			Align(lipgloss.Center)
 )
 
@@ -49,84 +49,194 @@ type errMsg error
 type successMsg bool
 
 type model struct {
-	spinner   spinner.Model
-	status    string
-	err       error
-	quitting  bool
-	step      int
-	adminUser string
-	adminPwd  string
-	results   []string
+	spinner     spinner.Model
+	status      string
+	err         error
+	quitting    bool
+	step        int
+	adminUser   string
+	adminPwd    string
+	results     []string
+	projectRoot string // Stockage du chemin absolu racine
 }
 
-// 1. System Check & Smart Cleanup
+// --- CORE FUNCTIONS ---
+
 func checkAndPrepare() (string, error) {
 	if runtime.GOOS != "linux" {
-		return "", fmt.Errorf("K-Guard is optimized for Linux")
+		return "", fmt.Errorf("K-Guard is optimized for Linux systems")
 	}
+	// Vérification de K3s (Crucial pour ton architecture)
 	if _, err := os.Stat("/etc/rancher/k3s/k3s.yaml"); os.IsNotExist(err) {
-		return "", fmt.Errorf("K3s not found. Please install K3s first")
+		return "", fmt.Errorf("K3s not found. Please install K3s to host K-Guard infrastructure")
 	}
 
+	// Nettoyage intelligent du Namespace
 	cmd := exec.Command("kubectl", "get", "ns", "k-guard")
 	if err := cmd.Run(); err == nil {
-		pruneCmd := exec.Command("kubectl", "apply", "-f", "../k8s/", "-n", "k-guard", "--prune", "-l", "app=k-guard", "--all")
-		_ = pruneCmd.Run()
-		return "Infrastructure update and cleanup completed", nil
+		return "Infrastructure existing, ready for update", nil
 	}
 
 	if err := exec.Command("kubectl", "create", "namespace", "k-guard").Run(); err != nil {
 		return "", fmt.Errorf("Namespace creation failed: %v", err)
 	}
-	return "Infrastructure initialized", nil
+	return "Infrastructure namespace initialized", nil
 }
 
-// 2. Credentials Generation & Hashing
-func setupCredentials(username string, password string) error {
+// Helper to get the public IP of the VPS
+func getPublicIP() string {
+	cmd := exec.Command("curl", "-s", "ifconfig.me")
+	out, err := cmd.Output()
+	if err != nil {
+		return "127.0.0.1" // Fallback to localhost if no internet
+	}
+	return strings.TrimSpace(string(out))
+}
+
+func setupCredentials(rootPath, username, password string) error {
+	publicIP := getPublicIP() // Dynamic detection
+
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to hash password: %v", err)
 	}
 
-	envContent := fmt.Sprintf(`# K-GUARD CONFIGURATION GENERATED ON %s
-ALLOWED_ORIGINS=http://localhost:30002,http://113.30.191.17:30002
+	envPath := filepath.Join(rootPath, "backend", ".env")
+
+	protectedNamespaces := "k-guard"
+
+	// Fixed: Added publicIP and publicIP to the arguments of Sprintf
+	envContent := fmt.Sprintf(`# K-GUARD SYSTEM CONFIGURATION
+# Generated on: %s
+# Target Environment: Global/Portable
+
+# --- PATH RESOLUTION ---
+PROJECT_ROOT=%s
+DB_DIR=%s/backend/data
+KGUARD_ANSIBLE_PATH=%s/infra/ansible/harden_network.yml
+
+# --- AUTHENTICATION & SECURITY ---
 ADMIN_USERNAME=%s
 ADMIN_PASSWORD_HASH=%s
 SECRET_KEY=kguard_%d
 ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=600
 
-USER_DOMAIN=113.30.191.17
+# --- NETWORK CONFIGURATION ---
+ALLOWED_ORIGINS=http://localhost:8443,http://%s:8443,http://k-guard.local:8443
+USER_DOMAIN=%s
 PROJECT_NAME=K-Guard
-KGUARD_PROTECTED_NS=k-guard,blog-prod,portfolio-prod
-KGUARD_ANSIBLE_PATH=../infra/ansible/harden_network.yml
+KGUARD_PROTECTED_NS=%s
 TRIVY_CACHE_DIR=/data/trivy-cache
 `,
-		time.Now().Format("2006-01-02"),
-		username,
-		string(hash),
-		time.Now().Unix())
+		time.Now().Format("2006-01-02 15:04:05"), // ARG 1: Date
+		rootPath,                                 // ARG 2: PROJECT_ROOT
+		rootPath,                                 // ARG 3: DB_DIR
+		rootPath,                                 // ARG 4: KGUARD_ANSIBLE_PATH
+		username,                                 // ARG 5: ADMIN_USERNAME
+		string(hash),                             // ARG 6: ADMIN_PASSWORD_HASH
+		time.Now().Unix(),                        // ARG 7: SECRET_KEY (%d)
+		publicIP,                                 // ARG 8: For ALLOWED_ORIGINS (%s)
+		publicIP,                                 // ARG 9: For USER_DOMAIN (%s)
+		protectedNamespaces)                      // ARG 10: For KGUARD_PROTECTED_NS (%s)
 
-	return os.WriteFile("../backend/.env", []byte(envContent), 0600)
+	return os.WriteFile(envPath, []byte(envContent), 0600)
 }
 
-func syncSecretsToK8s() error {
-	script := "kubectl create secret generic k-guard-secrets --from-env-file=../backend/.env -n k-guard --dry-run=client -o yaml | kubectl apply -f -"
+func syncSecretsToK8s(rootPath string) error {
+	envPath := filepath.Join(rootPath, "backend", ".env")
+	script := fmt.Sprintf("kubectl create secret generic k-guard-secrets --from-env-file=%s -n k-guard --dry-run=client -o yaml | kubectl apply -f -", envPath)
 	cmd := exec.Command("sh", "-c", script)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("Secrets sync failed: %v\n%s", err, string(output))
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("Secrets sync failed: %s", string(output))
 	}
 	return nil
 }
 
-func deployK8s() error {
-	cmd := exec.Command("kubectl", "apply", "-f", "../k8s/", "-n", "k-guard")
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("K8s deployment failed: %v\n%s", err, string(output))
+// --- SYSTEMD & CLI TOOLS ---
+
+func setupSystemdService(rootPath string) error {
+	backendDir := filepath.Join(rootPath, "backend")
+	envFilePath := filepath.Join(backendDir, ".env")
+	user := os.Getenv("SUDO_USER")
+	if user == "" {
+		user = "root"
 	}
+
+	serviceContent := fmt.Sprintf(`[Unit]
+Description=K-Guard Backend Service
+After=network.target
+
+[Service]
+Type=simple
+User=%s
+WorkingDirectory=%s
+EnvironmentFile=%s
+ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8443	
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+`, user, backendDir, envFilePath, backendDir)
+
+	servicePath := "/etc/systemd/system/kguard.service"
+	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
+		return err
+	}
+
+	exec.Command("systemctl", "daemon-reload").Run()
+	exec.Command("systemctl", "enable", "kguard.service").Run()
+	return exec.Command("systemctl", "restart", "kguard.service").Run()
+}
+
+// deployFrontend ensures the compiled frontend (dist) is linked to the
+// 'static' directory expected by the FastAPI backend.
+func deployFrontend(rootPath string) error {
+	// Define source and destination paths
+	// distPath: where Vite/Vue.js outputs the production build
+	// staticLink: the directory name targeted by main.py
+	distPath := filepath.Join(rootPath, "frontend", "dist")
+	staticLink := filepath.Join(rootPath, "static")
+
+	// Check if the production build directory exists
+	// High-criticality environments require verification before deployment steps.
+	if _, err := os.Stat(distPath); os.IsNotExist(err) {
+		return fmt.Errorf("frontend build directory 'dist' is missing. Please run 'npm run build' first")
+	}
+
+	// Clean up existing symbolic link or directory to prevent "file exists" errors
+	// This ensures an idempotent installation process.
+	os.Remove(staticLink)
+
+	// Create a symbolic link (Symlink)
+	// This provides a seamless bridge between the frontend build and the backend server.
+	err := os.Symlink(distPath, staticLink)
+	if err != nil {
+		return fmt.Errorf("failed to create symbolic link for static files: %v", err)
+	}
+
+	fmt.Println("✅ Frontend successfully linked to static directory.")
 	return nil
+}
+
+func setupGlobalCommand(rootPath string) error {
+	// Wrapper intelligent pour le monitoring
+	wrapperContent := fmt.Sprintf(`#!/bin/bash
+echo "🛡️  K-Guard Management Console"
+echo "----------------------------"
+if [ "$1" == "logs" ]; then
+    journalctl -u kguard.service -f
+elif [ "$1" == "k8s" ]; then
+    kubectl get pods -n k-guard
+else
+    systemctl status kguard --no-pager
+    echo ""
+    echo "Usage: kguard [logs|k8s]"
+fi
+`)
+	binPath := "/usr/local/bin/kguard"
+	return os.WriteFile(binPath, []byte(wrapperContent), 0755)
 }
 
 // --- BUBBLE TEA ENGINE ---
@@ -139,42 +249,39 @@ func (m model) runStep(step int) tea.Cmd {
 	return func() tea.Msg {
 		var err error
 		var msg string
-		time.Sleep(800 * time.Millisecond)
-
-		// Récupération du chemin absolu du dossier actuel (installer)
-		currentDir, _ := os.Getwd()
-		// On remonte d'un cran pour atteindre la racine du projet, puis backend
-		absBackendPath := filepath.Join(currentDir, "..", "backend")
+		time.Sleep(600 * time.Millisecond)
 
 		switch step {
 		case 0:
-			msg = "Checking system dependencies"
+			msg = "Checking system architecture"
 			_, err = checkAndPrepare()
 		case 1:
-			msg = "Scanning Docker socket accessibility"
+			msg = "Verifying Docker socket (Runtime Check)"
 			if _, errStat := os.Stat("/var/run/docker.sock"); os.IsNotExist(errStat) {
-				msg = "Docker socket missing (Limited local scan)"
+				msg = "Socket missing (Simulated mode active)"
 			} else {
-				msg = "Docker socket detected"
+				msg = "Docker socket available"
 			}
 		case 2:
-			msg = "Hasing credentials and generating .env"
-			err = setupCredentials(m.adminUser, m.adminPwd)
+			msg = "Hashing credentials & updating .env"
+			err = setupCredentials(m.projectRoot, m.adminUser, m.adminPwd)
 		case 3:
-			msg = "Initializing Trivy database"
-			msg = "Trivy database ready"
+			msg = "Synchronizing Kubernetes secrets"
+			err = syncSecretsToK8s(m.projectRoot)
 		case 4:
-			msg = "Synchronizing secrets with K3s"
-			err = syncSecretsToK8s()
+			msg = "Applying K8s Manifests"
+			k8sPath := filepath.Join(m.projectRoot, "k8s")
+			cmd := exec.Command("kubectl", "apply", "-f", k8sPath, "-n", "k-guard")
+			err = cmd.Run()
 		case 5:
-			msg = "Deploying K-Guard Core Manifests"
-			err = deployK8s()
+			msg = "Deploying frontend assets (Linking static)"
+			err = deployFrontend(m.projectRoot)
 		case 6:
-			msg = "Installing Systemd service & 'kguard' command"
-			err = setupSystemdService(absBackendPath)
-			if err == nil {
-				err = setupGlobalCommand(absBackendPath)
-			}
+			msg = "Installing Systemd service"
+			err = setupSystemdService(m.projectRoot)
+		case 7:
+			msg = "Registering 'kguard' global command"
+			err = setupGlobalCommand(m.projectRoot)
 		default:
 			return successMsg(true)
 		}
@@ -223,28 +330,33 @@ func (m model) View() string {
 	}
 
 	if m.quitting {
+		// We detect the IP again for the final display
+		displayIP := getPublicIP()
 		finalMsg := fmt.Sprintf(
-			"Installation Complete, %s !\n\n"+
-				"🚀 Service started: 'systemctl status kguard'\n"+
-				"💻 Quick launch: 'sudo kguard'\n"+
-				"🌐 Accessible at: https://113.30.191.17:8443",
+			"Installation Success, %s !\n\n"+
+				"🚀 API: 'sudo kguard logs'\n"+
+				"💻 CLI: 'kguard' (status/logs/k8s)\n"+
+				"🌐 Access: http://%s:8443",
 			m.adminUser,
+			displayIP,
 		)
 		s += "\n" + footerStyle.Render(finalMsg) + "\n"
 		return s
 	}
 
 	s += "\n " + m.spinner.View() + " " + m.status + "\n\n"
-	s += statusStyle.Render(" [q] quit")
+	s += statusStyle.Render(" [q] quit installation")
 	return s
 }
 
+// --- VALIDATIONS & MAIN ---
+
 func isStrongPassword(p string) (bool, string) {
 	var (
-		hasMinLen  = len(p) >= 8
-		hasUpper   = false
-		hasNumber  = false
-		hasSpecial = false
+		hasMinLen = len(p) >= 10 // Augmenté pour la sécurité
+		hasUpper  = false
+		hasNumber = false
+		hasSpec   = false
 	)
 	for _, char := range p {
 		switch {
@@ -253,137 +365,70 @@ func isStrongPassword(p string) (bool, string) {
 		case unicode.IsNumber(char):
 			hasNumber = true
 		case unicode.IsPunct(char) || unicode.IsSymbol(char):
-			hasSpecial = true
+			hasSpec = true
 		}
 	}
 	if !hasMinLen {
-		return false, "8 characters minimum"
+		return false, "10 chars min"
 	}
-	if !hasUpper {
-		return false, "at least one uppercase letter"
-	}
-	if !hasNumber {
-		return false, "at least one number"
-	}
-	if !hasSpecial {
-		return false, "at least one special character"
+	if !hasUpper || !hasNumber || !hasSpec {
+		return false, "need uppercase, number and special char"
 	}
 	return true, ""
 }
 
 func main() {
+	// 1. Root privileges check
+	if os.Geteuid() != 0 {
+		fmt.Println(errorStyle.Render("❌ Error: Administrator privileges required. Run with 'sudo'."))
+		os.Exit(1)
+	}
+
+	// 2. Absolute Path Detection (Universal & Idempotent)
+	// We determine the project root based on the installer's location
+	exePath, err := os.Executable()
+	if err != nil {
+		fmt.Println(errorStyle.Render("❌ Error: Could not determine executable path."))
+		os.Exit(1)
+	}
+	// installerDir is /.../k-guard/installer
+	installerDir := filepath.Dir(exePath)
+	// projectRoot is /.../k-guard
+	projectRoot := filepath.Dir(installerDir)
+
 	reader := bufio.NewReader(os.Stdin)
-	var user string
-
-	for {
-		fmt.Print("👤 Enter the administrator username: ")
-		input, _ := reader.ReadString('\n')
-		user = strings.TrimSpace(input)
-
-		// Nouvelle validation : non vide ET au moins 5 caractères
-		if user == "" {
-			fmt.Println(errorStyle.Render("❌ Username cannot be empty."))
-			continue
-		}
-		if len(user) < 5 {
-			fmt.Println(errorStyle.Render("❌ Username must be at least 5 characters long."))
-			continue
-		}
-		break
+	fmt.Print("👤 Admin Username (min 5 chars): ")
+	user, _ := reader.ReadString('\n')
+	user = strings.TrimSpace(user)
+	if len(user) < 5 {
+		fmt.Println(errorStyle.Render("❌ Username too short."))
+		os.Exit(1)
 	}
 
-	var pass string
-	for {
-		// Correction du %s(MISSING) en passant 'user' en argument
-		fmt.Printf("🔐 Define the password for %s: ", user)
-		bytePassword, _ := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-
-		p1 := string(bytePassword)
-		if ok, help := isStrongPassword(p1); !ok {
-			fmt.Printf("❌ %s: %s\n", errorStyle.Render("Insufficiently secure"), help)
-			continue
-		}
-
-		fmt.Print("🔄 Confirm password: ")
-		byteConfirm, _ := term.ReadPassword(int(syscall.Stdin))
-		fmt.Println()
-
-		if p1 != string(byteConfirm) {
-			fmt.Println(errorStyle.Render("❌ Passwords do not match."))
-			continue
-		}
-
-		pass = p1
-		break
+	fmt.Printf("🔐 Password for %s: ", user)
+	bytePass, _ := term.ReadPassword(int(syscall.Stdin))
+	fmt.Println()
+	pass := string(bytePass)
+	if ok, help := isStrongPassword(pass); !ok {
+		fmt.Printf("❌ Weak password: %s\n", help)
+		os.Exit(1)
 	}
-
-	fmt.Println(successStyle.Render("✨ Credentials validated."))
 
 	spin := spinner.New()
 	spin.Spinner = spinner.Dot
 	spin.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#f05a28"))
 
 	p := tea.NewProgram(model{
-		spinner:   spin,
-		status:    "Starting installation engine...",
-		adminUser: user,
-		adminPwd:  pass,
-		results:   make([]string, 0),
+		spinner:     spin,
+		status:      "Launching DevSecOps Engine...",
+		adminUser:   user,
+		adminPwd:    pass,
+		results:     make([]string, 0),
+		projectRoot: projectRoot, // Passing the robust absolute path to the model
 	})
 
 	if _, err := p.Run(); err != nil {
-		fmt.Printf("Fatal Error: %v", err)
+		fmt.Printf("Runtime Error: %v\n", err)
 		os.Exit(1)
 	}
-}
-
-// --- NEW FUNCTIONS FOR SYSTEMD & CLI ---
-
-func setupSystemdService(backendDir string) error {
-	// On utilise SUDO_USER pour que le service appartienne à l'utilisateur réel
-	user := os.Getenv("SUDO_USER")
-	if user == "" {
-		user = os.Getenv("USER")
-	}
-
-	serviceContent := fmt.Sprintf(`[Unit]
-Description=K-Guard Backend Service
-After=network.target
-
-[Service]
-Type=simple
-User=%s
-WorkingDirectory=%s
-ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8443
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`, user, backendDir, backendDir)
-
-	err := os.WriteFile("/etc/systemd/system/kguard.service", []byte(serviceContent), 0644)
-	if err != nil {
-		return fmt.Errorf("failed to create service file (try running with sudo): %v", err)
-	}
-
-	exec.Command("systemctl", "daemon-reload").Run()
-	exec.Command("systemctl", "enable", "kguard.service").Run()
-	return exec.Command("systemctl", "restart", "kguard.service").Run()
-}
-
-func setupGlobalCommand(backendDir string) error {
-	wrapperContent := fmt.Sprintf(`#!/bin/bash
-cd %s
-source ./venv/bin/activate
-python3 -m uvicorn main:app --host 0.0.0.0 --port 8443
-`, backendDir)
-
-	binPath := "/usr/local/bin/kguard"
-	err := os.WriteFile(binPath, []byte(wrapperContent), 0755)
-	if err != nil {
-		return fmt.Errorf("failed to create global command: %v", err)
-	}
-	return nil
 }

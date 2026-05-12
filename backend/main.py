@@ -1,15 +1,21 @@
+import os
+from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from datetime import datetime
 from pathlib import Path
-import os
 
 import database
 
 # Routers Imports
 from network_manager import router as network_router
 from routers import auth, k3s, scan, remediation, integrations
+
+
+# --- ENV LOADING ---
+base_dir = Path(__file__).resolve().parent
+load_dotenv(dotenv_path=base_dir / ".env")
 
 app = FastAPI(
     title="🛡️ K-Guard API", 
@@ -21,7 +27,7 @@ app = FastAPI(
 # Security: Restricted to origins defined in environment variables to prevent unauthorized cross-site requests.
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
-    "http://localhost:32726,http://127.0.0.1:32726",
+    "http://localhost:8443,http://127.0.0.1:8443",
 )
 origins = [origin.strip() for origin in raw_origins.split(",")]
 
@@ -60,7 +66,8 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-BASE_STATIC_DIR = Path("/app/static").resolve()
+root_path = os.getenv("PROJECT_ROOT", base_dir.parent)
+BASE_STATIC_DIR = (Path(root_path) / "static").resolve()
 
 @app.get("/{rest_of_path:path}", tags=["Frontend"])
 async def serve_frontend(rest_of_path: str):
