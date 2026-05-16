@@ -30,9 +30,10 @@
 ## 🧪 <a name="en-tech-stack"></a>Tech Stack
 
 * **Backend**: FastAPI (Python), Ansible Core, Trivy.
-* **Frontend**: Vue.js 3, Tailwind CSS, Axios (JWT Auth).
+* **Frontend**: Vue.js 3, Tailwind CSS, Fetch, JWT Auth.
 * **Installer**: Go (Bubble Tea / Lipgloss).
-* **OS/Infra**: Ubuntu 24.04 LTS, K3s, Kamatera VPS.
+
+* **Created with**: Ubuntu 24.04 LTS, K3s, Kamatera VPS.
 
 ---
 
@@ -75,18 +76,6 @@ K-Guard automatically generates interactive API documentation using **Swagger UI
 
 ---
 
-K-Guard génère automatiquement une documentation API interactive via **Swagger UI (OpenAPI 3.1)**. Cela permet aux développeurs et aux auditeurs de sécurité d'explorer et de tester tous les points de terminaison (endpoints) directement depuis le navigateur.
-
-- **Interface Interactive :** `https://<votre-domaine-ou-ip>/docs`
-- **Fonctionnalités documentées :**
-    - 🔍 Métriques d'Infrastructure K3s
-    - 🔐 Authentification & Gestion des tokens (JWT)
-    - 💓 Tests de santé système (Liveness Probes)
-
-> **Note :** L'accès à la documentation via HTTPS est obligatoire. Si vous utilisez un certificat auto-signé, vous devrez valider l'exception de sécurité dans votre navigateur pour accéder à l'interface.
-
----
-
 ## 🛠️ <a name="en-installation--setup"></a>Installation & Setup
 
 ![K-Guard System Overview](frontend/public/screenshots/install.png)
@@ -111,13 +100,13 @@ The assistant launches a "Pre-flight check" script to validate the secure config
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
 
-cd k-guard/installer
+cd installer (k-guard/installer)
 
 # Grant execution rights
-chmod +x kguard-installer
+chmod +x install-kguard
 
 # Launch installation
-./kguard-installer
+./install-kguard or sudo ./install-kguard
 ```
 ---
 
