@@ -7,7 +7,12 @@ import json
 
 # --- PATH CONFIGURATION ---
 base_dir = Path(__file__).resolve().parent
-load_dotenv(dotenv_path=base_dir / ".env")
+
+env_path = Path.cwd() / ".env"
+if env_path.exists():
+    load_dotenv(dotenv_path=env_path)
+else:
+    print(".env file not found, using environment variables")
 
 DB_DIR = os.getenv("DB_DIR", os.path.join(base_dir, "data"))
 DB_PATH = os.path.join(DB_DIR, "kguard.db")

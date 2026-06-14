@@ -7,3 +7,4 @@ passlib[bcrypt]==1.7.4
 bcrypt==5.0.0
 kubernetes>=35.0.0
 python-multipart>=0.0.28
+prometheus-fastapi-instrumentator==7.0.0

@@ -49,4 +49,6 @@ EXPOSE 8000
 
 # Service Execution Command
 # Running Uvicorn on all interfaces to be accessible via Kubernetes Services
+# SRE Fix: Ensuring the application runs with appropriate permissions and that the database is writable
+RUN chmod -R 755 /app
 CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
