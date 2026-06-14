@@ -40,7 +40,7 @@ jobs:
   deploy_to_k3s:
     needs: build_images
     runs-on: ubuntu-latest
-    environment: VPS_KAMATERA_UBUNTU_THINKPAD_E11 
+    environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11 
     steps:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6

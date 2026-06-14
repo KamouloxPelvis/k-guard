@@ -3,6 +3,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
+from prometheus_fastapi_instrumentator import Instrumentator
 from datetime import datetime
 from pathlib import Path
 
@@ -22,6 +23,8 @@ app = FastAPI(
     version="1.0.0",
     description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
 )
+
+Instrumentator().instrument(app).expose(app)
 
 # --- CORS CONFIGURATION ---
 # Security: Restricted to origins defined in environment variables to prevent unauthorized cross-site requests.
@@ -44,6 +47,10 @@ app.add_middleware(
 async def startup_event():
     """Triggers database initialization on application startup."""
     database.init_db()
+
+@app.get("/")
+def read_root():
+    return {"message": "K-Guard Operational"}
 
 # --- 1. INFRASTRUCTURE ROUTES ---
 @app.get("/health", tags=["Infra"])

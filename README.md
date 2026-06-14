@@ -96,6 +96,7 @@ The assistant launches a "Pre-flight check" script to validate the secure config
 * Python 3 & Pip.
 
 ### <a name="en-3-quick-start-procedure"></a>3. Quick Install procedure
+
 ```bash
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
