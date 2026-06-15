@@ -48,10 +48,6 @@ async def startup_event():
     """Triggers database initialization on application startup."""
     database.init_db()
 
-@app.get("/")
-def read_root():
-    return {"message": "K-Guard Operational"}
-
 # --- 1. INFRASTRUCTURE ROUTES ---
 @app.get("/health", tags=["Infra"])
 async def liveness_probe():
@@ -73,8 +69,8 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-root_path = os.getenv("PROJECT_ROOT", base_dir.parent)
-BASE_STATIC_DIR = (Path(root_path) / "static").resolve()
+root_path = os.getenv("PROJECT_ROOT", "/home/kamal/infrastructure/apps/k-guard")
+BASE_STATIC_DIR = (Path(root_path) / "frontend" / "dist").resolve()
 
 @app.get("/{rest_of_path:path}", tags=["Frontend"])
 async def serve_frontend(rest_of_path: str):

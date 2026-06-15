@@ -191,7 +191,7 @@
                   - protocol: TCP
                     port: 8000 
                   - protocol: TCP
-                    port: 8443 
+                    port: 8445 
       loop: "{{ protected_namespaces }}"
 
     # --- LAYER 10: VPS HOST -> K-GUARD SECURE ACCESS ---
@@ -219,4 +219,4 @@
                   - protocol: TCP
                     port: 8000
                   - protocol: TCP
-                    port: 8443
+                    port: 8445
