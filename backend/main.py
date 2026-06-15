@@ -24,7 +24,7 @@ app = FastAPI(
     description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
 )
 
-Instrumentator().instrument(app).expose(app)
+Instrumentator().instrument(app, skip_paths=["/api/.*"]).expose(app)
 
 # --- CORS CONFIGURATION ---
 # Security: Restricted to origins defined in environment variables to prevent unauthorized cross-site requests.
