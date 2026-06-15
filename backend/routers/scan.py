@@ -19,6 +19,14 @@ class ScanRequest(BaseModel):
     """Data model for incoming security scan requests."""
     image: str
 
+# --- 0. Test internal API connectivity at startup ---
+import requests
+try:
+    response = requests.get("http://localhost:8445/api/health") # Vérifie si l'API répond
+    print(f"DEBUG: Internal API check on 8445: {response.status_code}")
+except Exception as e:
+    print(f"DEBUG: Internal API check FAILED: {e}")
+
 # --- 1. EXECUTION ROUTE (NON-BLOCKING) ---
 @router.post("/scan")
 async def launch_security_scan(payload: ScanRequest, background_tasks: BackgroundTasks, user: dict = Depends(verify_token)):
@@ -86,8 +94,12 @@ def run_and_store_scan(image: str):
     notifier = CiscoWebexNotifier() 
     try:
         # Step 1: Execute the vulnerability scanner
+        logger.info(f"🔍 [SCANNER] Attempting to scan: {image}")
         report = run_trivy_scan(image) 
         
+        logger.info(f"DEBUG: Trivy returned report type: {type(report)}")
+        logger.debug(f"DEBUG: Full report content: {report}")
+
         # Step 2: Persist results to the SQLite database
         update_scan_status(image, "completed", report) 
         
