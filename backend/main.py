@@ -3,7 +3,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
-from prometheus_fastapi_instrumentator import Instrumentator
+#from prometheus_fastapi_instrumentator import Instrumentator
 from datetime import datetime
 from pathlib import Path
 
@@ -24,7 +24,9 @@ app = FastAPI(
     description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
 )
 
-Instrumentator().instrument(app, skip_paths=["/api/.*"]).expose(app)
+#instrumentator = Instrumentator(should_group_status_codes=True)
+
+#instrumentator.instrument(app, metric_namespace="kguard").expose(app)
 
 # --- CORS CONFIGURATION ---
 # Security: Restricted to origins defined in environment variables to prevent unauthorized cross-site requests.

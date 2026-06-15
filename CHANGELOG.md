@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.2.1] - 2026-06-15
+
+Fixed
+Port Migration: Resolved network conflicts by migrating the API/Frontend service from port 8443 to 8445.
+
+Auth Stability: Resolved internal 500 errors during authentication by optimizing middleware stack handling.
+
+Asset Serving: Corrected static file resolution logic in FastAPI to properly serve the Vue.js frontend build from /frontend/dist.
+
+Instrumentation: Refined Prometheus middleware to ensure compatible metric collection without breaking router path resolution.
+
+Infrastructure
+Updated systemd service configuration to align with the new port architecture.
+
+Updated environment variable definitions to ensure robust path resolution across development and production environments.
+
 ## [1.2.0] - 2026-05-12
 
 ### Added
