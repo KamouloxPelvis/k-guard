@@ -137,7 +137,7 @@ sudo kguard logs
 ### <a name="en-accessing-dashboard"></a>5. Accessing the Dashboard
 Once the deployment is finalized on your K3s cluster, the K-Guard interface is exposed through a secure endpoint.
 
-1. **URL**: Open your browser and navigate to `http://VPS_IP:8443` (or the hostname configured in your local `/etc/hosts` with your VPS IP adress e.g : http://k-guard.local:8443).
+1. **URL**: Open your browser and navigate to `http://VPS_IP:8445` (or the hostname configured in your local `/etc/hosts` with your VPS IP adress e.g : http://k-guard.local:8445).
 
 2. **Authentication**: Use the administrative credentials defined during the installation process to log in and access the real-time Sentinel topology and security scans.
 

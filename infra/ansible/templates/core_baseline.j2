@@ -38,7 +38,7 @@ spec:
       ports:
         - { protocol: TCP, port: 443 }  # Standard HTTPS (ex: Webex Webhooks)
         - { protocol: TCP, port: 6443 } # Standard K3s API 
-        - { protocol: TCP, port: 8443 } # Custom VPS HTTPS & K-Guard Port
+        - { protocol: TCP, port: 8445 } # Custom VPS HTTPS & K-Guard Port
   ingress:
 {% if monitoring_enabled %}
     - from: # Observability: Allow Prometheus/Grafana probes

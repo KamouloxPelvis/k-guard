@@ -172,7 +172,7 @@ Type=simple
 User=%s
 WorkingDirectory=%s
 EnvironmentFile=%s
-ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8443	
+ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8445	
 Restart=always
 RestartSec=5
 
@@ -336,7 +336,7 @@ func (m model) View() string {
 			"Installation Success, %s !\n\n"+
 				"🚀 API: 'sudo kguard logs'\n"+
 				"💻 CLI: 'kguard' (status/logs/k8s)\n"+
-				"🌐 Access: http://%s:8443",
+				"🌐 Access: http://%s:8445",
 			m.adminUser,
 			displayIP,
 		)
