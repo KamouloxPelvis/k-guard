@@ -11,13 +11,11 @@
   }
 
   interface Vulnerability {
-    vulnerability_id: string;
-    pkg_name: string;
-    installed_version: string;
-    fixed_version?: string;
-    severity: string;
-    description?: string;
-  }
+    id: string;         
+    package: string;   
+    fixedVersion: string;
+    severity: string; 
+}
 
   interface ScanResult {
     image: string;
@@ -139,7 +137,7 @@
    */
   const patchApplication = async (namespace: string, appName: string, appId: string) => {
     const result = scanResults.value[appId];
-    const suggestion = result?.vulnerabilities?.find(v => v.fixed_version)?.fixed_version;
+    const suggestion = result?.vulnerabilities?.find(v => v.fixedVersion)?.fixedVersion;
     
     if (!suggestion || !confirm(`🚀 Trigger automated remediation for ${appName}?`)) return;
 
@@ -225,10 +223,10 @@
                 </tr>
               </thead>
               <tbody class="divide-y divide-slate-800/50">
-                <tr v-for="vuln in selectedAppVulnerabilities" :key="vuln.vulnerability_id">
-                  <td class="py-2 text-[11px] text-blue-400">{{ vuln.vulnerability_id }}</td>
-                  <td class="py-2 text-[11px] text-slate-300">{{ vuln.pkg_name }}</td>
-                  <td class="py-2 text-[11px] text-green-400">{{ vuln.fixed_version || '-' }}</td>
+                <tr v-for="vuln in selectedAppVulnerabilities" :key="vuln.id">
+                  <td class="py-2 text-[11px] text-blue-400">{{ vuln.id }}</td>
+                  <td class="py-2 text-[11px] text-slate-300">{{ vuln.package }}</td>
+                  <td class="py-2 text-[11px] text-green-400">{{ vuln.fixedVersion || '-' }}</td> 
                   <td class="py-2 text-right">
                     <span :class="vuln.severity === 'CRITICAL' ? 'text-red-500 bg-red-500/10 border-red-500/30' : 'text-orange-500 bg-orange-500/10 border-orange-500/30'"
                           class="text-[8px] font-bold px-1.5 py-0.5 border rounded-sm uppercase">
