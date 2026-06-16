@@ -1,17 +1,18 @@
 import os
 from dotenv import load_dotenv
+from pathlib import Path
+from backend import database
 from fastapi import FastAPI, APIRouter
+from datetime import datetime
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 #from prometheus_fastapi_instrumentator import Instrumentator
-from datetime import datetime
-from pathlib import Path
 
-import database
+# --- Routers Imports ---
+from backend.network_manager import router as network_router
+from backend.routers import auth, k3s, scan, remediation, integrations, sentinel_test
 
-# Routers Imports
-from network_manager import router as network_router
-from routers import auth, k3s, scan, remediation, integrations
+print(f"DEBUG: LE MODULE EST CHARGÉ DEPUIS : {sentinel_test.__file__}")
 
 
 # --- ENV LOADING ---
@@ -63,6 +64,7 @@ app.include_router(scan.router, prefix="/api")
 app.include_router(remediation.router, prefix="/api")
 app.include_router(network_router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
+app.include_router(sentinel_test.router, prefix="/api")
 
 # --- 3. GLOBAL API ROUTES ---
 @app.get("/api/health", tags=["Status"])
