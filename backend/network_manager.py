@@ -110,30 +110,3 @@ async def deactivate_hardening():
         return {"status": "SUCCESS", "message": "Network policies deactivated."}
     except subprocess.CalledProcessError as e:
         return {"status": "ERROR", "details": e.stderr}
-
-@router.post("/sentinel/test")
-async def test_connectivity():
-    """
-    Executes the SRE connectivity diagnostic script.
-    Standardized for international DevSecOps reporting.
-    """
-    if not os.path.exists(TEST_SCRIPT_PATH):
-        # Neutral technical logging
-        logging.error(f"SRE Diagnostic: Script missing at {TEST_SCRIPT_PATH}")
-        return {"output": "❌ ERROR: Infrastructure diagnostic tool is unavailable."}
-    
-    try:
-        # Run with a timeout to avoid hanging the API if a pod takes too long to spin up
-        result = subprocess.run(
-            ["bash", TEST_SCRIPT_PATH],
-            capture_output=True, 
-            text=True, 
-            check=True,
-            timeout=60 
-        )
-        return {"output": result.stdout}
-    except subprocess.TimeoutExpired:
-        return {"output": "⚠️ TIMEOUT: Connectivity audit exceeded 60s limit."}
-    except subprocess.CalledProcessError as e:
-        # Combine stdout and stderr for full terminal debugging
-        return {"output": f"{e.stdout}\n{e.stderr}\n❌ ERROR: Audit process failed."}
