@@ -25,6 +25,7 @@ app = FastAPI(
     description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
 )
 
+
 #instrumentator = Instrumentator(should_group_status_codes=True)
 
 #instrumentator.instrument(app, metric_namespace="kguard").expose(app)
@@ -44,6 +45,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
 
 # --- 0. DATABASE INITIALIZATION ---
 @app.on_event("startup")

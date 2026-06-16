@@ -1,5 +1,5 @@
 # --- STAGE 1: Frontend Build Process ---
-# Using a lightweight Alpine image to build the Vue.js assets
+# Using a lightweight Alpine image to compile Vue.js assets
 FROM node:20-alpine AS build-frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -7,48 +7,51 @@ RUN npm install
 COPY frontend/ ./
 RUN npm run build
 
-# --- STAGE 2: Backend Runtime (FastAPI) + Static Frontend ---
-# Slim Python image to reduce attack surface and image size
+# --- STAGE 2: Backend Runtime ---
+# Using a slim Python image to minimize the attack surface
 FROM python:3.11-slim
 WORKDIR /app
 
-# 1. System Dependencies + Trivy & Kubectl Installation
-# Installing curl and certificates, then downloading Trivy and Kubectl binaries
+# 1. System Dependencies
+# Installing essential tools for SRE operations and security scanning
 RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
     && curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin \
     && curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl" \
     && chmod +x kubectl && mv kubectl /usr/local/bin/ \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. Dependency Management (Cache Optimization)
-# Copying only requirements first to leverage Docker layer caching
+# 2. Dependency Management
+# Leveraging Docker layer caching by copying requirements first
 COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 3. Backend & SRE Scripts Setup
-# Copying the local backend source code into the container
+# 3. Source Code Placement
+# Copying backend and infrastructure components to their expected paths
 COPY backend/ ./backend/
-# SRE Fix: Explicitly copying infrastructure and test scripts into the container
-COPY tests/ /app/tests/
-COPY infra/ /app/infra/
-WORKDIR /app/backend
+COPY tests/ ./tests/
+COPY infra/ ./infra/
 
-# 4. Persistence Setup (K-Guard SQLite permissions)
-# Ensuring the local database and directory are writable for the non-root user
-RUN touch kguard.db && chmod 777 kguard.db && chmod 777 .
-
-# 5. Frontend Integration
-# Pulling the compiled static assets from Stage 1 into the backend static folder
+# 4. Frontend Integration
+# Importing compiled static assets from Stage 1
 COPY --from=build-frontend /app/frontend/dist /app/static
 
-# Runtime Environment Variables
+# 5. Runtime Configuration & Persistence
+# Transition to the backend directory for the application runtime
+WORKDIR /app/backend
+
+# Initialize SQLite database and set appropriate file permissions
+RUN touch kguard.db && chmod 777 kguard.db && chmod 777 .
+
+# SRE Fix: Add the root directory to PYTHONPATH to allow relative 'backend.' imports
+# This ensures uvicorn can locate modules correctly from within the /app/backend directory
+ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
-ENV PYTHONPATH=/app/backend
 
 EXPOSE 8000
 
-# Service Execution Command
-# Running Uvicorn on all interfaces to be accessible via Kubernetes Services
-# SRE Fix: Ensuring the application runs with appropriate permissions and that the database is writable
+# Service Execution
+# Ensure all files are accessible with non-root compliant permissions
 RUN chmod -R 755 /app
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+
+# Launch Uvicorn, pointing to the main app module
+CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]

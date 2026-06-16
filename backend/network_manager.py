@@ -31,25 +31,28 @@ load_k8s_config()
 async def get_network_policy_status():
     """
     Checks if the K-Guard Network Policies are currently deployed
-    in the 'blog-prod' namespace.
+    across the entire cluster.
     """
     try:
         # Initialize the Networking V1 API client
         networking_v1 = client.NetworkingV1Api()
         
-        # Retrieve all network policies in the target namespace
-        netpols = networking_v1.list_namespaced_network_policy("blog-prod")
+        # Retrieve all network policies across all namespaces in the cluster
+        # Using list_network_policy_for_all_namespaces() 
+        netpols = networking_v1.list_network_policy_for_all_namespaces()
         
-        # Verify if the 'sentinel-default-deny' policy exists
+        # Verify if our K-Guard managed policy exists anywhere in the cluster
+        # We look for the label 'managed-by=k-guard-sentinel' 
+        # This is more robust than checking by name alone.
         is_deployed = any(
-            policy.metadata.name == "sentinel-default-deny" 
+            policy.metadata.labels and policy.metadata.labels.get("managed-by") == "k-guard-sentinel"
             for policy in netpols.items
         )
         
         return {"deployed": is_deployed}
         
     except Exception as e:
-        # Log the error for debugging purposes
+        logging.exception("Error checking cluster-wide policies")
         return {"deployed": False, "error": str(e)}
 
 @router.get("/sentinel/map")
