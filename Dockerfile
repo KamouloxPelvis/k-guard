@@ -29,7 +29,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copying the local backend source code into the container
 COPY backend/ ./backend/
 # SRE Fix: Explicitly copying infrastructure and test scripts into the container
-COPY test/ /app/test/
+COPY tests/ /app/tests/
 COPY infra/ /app/infra/
 WORKDIR /app/backend
 
