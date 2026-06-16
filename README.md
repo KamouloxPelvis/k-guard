@@ -106,8 +106,8 @@ cd installer (k-guard/installer)
 # Grant execution rights
 chmod +x install-kguard
 
-# Launch installation
-./install-kguard or sudo ./install-kguard
+# Launch installation & follow the wizard
+./kguard-install or sudo ./kguard-install
 ```
 ---
 
