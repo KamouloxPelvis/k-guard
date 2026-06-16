@@ -21,7 +21,7 @@ async def run_isolation_audit():
     # 1. Initialize Kubernetes client
     try:
         if os.path.exists(KUBE_CONFIG):
-            config.load_kubeconfig(config_file=KUBE_CONFIG)
+            config.load_kube_config(config_file=KUBE_CONFIG)
         else:
             return {"output": "❌ FATAL: K3s configuration not found at " + KUBE_CONFIG}
     except Exception as e:

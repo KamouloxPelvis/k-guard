@@ -1,7 +1,7 @@
 import os
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException
-from k3s_manager import (
+from backend.k3s_manager import (
     get_k3s_status, 
     get_cluster_deployments, 
     get_storage_stats, 
@@ -9,7 +9,7 @@ from k3s_manager import (
     get_node_capacity,
     get_pod_logs
 )
-from metrics_manager import get_pod_metrics 
+from backend.metrics_manager import get_pod_metrics 
 from .auth import verify_token
 
 # Dedicated router for K3s Infrastructure management and monitoring

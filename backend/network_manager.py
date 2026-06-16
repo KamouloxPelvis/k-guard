@@ -5,6 +5,8 @@ import os
 import subprocess
 import logging
 
+print(f"DEBUG: LOADING NETWORK_MANAGER FROM: {__file__}")
+
 router = APIRouter(tags=["Network Sentinel"])
 
 # --- DYNAMIC CONFIGURATION ---
@@ -13,14 +15,16 @@ ANSIBLE_PATH = "/app/infra/ansible/playbooks/harden_policies.yml"
 TEST_SCRIPT_PATH = "/app/test/check_connectivity.sh"
 
 def load_k8s_config():
-    """Loads K8s configuration with auto-detection."""
     try:
-        if os.path.exists("/etc/rancher/k3s/k3s.yaml"):
-            config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
-        else:
-            config.load_incluster_config()
+        config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
+        return True
+    except AttributeError:
+        if hasattr(config, 'load_kubeconfig'):
+            config.load_kubeconfig(config_file="/etc/rancher/k3s/k3s.yaml")
+        return True
     except Exception as e:
-        print(f"⚠️ Kubernetes configuration error: {e}")
+        print(f"Erreur fatale de config: {e}")
+        return False
 
 load_k8s_config()
 

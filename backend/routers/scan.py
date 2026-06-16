@@ -5,9 +5,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from .auth import verify_token
-from database import DB_PATH, update_scan_status
-from security_manager import run_trivy_scan
-from services.cisco_notifier import CiscoWebexNotifier
+from backend.database import DB_PATH, update_scan_status
+from backend.security_manager import run_trivy_scan
+from backend.services.cisco_notifier import CiscoWebexNotifier
 
 # Standard SRE logging initialization
 # Ensuring traceability for background processes in K3s environment

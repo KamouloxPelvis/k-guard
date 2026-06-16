@@ -1,4 +1,4 @@
-from database import v1, apps_client
+from backend.database import v1, apps_client
 import shutil
 import os
 

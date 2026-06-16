@@ -1,7 +1,7 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import os
-import database
+import backend.database
 
 router = APIRouter(tags=["Integrations"])
 
@@ -16,7 +16,7 @@ async def get_webex_status():
     Retrieves current configuration for Frontend display.
     """
     try:
-        settings = database.get_integration_settings("webex")
+        settings = backend.database.get_integration_settings("webex")
         if not settings:
             return {"enabled": False, "configured": False}
         
@@ -38,7 +38,7 @@ async def update_webex(config: WebexConfig):
     """
     try:
         # 1. Update SQLite database
-        conn = database.sqlite3.connect(database.DB_PATH)
+        conn = backend.database.sqlite3.connect(backend.database.DB_PATH)
         cursor = conn.cursor()
         cursor.execute('''
             UPDATE integrations 
