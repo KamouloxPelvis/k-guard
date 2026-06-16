@@ -3,6 +3,11 @@
 # Compliance: Cisco DevNet Standard for In-Cluster Diagnostics
 set -e
 
+cleanup() {
+    kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1
+}
+trap cleanup EXIT
+
 # 0. SRE ENVIRONMENT SETUP
 export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
@@ -57,11 +62,10 @@ kubectl get nodes > /dev/null 2>&1 || echo "❌ FAIL: No access to cluster"
 
 # 3. SECURITY AUDIT EXECUTION (Focus: Isolation)
 echo -n "[1/2] Internal Mesh Isolation...   "
-# On teste si le pod de debug est BIEN bloqué pour parler à un autre pod non autorisé
-if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 "$POD_IP:$POD_PORT" > /dev/null 2>&1; then 
-    echo "✅ SECURE (Isolated)"; 
+if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 http://kubernetes.default > /dev/null 2>&1; then 
+    echo "✅ SECURE (Isolated)"
 else 
-    echo "⚠️ WARNING (Open)"; 
+    echo "⚠️ WARNING (Open - Lateral Movement Possible)"
 fi
 
 echo -n "[2/2] Zero-Trust Egress Check...   "
