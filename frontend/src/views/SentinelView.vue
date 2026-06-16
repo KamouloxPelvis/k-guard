@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, computed, onMounted, watch } from 'vue';
+  import { ref, computed, onMounted } from 'vue';
   import api from '@/services/api';
 
   // --- INTERFACES ---
@@ -55,9 +55,22 @@
   const isTesting = ref(false);
   const testTerminalOutput = ref('');
   const activeAccordion = ref<string | null>(null);
+  const isHardened = ref(false); // Track the deployment status
 
   // --- LOGIC: SECURITY ANALYSIS ---
   const isVulnerable = (pod: PodNode) => !pod.is_hardened;
+
+  /**
+ * Fetches the current Sentinel status to update the UI buttons accordingly.
+ */
+  const fetchSentinelStatus = async () => {
+    try {
+      const { data } = await api.get('/sentinel/status');
+      isHardened.value = data.deployed;
+    } catch (error) {
+      console.error("[K-Guard] Failed to fetch Sentinel status:", error);
+    }
+  };
 
   /**
    * Computes the global security score based on hardened vs vulnerable pods.
@@ -149,24 +162,18 @@
   // --- SENTINEL ACTIONS ---
 
   const triggerHarden = async () => {
-    if (!confirm("🚨 Apply Network Sentinel hardening to the cluster?")) return;
-    try {
-      await api.post('/sentinel/activate', {});
-      fetchNetworkData();
-    } catch (e) {
-      console.error("Hardening failed");
-    }
-  };
+  if (!confirm("🚨 Apply Network Sentinel hardening?")) return;
+  await api.post('/sentinel/activate', {});
+  await fetchSentinelStatus(); // Refresh status after action
+  fetchNetworkData();
+};
 
   const triggerDeactivate = async () => {
-    if (!confirm("⚠️ Deactivate Zero-Trust Network Policies?")) return;
-    try {
-      await api.post('/sentinel/deactivate', {});
-      fetchNetworkData();
-    } catch (e) {
-      console.error("Deactivation failed");
-    }
-  };
+  if (!confirm("⚠️ Deactivate Zero-Trust policies?")) return;
+  await api.post('/sentinel/deactivate', {});
+  await fetchSentinelStatus(); // Refresh status after action
+  fetchNetworkData();
+};
 
   /**
    * Executes an automated network isolation audit using netshoot ephemeral pods.
@@ -195,8 +202,10 @@
     showRoleModal.value = true;
   };
 
-  onMounted(fetchNetworkData);
-  watch(selectedNS, fetchNetworkData);
+  onMounted(() => {
+    fetchNetworkData();
+    fetchSentinelStatus();
+  });
 </script>
 
 <template>
@@ -219,8 +228,21 @@
           </select>
           
           <button @click="runIsolationTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Isolation</button>
-          <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deactivate</button>
-          <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Deploy Hardening</button>
+          <template v-if="isHardened">
+          <div class="px-3 py-1 bg-green-500/10 border border-green-500 text-green-500 text-[8px] font-black uppercase tracking-widest rounded-sm">
+            Policies Active
+          </div>
+          <button @click="triggerDeactivate" class="bg-red-500/10 hover:bg-red-500/20 border border-red-500 text-red-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">
+            Deactivate Policies
+          </button>
+        </template>
+        
+        <template v-else>
+          <button @click="triggerHarden" class="bg-[#f05a28]/10 hover:bg-[#f05a28]/20 border border-[#f05a28] text-[#f05a28] px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">
+            Deploy Net Policies
+          </button>
+        </template>
+      </div>
         </div>
       </div>
 
@@ -324,7 +346,6 @@
           </div>
         </div>
       </Transition>
-    </div>
 </template>
 
 <style scoped>

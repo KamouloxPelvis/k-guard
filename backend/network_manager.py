@@ -27,6 +27,31 @@ def load_k8s_config():
 
 load_k8s_config()
 
+@router.get("/sentinel/status")
+async def get_network_policy_status():
+    """
+    Checks if the K-Guard Network Policies are currently deployed
+    in the 'blog-prod' namespace.
+    """
+    try:
+        # Initialize the Networking V1 API client
+        networking_v1 = client.NetworkingV1Api()
+        
+        # Retrieve all network policies in the target namespace
+        netpols = networking_v1.list_namespaced_network_policy("blog-prod")
+        
+        # Verify if the 'sentinel-default-deny' policy exists
+        is_deployed = any(
+            policy.metadata.name == "sentinel-default-deny" 
+            for policy in netpols.items
+        )
+        
+        return {"deployed": is_deployed}
+        
+    except Exception as e:
+        # Log the error for debugging purposes
+        return {"deployed": False, "error": str(e)}
+
 @router.get("/sentinel/map")
 async def get_network_map():
     """
