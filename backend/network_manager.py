@@ -11,8 +11,7 @@ router = APIRouter(tags=["Network Sentinel"])
 
 # --- DYNAMIC CONFIGURATION ---
 # Correcting paths: Using relative roots to match your SRE directory structure.
-ANSIBLE_PATH = "/app/infra/ansible/playbooks/harden_policies.yml"
-TEST_SCRIPT_PATH = "/app/test/check_connectivity.sh"
+ANSIBLE_PATH = "/infra/ansible/playbooks/harden_policies.yml"
 
 def load_k8s_config():
     try:
