@@ -34,10 +34,11 @@ echo "--------------------------------------------------------"
 # 2. EPHEMERAL DIAGNOSTIC DEPLOYMENT
 echo "⏳ Deploying sentinel-debug pod (Netshoot)..."
 
-kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1 || true
+NAMESPACE="k-guard" 
 
-# Using IfNotPresent to avoid rate limits and ensuring fast startup
-kubectl run sentinel-debug -n "$TARGET_NS" \
+kubectl delete pod sentinel-debug -n "$NAMESPACE" --grace-period=0 --force > /dev/null 2>&1 || true
+
+kubectl run sentinel-debug -n "$NAMESPACE" \
     --image=nicolaka/netshoot:latest \
     --labels="role=debug,managed-by=k-guard-sentinel" \
     --overrides='{
@@ -48,10 +49,9 @@ kubectl run sentinel-debug -n "$TARGET_NS" \
     }' \
     --restart=Never \
     -- sleep 60
-
-if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --timeout=30s > /dev/null 2>&1; then
-    echo "❌ FATAL: Diagnostic pod failed to initialize (Check ImagePullBackOff or Resources)."
-    kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1
+    
+if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$NAMESPACE" --timeout=30s > /dev/null 2>&1; then
+    echo "❌ FATAL: Diagnostic pod failed to initialize."
     exit 1
 fi
 

@@ -122,61 +122,73 @@
    * Synchronizes the network map from the Sentinel backend service.
    */
   /**
- * Fetches the network topology for the Sentinel module.
- * Includes a safety watchdog timer to detect hung requests.
- */
-// Assurez-vous de définir cette variable en dehors de la fonction
-let abortController: AbortController | null = null;
+   * Fetches the network topology for the Sentinel module.
+   * Includes a safety watchdog timer to detect hung requests.
+   */
+  let abortController: AbortController | null = null;
 
-const fetchNetworkData = async () => {
-  // 1. Gestion de la concurrence : Annuler la requête précédente si elle existe
-  if (abortController) {
-    abortController.abort();
-  }
-  
-  // 2. Création d'un nouveau contrôleur pour cette requête
-  abortController = new AbortController();
-  isLoading.value = true;
-  
-  try {
-    const response = await api.get<SentinelMapResponse>('/sentinel/map', {
-      signal: abortController.signal
-    });
-    
-    const { data } = response;
-    
-    // 3. Attendre que le DOM soit prêt à recevoir les nouvelles données
-    await nextTick(); 
-    
-    // 4. Mise à jour atomique des états réactifs
-    pods.value = data.nodes || [];
-    namespaces.value = data.namespaces 
-      ? ['all-protected', ...data.namespaces] 
-      : ['all-protected'];
-
-    // 5. Mapping des edges avec recherche sécurisée
-    edges.value = (data.edges || []).map(edge => ({
-      ...edge,
-      sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
-      targetIp: pods.value.find(p => p.id === edge.target)?.ip || '0.0.0.0'
-    }));
-
-    console.info("DEBUG: Données appliquées avec succès au template");
-    
-  } catch (error: any) {
-    // Ne pas loguer comme erreur si la requête a été annulée volontairement
-    if (error.name === 'CanceledError' || error.name === 'AbortError') {
-      console.warn("DEBUG: Requête réseau annulée par une navigation.");
-    } else {
-      console.error("DEBUG: Erreur de synchronisation:", error);
+  /**
+   * Synchronizes the network topology from the Sentinel backend.
+   * Implements robust error handling and concurrency control to ensure UI stability.
+   */
+  const fetchNetworkData = async () => {
+    // 1. Concurrency Management: Abort the previous request if still pending
+    if (abortController) {
+      abortController.abort();
     }
-  } finally {
-    // 6. Réinitialisation seulement si cette requête est celle qui a été finalisée
-    if (!abortController.signal.aborted) {
+
+    // 2. Secure Initialization
+    abortController = new AbortController();
+    isLoading.value = true;
+
+    try {
+      // API call with AbortSignal for request cancellation
+      const response = await api.get<SentinelMapResponse>('/sentinel/map', {
+        signal: abortController.signal
+      });
+
+      const { data } = response;
+
+      // 3. Wait for DOM to be ready for incoming data
+      await nextTick();
+
+      // 4. Atomic state updates
+      pods.value = data.nodes || [];
+      namespaces.value = data.namespaces 
+        ? ['all-protected', ...data.namespaces] 
+        : ['all-protected'];
+
+      // 5. Edge mapping with safe lookup for associated IPs
+      edges.value = (data.edges || []).map(edge => ({
+        ...edge,
+        sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
+        targetIp: pods.value.find(p => p.id === edge.target)?.ip || '0.0.0.0'
+      }));
+
+      console.info("DEBUG: Network topology data successfully applied to state");
+
+    } catch (error: any) {
+      // 6. Fine-grained error handling
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        console.warn("DEBUG: Request aborted due to navigation.");
+        return; 
+      }
+      
+      console.error("DEBUG: Critical synchronization error:", error);
+      
+      // Reset state to prevent UI inconsistency in case of API failure
+      pods.value = [];
+      edges.value = [];
+      namespaces.value = ['all-protected'];
       isLoading.value = false;
+      
+    } finally {
+      // 7. Final Cleanup: Ensure loading state is reset
+      if (abortController && !abortController.signal.aborted) {
+        isLoading.value = false;
+      }
     }
-  }
-};
+  };
 
   // --- TOPOLOGY HELPERS ---
   const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
@@ -185,7 +197,11 @@ const fetchNetworkData = async () => {
     return { x, y };
   };
 
+  // --- TOPOLOGY HELPERS ---
   const getEdgePath = (edge: NetworkEdge) => {
+    
+    if (!pods.value || pods.value.length === 0) return "";
+    
     const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
     const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
 
@@ -198,14 +214,14 @@ const fetchNetworkData = async () => {
     return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
   };
 
-  // --- SENTINEL ACTIONS ---
+    // --- SENTINEL ACTIONS ---
 
-  const triggerHarden = async () => {
-  if (!confirm("🚨 Apply Network Sentinel hardening?")) return;
-  await api.post('/sentinel/activate', {});
-  await fetchSentinelStatus(); // Refresh status after action
-  fetchNetworkData();
-};
+    const triggerHarden = async () => {
+    if (!confirm("🚨 Apply Network Sentinel hardening?")) return;
+    await api.post('/sentinel/activate', {});
+    await fetchSentinelStatus(); // Refresh status after action
+    fetchNetworkData();
+  };
 
   const triggerDeactivate = async () => {
   if (!confirm("⚠️ Deactivate Zero-Trust policies?")) return;
@@ -220,13 +236,16 @@ const fetchNetworkData = async () => {
   const runIsolationTest = async () => {
     showTestModal.value = true;
     isTesting.value = true;
-    testTerminalOutput.value = "⏳ Deploying ephemeral diagnostic pod (nicolaka/netshoot)...\n";
+    testTerminalOutput.value = "⏳ Initializing audit environment...\n";
     
     try {
-      const { data } = await api.post<ActionResponse>('/sentinel/test', {});
-      testTerminalOutput.value = data.output;
-    } catch (error) {
-      testTerminalOutput.value += "\n<span style='color: #ef4444;'>❌ FATAL: Communication failure.</span>";
+      const response = await api.post<ActionResponse>('/sentinel/test', {});
+      testTerminalOutput.value = response.data.output;
+    } catch (error: any) {
+      console.error("Audit failed:", error);
+      
+      const errorMsg = error.response?.data?.output || error.message || "Unknown error";
+      testTerminalOutput.value += `\n<span style='color: #ef4444;'>❌ FATAL: ${errorMsg}</span>`;
     } finally {
       isTesting.value = false;
     }
@@ -253,6 +272,15 @@ const fetchNetworkData = async () => {
     fetchNetworkData();
     fetchSentinelStatus();
     console.log("SentinelView monté et actif")
+  });
+
+  import { onUnmounted } from 'vue';
+
+  onUnmounted(() => {
+    if (abortController) {
+      abortController.abort();
+      console.log("SentinelView : Nettoyage des requêtes en cours...");
+    }
   });
 </script>
 
