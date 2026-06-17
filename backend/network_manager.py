@@ -17,15 +17,14 @@ ANSIBLE_PATH = "/infra/ansible/playbooks/harden_policies.yml"
 
 def load_k8s_config():
     try:
-        config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
-        return True
-    except AttributeError:
-        if hasattr(config, 'load_kubeconfig'):
-            config.load_kubeconfig(config_file="/etc/rancher/k3s/k3s.yaml")
+        
+        config.load_incluster_config()
+        print("DEBUG: Loaded IN-CLUSTER config")
         return True
     except Exception as e:
-        print(f"Erreur fatale de config: {e}")
-        return False
+        print(f"DEBUG: Falling back to local config: {e}")
+        config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
+        return True
 
 load_k8s_config()
 
@@ -127,8 +126,11 @@ async def get_network_map():
             "namespaces": target_ns
         }
     except Exception as e:
-        logging.exception("Error generating network map")
-        return {"error": "Internal SRE Discovery failure"}
+        
+        import traceback
+        logging.error(f"CRITICAL ERROR in get_network_map: {str(e)}")
+        logging.error(traceback.format_exc()) 
+        return {"error": f"SRE Discovery failed: {str(e)}"}
 
 @router.post("/sentinel/activate")
 async def activate_hardening():

@@ -58,7 +58,10 @@
   const isHardened = ref(false); // Track the deployment status
 
   // --- LOGIC: SECURITY ANALYSIS ---
-  const isVulnerable = (pod: PodNode) => !pod.is_hardened;
+  const isVulnerable = (pod: PodNode) => {
+    if (!pod || !pod.role) return true; 
+    return !pod.is_hardened;
+  };
 
   /**
  * Fetches the current Sentinel status to update the UI buttons accordingly.
@@ -233,23 +236,47 @@
   /**
    * Executes an automated network isolation audit using netshoot ephemeral pods.
    */
-  const runIsolationTest = async () => {
-    showTestModal.value = true;
-    isTesting.value = true;
-    testTerminalOutput.value = "⏳ Initializing audit environment...\n";
+  // --- MODIFIED ACTION : Securing Isolation Test ---
+
+/**
+ * Executes an automated network isolation audit.
+ * Implements failsafe fallback to mock data in case of API/infrastructure failure.
+ */
+const runIsolationTest = async () => {
+  showTestModal.value = true;
+  isTesting.value = true;
+  testTerminalOutput.value = "⏳ [K-GUARD] Initializing audit environment...\n";
+  testTerminalOutput.value += "⏳ [K-GUARD] Attaching Network Sentinel agent...\n";
+  
+  try {
+    const response = await api.post<ActionResponse>('/sentinel/test', {});
     
-    try {
-      const response = await api.post<ActionResponse>('/sentinel/test', {});
+    // Check if the response contains actual data from the cluster
+    if (response.data && response.data.output) {
       testTerminalOutput.value = response.data.output;
-    } catch (error: any) {
-      console.error("Audit failed:", error);
-      
-      const errorMsg = error.response?.data?.output || error.message || "Unknown error";
-      testTerminalOutput.value += `\n<span style='color: #ef4444;'>❌ FATAL: ${errorMsg}</span>`;
-    } finally {
-      isTesting.value = false;
+    } else {
+      // API call succeeded but no real data was returned (e.g. timeout)
+      throw new Error("No data returned from Sentinel audit.");
     }
-  };
+    
+  } catch (error: any) {
+    // 🛡️ FAILSAFE : If API fails or infrastructure blocks, use pre-defined mock data.
+    console.warn("DEBUG: K-Guard Audit Infra failed, deploying fallback mock data.");
+    
+    testTerminalOutput.value += `<span style='color: #fb923c;'>⚠️ WARNING: Audit infrastructure connection failed.</span>\n`;
+    testTerminalOutput.value += `<span style='color: #fb923c;'>⚠️ WARNING: Displaying SIMULATED SRE scenario data for blog-prod namespace.</span>\n\n`;
+    testTerminalOutput.value += `--- SIMULATED ISOLATION REPORT ---\n`;
+    testTerminalOutput.value += `TARGET NAMESPACE: blog-prod\n`;
+    testTerminalOutput.value += `STATUS: AUDIT COMPLETED (SIMULATED)\n\n`;
+    testTerminalOutput.value += `[TEST] Web -> Database (Intra-NS): <span style='color: #ef4444;'>FAILURE (Connection Refused)</span>\n`;
+    testTerminalOutput.value += `[TEST] Web -> Internet (Egress): <span style='color: #4ade80;'>SUCCESS (Connection Allowed)</span>\n\n`;
+    testTerminalOutput.value += `CONCLUSION: Namespace 'blog-prod' is currently vulnerable to egress traffic leaks.\n`;
+    testTerminalOutput.value += `RECOMMENDATION: Apply Sentinel micro-segmentation policies immediately.\n`;
+    
+  } finally {
+    isTesting.value = false;
+  }
+};
 
   const toggleAccordion = (id: string) => {
     activeAccordion.value = activeAccordion.value === id ? null : id;
