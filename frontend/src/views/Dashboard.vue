@@ -205,9 +205,11 @@
 
       <div class="flex-1 overflow-y-auto overflow-x-auto relative z-10 custom-scrollbar">
         <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
-          </transition>
+          <keep-alive>
+            <transition name="page" mode="out-in">
+              <component :is="Component" />
+            </transition>
+          </keep-alive>
         </router-view>
       </div>
     </main>

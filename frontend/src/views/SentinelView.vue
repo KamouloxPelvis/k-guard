@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, computed, onMounted } from 'vue';
+  import { ref, computed, onMounted, onActivated } from 'vue';
   import api from '@/services/api';
 
   // --- INTERFACES ---
@@ -123,8 +123,14 @@
    */
   const fetchNetworkData = async () => {
     isLoading.value = true;
+
+    const timer = setTimeout(() => {
+    if(isLoading.value) console.warn("DEBUG: [Timeout] Le chargement prend plus de 5 secondes !");
+  }, 5000);
+
     try {
       const { data } = await api.get<SentinelMapResponse>('/sentinel/map');
+      clearTimeout(timer);
       console.log("DEBUG: Données reçues:", data);
 
       pods.value = data.nodes || [];
@@ -208,6 +214,14 @@
     selectedPod.value = pod;
     showRoleModal.value = true;
   };
+
+  onActivated(() => {
+
+    if (pods.value.length === 0) {
+      fetchNetworkData();
+      fetchSentinelStatus();
+    }
+  });
 
   onMounted(() => {
     fetchNetworkData();
