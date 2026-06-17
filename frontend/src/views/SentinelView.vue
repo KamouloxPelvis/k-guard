@@ -228,7 +228,6 @@
           <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[9px] text-slate-300 px-3 py-1.5 rounded-sm uppercase font-bold tracking-widest cursor-pointer">
             <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
           </select>
-          <div class="text-white">Debug: isHardened = {{ isHardened }}</div>
           <button @click="runIsolationTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Isolation</button>
           <template v-if="isHardened">
           <div class="px-3 py-1 bg-green-500/10 border border-green-500 text-green-500 text-[8px] font-black uppercase tracking-widest rounded-sm">

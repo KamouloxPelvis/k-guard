@@ -65,4 +65,8 @@ router.beforeEach((to, _from, next) => {
   }
 });
 
+router.onError((error, to) => {
+  console.error(`[Router] Navigation error to ${to.path}:`, error);
+});
+
 export default router

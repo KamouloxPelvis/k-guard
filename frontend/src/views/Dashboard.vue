@@ -67,17 +67,19 @@
   };
 
   onMounted(async () => {
-    // Initial data synchronization sequence
-    await fetchSystemInfo();
+  await fetchSystemInfo();
+  
+  // Recursive function to prevent call stacking
+  const pollStats = async () => {
     await updateSystemStats();
-    
-    // Establishing heartbeat interval (20-second cycles)
-    statsInterval = setInterval(updateSystemStats, 20000);
+    statsInterval = setTimeout(pollStats, 20000);
+  };
+  
+  pollStats();
   });
 
   onUnmounted(() => {
-    // Memory leak prevention by clearing the polling interval
-    if (statsInterval) clearInterval(statsInterval);
+    if (statsInterval) clearTimeout(statsInterval);
   });
 
   /**
