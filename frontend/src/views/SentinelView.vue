@@ -125,22 +125,36 @@
  * Fetches the network topology for the Sentinel module.
  * Includes a safety watchdog timer to detect hung requests.
  */
+// Assurez-vous de définir cette variable en dehors de la fonction
+let abortController: AbortController | null = null;
+
 const fetchNetworkData = async () => {
+  // 1. Gestion de la concurrence : Annuler la requête précédente si elle existe
+  if (abortController) {
+    abortController.abort();
+  }
+  
+  // 2. Création d'un nouveau contrôleur pour cette requête
+  abortController = new AbortController();
   isLoading.value = true;
   
   try {
-    const response = await api.get<SentinelMapResponse>('/sentinel/map');
+    const response = await api.get<SentinelMapResponse>('/sentinel/map', {
+      signal: abortController.signal
+    });
+    
     const { data } = response;
     
-    // Utilisation de nextTick pour s'assurer que le DOM est prêt à recevoir la donnée
-    // après que le composant ait été activé par le keep-alive
+    // 3. Attendre que le DOM soit prêt à recevoir les nouvelles données
     await nextTick(); 
     
-    // Assignation directe pour déclencher les watchers du template
+    // 4. Mise à jour atomique des états réactifs
     pods.value = data.nodes || [];
-    namespaces.value = data.namespaces ? ['all-protected', ...data.namespaces] : ['all-protected'];
+    namespaces.value = data.namespaces 
+      ? ['all-protected', ...data.namespaces] 
+      : ['all-protected'];
 
-    // Mapping des edges
+    // 5. Mapping des edges avec recherche sécurisée
     edges.value = (data.edges || []).map(edge => ({
       ...edge,
       sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
@@ -148,10 +162,19 @@ const fetchNetworkData = async () => {
     }));
 
     console.info("DEBUG: Données appliquées avec succès au template");
-  } catch (error) {
-    console.error("DEBUG: Erreur de synchronisation:", error);
+    
+  } catch (error: any) {
+    // Ne pas loguer comme erreur si la requête a été annulée volontairement
+    if (error.name === 'CanceledError' || error.name === 'AbortError') {
+      console.warn("DEBUG: Requête réseau annulée par une navigation.");
+    } else {
+      console.error("DEBUG: Erreur de synchronisation:", error);
+    }
   } finally {
-    isLoading.value = false;
+    // 6. Réinitialisation seulement si cette requête est celle qui a été finalisée
+    if (!abortController.signal.aborted) {
+      isLoading.value = false;
+    }
   }
 };
 
@@ -235,10 +258,7 @@ const fetchNetworkData = async () => {
 
 <template>
   <div class="p-4 lg:p-6 space-y-4 relative max-w-[1600px] mx-auto">
-  
-  <div class="bg-red-500 text-white p-4">
-    Pods trouvés: {{ pods.length }} | Statut IsHardened global: {{ isHardened }}
-  </div>
+
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
       <div class="lg:col-span-3 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#111217] p-5 border border-slate-800/60 rounded-sm">
         <div>
@@ -288,7 +308,7 @@ const fetchNetworkData = async () => {
     <div v-if="currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-2 rounded-sm relative min-h-[500px] overflow-hidden flex items-center justify-center">
       <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 20px 20px;"></div>
       
-      <svg viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
+      <svg v-if="pods.length > 0" viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
         <g v-for="edge in filteredEdges" :key="'base-' + edge.source + edge.target">
           <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1]" />
         </g>

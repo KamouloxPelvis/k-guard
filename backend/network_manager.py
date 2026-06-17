@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Query
-from typing import Optional
-from kubernetes import client, config
 import os
 import subprocess
 import logging
+import asyncio
+from fastapi import APIRouter, Query
+from typing import Optional
+from kubernetes import client, config
+from typing import List, Dict, Any
 
 print(f"DEBUG: LOADING NETWORK_MANAGER FROM: {__file__}")
 
@@ -55,46 +57,61 @@ async def get_network_policy_status():
         logging.exception("Error checking cluster-wide policies")
         return {"deployed": False, "error": str(e)}
 
+async def fetch_namespace_data(namespace: str, v1: client.CoreV1Api, net_v1: client.NetworkingV1Api) -> Dict[str, Any]:
+    """
+    Fetches pods and network policies for a single namespace concurrently.
+    """
+    try:
+        # We run these two K8s calls in parallel for the specific namespace
+        pods_task = asyncio.to_thread(v1.list_namespaced_pod, namespace)
+        policies_task = asyncio.to_thread(net_v1.list_namespaced_network_policy, namespace)
+        
+        pods, policies = await asyncio.gather(pods_task, policies_task)
+        
+        namespace_nodes = []
+        for pod in pods.items:
+            labels = pod.metadata.labels or {}
+            role = labels.get("app", labels.get("k8s-app", next(iter(labels.values()), "generic")))
+            
+            namespace_nodes.append({
+                "id": pod.metadata.name,
+                "name": pod.metadata.name,
+                "namespace": namespace,
+                "status": pod.status.phase,
+                "ip": pod.status.pod_ip or "0.0.0.0",
+                "role": role,
+                "labels": labels,
+                "is_hardened": len(policies.items) > 0
+            })
+        return {"nodes": namespace_nodes}
+    except Exception as e:
+        logging.error(f"Error fetching data for namespace {namespace}: {e}")
+        return {"nodes": []}
+
 @router.get("/sentinel/map")
 async def get_network_map():
     """
-    Generates a dynamic map of network flows using Full Auto-Discovery.
+    Generates a dynamic map of network flows using parallelized discovery.
     """
     v1 = client.CoreV1Api()
     net_v1 = client.NetworkingV1Api()
     
-    nodes = []
-    edges = []
-    discovered_ns = []
-
     try:
-        all_ns = v1.list_namespace(timeout_seconds=5)
+        # Fetch namespaces list
+        all_ns = await asyncio.to_thread(v1.list_namespace, timeout_seconds=5)
         target_ns = [
             n.metadata.name for n in all_ns.items 
             if not n.metadata.name.startswith(("kube-", "local-path-", "node-lease"))
         ]
-        discovered_ns = target_ns
 
-        for namespace in target_ns:
-            policies = net_v1.list_namespaced_network_policy(namespace)
-            pods = v1.list_namespaced_pod(namespace)
-            
-            for pod in pods.items:
-                pod_name = pod.metadata.name
-                labels = pod.metadata.labels or {}
-                role = labels.get("app", labels.get("k8s-app", next(iter(labels.values()), "generic")))
-                
-                nodes.append({
-                    "id": pod_name,
-                    "name": pod_name,
-                    "namespace": namespace,
-                    "status": pod.status.phase,
-                    "ip": pod.status.pod_ip or "0.0.0.0",
-                    "role": role,
-                    "labels": labels,
-                    "is_hardened": len(policies.items) > 0
-                })
-
+        # Parallel fetching for all target namespaces
+        results = await asyncio.gather(*[fetch_namespace_data(ns, v1, net_v1) for ns in target_ns])
+        
+        # Flatten results
+        nodes = [node for res in results for node in res["nodes"]]
+        
+        # Build Edges (Intra-NS flow logic)
+        edges = []
         for i, node_a in enumerate(nodes):
             for node_b in nodes[i+1:]:
                 if node_a["namespace"] == node_b["namespace"]:
@@ -103,14 +120,13 @@ async def get_network_map():
                         "target": node_b["id"],
                         "label": "Intra-NS Flow"
                     })
-                
+                    
         return {
             "nodes": nodes,
             "edges": edges,
-            "namespaces": discovered_ns
+            "namespaces": target_ns
         }
     except Exception as e:
-        # Security: Logging full error server-side while returning generic message [cite: 2026-03-07]
         logging.exception("Error generating network map")
         return {"error": "Internal SRE Discovery failure"}
 
