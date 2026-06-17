@@ -51,6 +51,7 @@ spec:
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
+        - containerPort: 80
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-socket
@@ -62,6 +63,8 @@ spec:
         env:
           - name: DB_DIR
             value: "/app/backend/data"
+          - name: PROJECT_ROOT
+            value: /app
         envFrom:
           - secretRef:
               name: k-guard-secrets

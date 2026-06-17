@@ -12,9 +12,6 @@ from fastapi.responses import FileResponse, JSONResponse
 from backend.network_manager import router as network_router
 from backend.routers import auth, k3s, scan, remediation, integrations, sentinel_test
 
-print(f"DEBUG: LE MODULE EST CHARGÉ DEPUIS : {sentinel_test.__file__}")
-
-
 # --- ENV LOADING ---
 base_dir = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=base_dir / ".env")
@@ -46,8 +43,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-
-
 # --- 0. DATABASE INITIALIZATION ---
 @app.on_event("startup")
 async def startup_event():
@@ -76,39 +71,35 @@ async def api_heartbeat():
     return {"status": "online", "message": "K-Guard API is reachable"}
 
 # --- 4. SECURE FRONTEND SERVING (SPA Mode) ---
-root_path = os.getenv("PROJECT_ROOT", "/home/kamal/infrastructure/apps/k-guard")
-BASE_STATIC_DIR = (Path(root_path) / "frontend" / "dist").resolve()
+# Define the absolute path to static assets within the container.
+# This ensures consistency regardless of the current working directory.
+BASE_STATIC_DIR = Path("/app/static").resolve()
 
 @app.get("/{rest_of_path:path}", tags=["Frontend"])
 async def serve_frontend(rest_of_path: str):
     """
-    Serves the Vue.js frontend with robust Path Traversal protection.
-    Optimized for CodeQL static analysis recognition.
+    Serves the Single Page Application (SPA) index.html for any requested path.
+    Implements security checks to prevent path traversal attacks.
     """
-    # 1. Validation & Normalization
-    # We resolve the path immediately to neutralize '..' and symlinks.
+    # If the path is empty, default to index.html
+    if not rest_of_path:
+        rest_of_path = "index.html"
+    
+    # Resolve the requested path relative to the static directory
     candidate_path = (BASE_STATIC_DIR / rest_of_path).resolve()
-
-    # 2. Strict Boundary Check
-    # CodeQL prefers direct comparison or .relative_to() within the final check.
+    
+    # Security: Ensure the file remains within the designated static directory
     try:
-        # This check is the gold standard for Path Traversal prevention in Python.
-        # It raises a ValueError if candidate_path is not under BASE_STATIC_DIR.
         candidate_path.relative_to(BASE_STATIC_DIR)
-    except (ValueError, RuntimeError):
-        return JSONResponse(
-            status_code=403,
-            content={"error": "Security Violation: Path escapes safe boundary"},
-        )
+    except ValueError:
+        return JSONResponse(status_code=403, content={"error": "Security Violation"})
 
-    # 3. File existence check
+    # Check if the requested file exists
     if candidate_path.is_file():
-        # Passing the Path object directly is the secure standard for FastAPI/Starlette.
         return FileResponse(path=candidate_path)
 
-    # 4. SPA Fallback
-    index_path = BASE_STATIC_DIR / "index.html"
-    return FileResponse(path=index_path.resolve())
+    # SPA Fallback: If the file is not found (e.g., client-side route), serve index.html
+    return FileResponse(path=(BASE_STATIC_DIR / "index.html").resolve())
 
 # --- 5. LOGGING MIDDLEWARE ---
 @app.middleware("http")
