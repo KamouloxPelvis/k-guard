@@ -36,6 +36,10 @@ spec:
         - name: temp-storage
           emptyDir:
             sizeLimit: 500Mi
+        - name: k3s-config
+          hostPath:
+            path: /etc/rancher/k3s/k3s.yaml
+            type: File
       
       initContainers:
       - name: init-permissions
@@ -56,7 +60,6 @@ spec:
           allowPrivilegeEscalation: false
         ports:
         - containerPort: 8000
-        - containerPort: 80
         volumeMounts:
           - mountPath: /var/run/docker.sock
             name: docker-socket
@@ -67,6 +70,10 @@ spec:
             subPath: database 
           - mountPath: /tmp
             name: temp-storage
+          - name: k3s-config
+            mountPath: /etc/rancher/k3s/k3s.yaml
+            readOnly: true
+          
         env:
           - name: DB_DIR
             value: "/app/backend/data"

@@ -10,6 +10,6 @@ spec:
     - name: api
       port: 8000
       targetPort: 8000
-    - name: web
+    - name: http
       port: 80
       targetPort: 8000

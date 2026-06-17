@@ -8,7 +8,7 @@ router = APIRouter()
 
 # --- CONFIGURATION ---
 # Path defined as absolute to avoid ambiguity regardless of execution context
-BASE_DIR = Path("/home/kamal/infrastructure/apps/k-guard")
+BASE_DIR = Path(os.getenv("PROJECT_ROOT", "/app")) 
 SCRIPT_PATH = BASE_DIR / "tests" / "check_connectivity.sh"
 KUBE_CONFIG = "/etc/rancher/k3s/k3s.yaml"
 

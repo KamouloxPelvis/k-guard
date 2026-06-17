@@ -241,13 +241,13 @@ const fetchNetworkData = async () => {
     showRoleModal.value = true;
   };
 
-  onActivated(() => {
-
-    if (pods.value.length === 0) {
-      fetchNetworkData();
-      fetchSentinelStatus();
-    }
-  });
+  onActivated(async () => {
+    
+  if (pods.value.length === 0) {
+    console.log("🔄 Réactivation sécurisée : chargement des données...");
+    await fetchNetworkData(); 
+  }
+});
 
   onMounted(() => {
     fetchNetworkData();
