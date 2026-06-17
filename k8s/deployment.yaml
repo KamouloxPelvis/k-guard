@@ -36,10 +36,6 @@ spec:
         - name: temp-storage
           emptyDir:
             sizeLimit: 500Mi
-        - name: k3s-config
-          hostPath:
-            path: /etc/rancher/k3s/k3s.yaml
-            type: File
       
       initContainers:
       - name: init-permissions
@@ -70,9 +66,6 @@ spec:
             subPath: database 
           - mountPath: /tmp
             name: temp-storage
-          - name: k3s-config
-            mountPath: /etc/rancher/k3s/k3s.yaml
-            readOnly: true
           
         env:
           - name: DB_DIR
@@ -81,6 +74,8 @@ spec:
             value: /app
           - name: TMPDIR
             value: /data/trivy-cache/tmp
+          - name: K8S_MODE
+            value: "in-cluster"
         envFrom:
           - secretRef:
               name: k-guard-secrets

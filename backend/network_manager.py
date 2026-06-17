@@ -16,17 +16,22 @@ router = APIRouter(tags=["Network Sentinel"])
 ANSIBLE_PATH = "/infra/ansible/playbooks/harden_policies.yml"
 
 def load_k8s_config():
-    try:
+    
+    if os.getenv("K8S_MODE") == "in-cluster":
+        try:
+            config.load_incluster_config()
+            print("DEBUG: Loaded IN-CLUSTER config successfully")
+            return True
+        except Exception as e:
+            print(f"CRITICAL: Failed to load IN-CLUSTER config: {e}")
+            return False
+    else:
         
-        config.load_incluster_config()
-        print("DEBUG: Loaded IN-CLUSTER config")
-        return True
-    except Exception as e:
-        print(f"DEBUG: Falling back to local config: {e}")
-        config.load_kube_config(config_file="/etc/rancher/k3s/k3s.yaml")
+        config.load_kube_config(config_file="/home/kamal/.kube/config")
         return True
 
-load_k8s_config()
+if not load_k8s_config():
+    raise RuntimeError("Failed to initialize Kubernetes configuration")
 
 @router.get("/sentinel/status")
 async def get_network_policy_status():
