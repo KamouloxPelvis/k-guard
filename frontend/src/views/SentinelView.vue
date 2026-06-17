@@ -121,36 +121,54 @@
   /**
    * Synchronizes the network map from the Sentinel backend service.
    */
-  const fetchNetworkData = async () => {
-    isLoading.value = true;
-
-    const timer = setTimeout(() => {
-    if(isLoading.value) console.warn("DEBUG: [Timeout] Le chargement prend plus de 5 secondes !");
+  /**
+ * Fetches the network topology for the Sentinel module.
+ * Includes a safety watchdog timer to detect hung requests.
+ */
+const fetchNetworkData = async () => {
+  isLoading.value = true;
+  
+  // Watchdog timer: alerts if API takes > 5s
+  const watchdog = setTimeout(() => {
+    if (isLoading.value) {
+      console.warn("DEBUG: [K-Guard Watchdog] Sentinel data fetch timed out (exceeded 5s)");
+    }
   }, 5000);
 
-    try {
-      const { data } = await api.get<SentinelMapResponse>('/sentinel/map');
-      clearTimeout(timer);
-      console.log("DEBUG: Données reçues:", data);
+  try {
+    const response = await api.get<SentinelMapResponse>('/sentinel/map');
+    const { data } = response;
+    
+    clearTimeout(watchdog);
+    console.info("DEBUG: Sentinel data successfully synced:", {
+      nodes: data.nodes?.length,
+      edges: data.edges?.length
+    });
 
-      pods.value = data.nodes || [];
-      console.log("DEBUG: Nombre de pods chargés:", pods.value.length);
-      if (data.namespaces) namespaces.value = ['all-protected', ...data.namespaces];
+    // Data normalization and reactive state updates
+    pods.value = data.nodes || [];
+    namespaces.value = data.namespaces ? ['all-protected', ...data.namespaces] : ['all-protected'];
 
-
-      const rawEdges = data.edges || [];
-      edges.value = rawEdges.map((edge: NetworkEdge) => ({
+    // Efficient mapping for network topology
+    const rawEdges = data.edges || [];
+    edges.value = rawEdges.map((edge: NetworkEdge) => {
+      const sourcePod = pods.value.find(p => p.id === edge.source);
+      const targetPod = pods.value.find(p => p.id === edge.target);
+      
+      return {
         ...edge,
-        sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
-        targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
-      }));
+        sourceIp: sourcePod?.ip || '0.0.0.0',
+        targetIp: targetPod?.ip || '0.0.0.0'
+      };
+    });
 
-    } catch (error) {
-      console.error("[K-Guard] Sentinel UI Sync Failure:", error);
-    } finally {
-      isLoading.value = false;
-    }
-  };
+  } catch (error) {
+    console.error("[K-Guard] Critical Sentinel UI Sync Failure:", error);
+    // Optional: add a UI notification here for the user
+  } finally {
+    isLoading.value = false;
+  }
+};
 
   // --- TOPOLOGY HELPERS ---
   const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
