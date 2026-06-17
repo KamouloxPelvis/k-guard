@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, computed, onMounted, onActivated } from 'vue';
+  import { ref, computed, onMounted, onActivated, nextTick } from 'vue';
   import api from '@/services/api';
 
   // --- INTERFACES ---
@@ -128,43 +128,28 @@
 const fetchNetworkData = async () => {
   isLoading.value = true;
   
-  // Watchdog timer: alerts if API takes > 5s
-  const watchdog = setTimeout(() => {
-    if (isLoading.value) {
-      console.warn("DEBUG: [K-Guard Watchdog] Sentinel data fetch timed out (exceeded 5s)");
-    }
-  }, 5000);
-
   try {
     const response = await api.get<SentinelMapResponse>('/sentinel/map');
     const { data } = response;
     
-    clearTimeout(watchdog);
-    console.info("DEBUG: Sentinel data successfully synced:", {
-      nodes: data.nodes?.length,
-      edges: data.edges?.length
-    });
-
-    // Data normalization and reactive state updates
+    // Utilisation de nextTick pour s'assurer que le DOM est prêt à recevoir la donnée
+    // après que le composant ait été activé par le keep-alive
+    await nextTick(); 
+    
+    // Assignation directe pour déclencher les watchers du template
     pods.value = data.nodes || [];
     namespaces.value = data.namespaces ? ['all-protected', ...data.namespaces] : ['all-protected'];
 
-    // Efficient mapping for network topology
-    const rawEdges = data.edges || [];
-    edges.value = rawEdges.map((edge: NetworkEdge) => {
-      const sourcePod = pods.value.find(p => p.id === edge.source);
-      const targetPod = pods.value.find(p => p.id === edge.target);
-      
-      return {
-        ...edge,
-        sourceIp: sourcePod?.ip || '0.0.0.0',
-        targetIp: targetPod?.ip || '0.0.0.0'
-      };
-    });
+    // Mapping des edges
+    edges.value = (data.edges || []).map(edge => ({
+      ...edge,
+      sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
+      targetIp: pods.value.find(p => p.id === edge.target)?.ip || '0.0.0.0'
+    }));
 
+    console.info("DEBUG: Données appliquées avec succès au template");
   } catch (error) {
-    console.error("[K-Guard] Critical Sentinel UI Sync Failure:", error);
-    // Optional: add a UI notification here for the user
+    console.error("DEBUG: Erreur de synchronisation:", error);
   } finally {
     isLoading.value = false;
   }
@@ -244,6 +229,7 @@ const fetchNetworkData = async () => {
   onMounted(() => {
     fetchNetworkData();
     fetchSentinelStatus();
+    console.log("SentinelView monté et actif")
   });
 </script>
 
