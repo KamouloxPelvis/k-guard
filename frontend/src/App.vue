@@ -6,17 +6,15 @@
 </script>
 
 <template>
-  <template>
   <router-view v-slot="{ Component }">
     <keep-alive>
       <component :is="Component" />
     </keep-alive>
   </router-view>
 </template>
-</template>
 
 <style>
-/* * Global styles are managed via style.css to prevent scoped conflicts 
+/* Global styles are managed via style.css to prevent scoped conflicts 
  * and maintain consistent branding across the SPA.
  */
 </style>
