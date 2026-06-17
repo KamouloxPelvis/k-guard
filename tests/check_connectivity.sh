@@ -42,7 +42,7 @@ kubectl run sentinel-debug -n "$TARGET_NS" \
     --labels="role=debug,managed-by=k-guard-sentinel" \
     --overrides='{
       "spec": {
-        "serviceAccountName": "sentinel-auditor",
+        "serviceAccountName": "k-guard-sa",
         "terminationGracePeriodSeconds": 0
       }
     }' \
@@ -56,8 +56,16 @@ if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --tim
 fi
 
 # Debug: check who is running the script and if they see the cluster
-echo "DEBUG: User is $(whoami)"
+echo "DEBUG: User ID is $(id -u)"
+
 echo "DEBUG: Kubeconfig is $KUBECONFIG"
+
+if kubectl auth can-i get nodes --as=system:serviceaccount:"$TARGET_NS":sentinel-auditor | grep -q "yes"; then
+    echo "✅ RBAC: ServiceAccount authorized."
+else
+    echo "❌ RBAC: Missing ClusterRole permissions."
+fi
+
 kubectl get nodes > /dev/null 2>&1 || echo "❌ FAIL: No access to cluster"
 
 # 3. SECURITY AUDIT EXECUTION (Focus: Isolation)
