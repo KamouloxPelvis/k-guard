@@ -125,8 +125,12 @@
     isLoading.value = true;
     try {
       const { data } = await api.get<SentinelMapResponse>('/sentinel/map');
+      console.log("DEBUG: Données reçues:", data);
+
       pods.value = data.nodes || [];
+      console.log("DEBUG: Nombre de pods chargés:", pods.value.length);
       if (data.namespaces) namespaces.value = ['all-protected', ...data.namespaces];
+
 
       const rawEdges = data.edges || [];
       edges.value = rawEdges.map((edge: NetworkEdge) => ({
@@ -134,6 +138,7 @@
         sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '?.?.?.?',
         targetIp: pods.value.find(p => p.id === edge.target)?.ip || '?.?.?.?'
       }));
+
     } catch (error) {
       console.error("[K-Guard] Sentinel UI Sync Failure:", error);
     } finally {
@@ -212,7 +217,10 @@
 
 <template>
   <div class="p-4 lg:p-6 space-y-4 relative max-w-[1600px] mx-auto">
-    
+  
+  <div class="bg-red-500 text-white p-4">
+    Pods trouvés: {{ pods.length }} | Statut IsHardened global: {{ isHardened }}
+  </div>
     <div class="grid grid-cols-1 lg:grid-cols-4 gap-4">
       <div class="lg:col-span-3 flex flex-col md:flex-row md:items-center justify-between gap-4 bg-[#111217] p-5 border border-slate-800/60 rounded-sm">
         <div>

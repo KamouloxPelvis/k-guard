@@ -33,6 +33,9 @@ spec:
         - name: trivy-cache
           persistentVolumeClaim:
             claimName: trivy-cache-pvc
+        - name: temp-storage
+          emptyDir:
+            sizeLimit: 500Mi
       
       initContainers:
       - name: init-permissions
@@ -41,6 +44,8 @@ spec:
         volumeMounts:
         - name: trivy-cache
           mountPath: /data/trivy-cache
+        - name: temp-storage  
+          mountPath: /temp-storage
 
       containers:
       - name: kguard-app
@@ -60,11 +65,15 @@ spec:
           - mountPath: /app/backend/data
             name: trivy-cache
             subPath: database 
+          - mountPath: /tmp
+            name: temp-storage
         env:
           - name: DB_DIR
             value: "/app/backend/data"
           - name: PROJECT_ROOT
             value: /app
+          - name: TMPDIR
+            value: /data/trivy-cache/tmp
         envFrom:
           - secretRef:
               name: k-guard-secrets
@@ -76,9 +85,11 @@ spec:
           initialDelaySeconds: 45
           periodSeconds: 30
         resources:
-          limits:
-            cpu: "1.5"
-            memory: "2Gi"
           requests:
-            cpu: "500m"
-            memory: "1Gi"
+            cpu: 500m
+            memory: 1Gi
+            ephemeral-storage: "500Mi"
+          limits:
+            cpu: 1500m
+            memory: 2Gi
+            ephemeral-storage: "2Gi"
