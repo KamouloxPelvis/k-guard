@@ -6,7 +6,13 @@
 </script>
 
 <template>
-  <router-view />
+  <template>
+  <router-view v-slot="{ Component }">
+    <keep-alive>
+      <component :is="Component" />
+    </keep-alive>
+  </router-view>
+</template>
 </template>
 
 <style>
