@@ -84,8 +84,10 @@ spec:
           httpGet:
             path: /health
             port: 8000
-          initialDelaySeconds: 45
-          periodSeconds: 30
+          initialDelaySeconds: 60 
+          periodSeconds: 45      
+          timeoutSeconds: 5   
+          failureThreshold: 3
         resources:
           requests:
             cpu: 500m
