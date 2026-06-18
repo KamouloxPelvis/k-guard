@@ -100,7 +100,7 @@ The assistant launches a "Pre-flight check" script to validate the secure config
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
 
-cd installer (k-guard/installer)
+cd installer (folder : k-guard/installer)
 
 # Grant execution rights
 chmod +x install-kguard
