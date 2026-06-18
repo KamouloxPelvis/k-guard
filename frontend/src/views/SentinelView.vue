@@ -240,10 +240,12 @@
     await Promise.all([fetchNetworkData(), fetchSentinelStatus()]);
   };
 
-  onMounted(() => {
-    console.log("DEBUG: SentinelView MONTE");
-    init(); 
-  });
+  onMounted(async () => {
+  console.log("DEBUG: SentinelView MONTE");
+  
+  await nextTick(); 
+  init(); 
+});
 
   onUnmounted(() => {
     console.log("DEBUG: SentinelView en cours de nettoyage...");
