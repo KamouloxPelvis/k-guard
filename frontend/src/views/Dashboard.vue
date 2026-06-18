@@ -203,7 +203,7 @@
         </div>
       </header>
 
-      <div class="flex-1 overflow-y-auto overflow-x-auto relative z-10 custom-scrollbar">
+      <div class="flex-1 overflow-y-auto overflow-x-auto relative z-20 custom-scrollbar">
         <router-view v-slot="{ Component, route }">
           <transition name="page" mode="out-in">
             <component :is="Component" :key="route.fullPath" />
