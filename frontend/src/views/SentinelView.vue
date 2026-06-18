@@ -234,23 +234,28 @@
     selectedPod.value = pod;
     showRoleModal.value = true;
   };
+  
+  const init = async () => {
+    console.log("DEBUG: Chargement frais des données Sentinel...");
+    await Promise.all([fetchNetworkData(), fetchSentinelStatus()]);
+  };
 
-  // --- DATA FETCHING ('keep-alive'-less version) ---
-const init = async () => {
-  console.log("DEBUG: Chargement frais des données Sentinel...");
-  await Promise.all([fetchNetworkData(), fetchSentinelStatus()]);
-};
+  onMounted(() => {
+    console.log("DEBUG: SentinelView MONTE");
+    init(); 
+  });
 
-onMounted(init);
-
-onUnmounted(() => {
-  console.log("DEBUG: Nettoyage avant démontage...");
-  if (abortController) {
-    abortController.abort();
+  onUnmounted(() => {
+    console.log("DEBUG: SentinelView en cours de nettoyage...");
+    if (abortController) {
+      abortController.abort(); 
+    }
+    
+    pods.value = [];
+    edges.value = [];
     isLoading.value = false;
-  }
-});
-
+    console.log("DEBUG: État nettoyé, prêt pour navigation.");
+  });
 </script>
 
   <template>
