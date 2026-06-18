@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, computed, onActivated, onDeactivated, nextTick, onMounted, onUnmounted } from 'vue';
+  import { ref, computed, nextTick, onMounted, onUnmounted } from 'vue';
   import api from '@/services/api';
 
   // --- INTERFACES ---
@@ -32,14 +32,6 @@
     namespaces: string[];
   }
 
-  /**
-   * Generic interface for terminal/test outputs.
-   */
-  interface ActionResponse {
-    output: string;
-    status?: string;
-  }
-
   // --- REACTIVE STATE ---
   const pods = ref<PodNode[]>([]);
   const edges = ref<NetworkEdge[]>([]);
@@ -50,10 +42,7 @@
   // --- UI STATES ---
   const showRoleModal = ref(false);
   const selectedPod = ref<PodNode | null>(null);
-  const currentViewMode = ref('list'); 
-  const showTestModal = ref(false);
-  const isTesting = ref(false);
-  const testTerminalOutput = ref('');
+  const currentViewMode = ref('list');
   const activeAccordion = ref<string | null>(null);
   const isHardened = ref(false); // Track the deployment status
 
@@ -237,51 +226,6 @@
   fetchNetworkData();
 };
 
-  /**
-   * Executes an automated network isolation audit using netshoot ephemeral pods.
-   */
-  // --- MODIFIED ACTION : Securing Isolation Test ---
-
-/**
- * Executes an automated network isolation audit.
- * Implements failsafe fallback to mock data in case of API/infrastructure failure.
- */
-  const runIsolationTest = async () => {
-    showTestModal.value = true;
-    isTesting.value = true;
-    testTerminalOutput.value = "⏳ [K-GUARD] Initializing audit environment...\n";
-    testTerminalOutput.value += "⏳ [K-GUARD] Attaching Network Sentinel agent...\n";
-    
-    try {
-      const response = await api.post<ActionResponse>('/sentinel/test', {});
-      
-      // Check if the response contains actual data from the cluster
-      if (response.data && response.data.output) {
-        testTerminalOutput.value = response.data.output;
-      } else {
-        // API call succeeded but no real data was returned (e.g. timeout)
-        throw new Error("No data returned from Sentinel audit.");
-      }
-      
-    } catch (error: any) {
-      // 🛡️ FAILSAFE : If API fails or infrastructure blocks, use pre-defined mock data.
-      console.warn("DEBUG: K-Guard Audit Infra failed, deploying fallback mock data.");
-      
-      testTerminalOutput.value += `<span style='color: #fb923c;'>⚠️ WARNING: Audit infrastructure connection failed.</span>\n`;
-      testTerminalOutput.value += `<span style='color: #fb923c;'>⚠️ WARNING: Displaying SIMULATED SRE scenario data for blog-prod namespace.</span>\n\n`;
-      testTerminalOutput.value += `--- SIMULATED ISOLATION REPORT ---\n`;
-      testTerminalOutput.value += `TARGET NAMESPACE: blog-prod\n`;
-      testTerminalOutput.value += `STATUS: AUDIT COMPLETED (SIMULATED)\n\n`;
-      testTerminalOutput.value += `[TEST] Web -> Database (Intra-NS): <span style='color: #ef4444;'>FAILURE (Connection Refused)</span>\n`;
-      testTerminalOutput.value += `[TEST] Web -> Internet (Egress): <span style='color: #4ade80;'>SUCCESS (Connection Allowed)</span>\n\n`;
-      testTerminalOutput.value += `CONCLUSION: Namespace 'blog-prod' is currently vulnerable to egress traffic leaks.\n`;
-      testTerminalOutput.value += `RECOMMENDATION: Apply Sentinel micro-segmentation policies immediately.\n`;
-      
-    } finally {
-      isTesting.value = false;
-    }
-  };
-
   const toggleAccordion = (id: string) => {
     activeAccordion.value = activeAccordion.value === id ? null : id;
   };
@@ -291,25 +235,21 @@
     showRoleModal.value = true;
   };
 
-  const init = async () => {
-  console.log("DEBUG: Initialisation des données Sentinel...");
+  // --- DATA FETCHING ('keep-alive'-less version) ---
+const init = async () => {
+  console.log("DEBUG: Chargement frais des données Sentinel...");
   await Promise.all([fetchNetworkData(), fetchSentinelStatus()]);
 };
 
-  onMounted(init);
-  onActivated(init);
+onMounted(init);
 
-  onDeactivated(() => {
-    console.log("DEBUG: SentinelView désactivé, annulation requête...");
-    if (abortController) {
-      abortController.abort();
-      isLoading.value = false;
-    }
-  });
-
-  onUnmounted(() => {
-    if (abortController) abortController.abort();
-  });
+onUnmounted(() => {
+  console.log("DEBUG: Nettoyage avant démontage...");
+  if (abortController) {
+    abortController.abort();
+    isLoading.value = false;
+  }
+});
 
 </script>
 
@@ -331,7 +271,9 @@
             <select v-model="selectedNS" class="bg-[#0b0c10] border border-slate-700 text-[9px] text-slate-300 px-3 py-1.5 rounded-sm uppercase font-bold tracking-widest cursor-pointer">
               <option v-for="ns in namespaces" :key="ns" :value="ns">{{ ns }}</option>
             </select>
-            <button @click="runIsolationTest" class="bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500 text-blue-500 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">Test Isolation</button>
+            <button @click="init" class="bg-slate-800 hover:bg-slate-700 border border-slate-600 text-slate-300 px-4 py-1.5 rounded-sm text-[9px] font-bold uppercase tracking-widest transition-all">
+              Refresh Audit
+            </button>
             <template v-if="isHardened">
             <div class="px-3 py-1 bg-green-500/10 border border-green-500 text-green-500 text-[8px] font-black uppercase tracking-widest rounded-sm">
               Policies Active
@@ -425,35 +367,6 @@
           </div>
         </div>
       </div>
-        <Transition name="fade">
-          <div v-if="showTestModal" class="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-black/90 backdrop-blur-sm">
-            <div class="bg-[#0d0e12] border border-slate-800 w-full max-w-2xl overflow-hidden shadow-2xl">
-              <div class="bg-[#111217] border-b border-slate-800 px-4 py-2 flex justify-between items-center">
-                <span class="text-[9px] font-black text-blue-500 uppercase tracking-widest">Sentinel Network Isolation Audit</span>
-                <button @click="showTestModal = false" class="text-slate-500 hover:text-white transition-colors cursor-pointer">✕</button>
-              </div>
-              
-              <div class="p-6 h-[400px] overflow-y-auto font-mono text-[11px] bg-black/40">
-                <div class="space-y-1">
-                  <p v-html="testTerminalOutput" class="whitespace-pre-wrap leading-relaxed text-slate-300"></p>
-                  <div v-if="isTesting" class="flex items-center gap-2 mt-2">
-                    <span class="w-1.5 h-1.5 bg-blue-500 rounded-full animate-ping"></span>
-                    <span class="text-blue-500 animate-pulse italic">Auditing cluster isolation...</span>
-                  </div>
-                </div>
-              </div>
-
-              <div class="p-4 bg-[#111217] border-t border-slate-800 flex justify-end">
-                <button 
-                  @click="showTestModal = false" 
-                  :disabled="isTesting"
-                  class="px-6 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-white text-[9px] font-bold uppercase tracking-widest transition-all cursor-pointer">
-                  Close Console
-                </button>
-              </div>
-            </div>
-          </div>
-        </Transition>
   </template>
 
   <style scoped>

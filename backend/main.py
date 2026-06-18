@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 # --- Routers Imports ---
 from backend.network_manager import router as network_router
-from backend.routers import auth, k3s, scan, remediation, integrations, sentinel_test
+from backend.routers import auth, k3s, scan, remediation, integrations
 
 # --- ENV LOADING ---
 base_dir = Path(__file__).resolve().parent
@@ -62,7 +62,6 @@ app.include_router(scan.router, prefix="/api")
 app.include_router(remediation.router, prefix="/api")
 app.include_router(network_router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
-app.include_router(sentinel_test.router, prefix="/api")
 
 # --- 3. GLOBAL API ROUTES ---
 @app.get("/api/health", tags=["Status"])

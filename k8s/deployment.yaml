@@ -66,7 +66,7 @@ spec:
             subPath: database 
           - mountPath: /tmp
             name: temp-storage
-          
+        
         env:
           - name: DB_DIR
             value: "/app/backend/data"
@@ -74,8 +74,10 @@ spec:
             value: /app
           - name: TMPDIR
             value: /data/trivy-cache/tmp
+          # Mode in-cluster : le SDK python détectera automatiquement l'API server interne
           - name: K8S_MODE
             value: "in-cluster"
+
         envFrom:
           - secretRef:
               name: k-guard-secrets
