@@ -123,7 +123,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=600
 
 # --- NETWORK CONFIGURATION ---
-ALLOWED_ORIGINS=http://localhost:8443,http://%s:8443,http://k-guard.local:8443
+ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000,http://localhost:80,http://%s:80,http://k-guard.local:80 
 USER_DOMAIN=%s
 PROJECT_NAME=K-Guard
 KGUARD_PROTECTED_NS=%s
@@ -172,7 +172,7 @@ Type=simple
 User=%s
 WorkingDirectory=%s
 EnvironmentFile=%s
-ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8445	
+ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8000	
 Restart=always
 RestartSec=5
 
@@ -336,7 +336,7 @@ func (m model) View() string {
 			"Installation Success, %s !\n\n"+
 				"🚀 API: 'sudo kguard logs'\n"+
 				"💻 CLI: 'kguard' (status/logs/k8s)\n"+
-				"🌐 Access: http://%s:8445",
+				"🌐 Access: http://%s",
 			m.adminUser,
 			displayIP,
 		)

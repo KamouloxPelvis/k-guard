@@ -134,6 +134,7 @@
    * Synchronizes the network topology from the Sentinel backend.
    * Implements robust error handling and concurrency control to ensure UI stability.
    */
+ 
   const fetchNetworkData = async () => {
     // 1. Concurrency Management: Abort the previous request if still pending
     if (abortController) {
@@ -192,6 +193,7 @@
       }
     }
   };
+  
 
   // --- TOPOLOGY HELPERS ---
   const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
@@ -288,12 +290,13 @@ const runIsolationTest = async () => {
   };
 
   onActivated(async () => {
-    
-  if (pods.value.length === 0) {
-    console.log("🔄 Réactivation sécurisée : chargement des données...");
-    await fetchNetworkData(); 
-  }
-});
+    console.log("🔄 SentinelView: Réactivation et rafraîchissement forcé");
+    // On force le reset pour éviter les incohérences d'état
+    pods.value = [];
+    edges.value = [];
+    await fetchNetworkData();
+    await fetchSentinelStatus();
+  });
 
   onMounted(() => {
     fetchNetworkData();
@@ -363,7 +366,7 @@ const runIsolationTest = async () => {
     <div v-if="currentViewMode === 'topology'" class="bg-[#0b0c10] border border-slate-800/60 p-2 rounded-sm relative min-h-[500px] overflow-hidden flex items-center justify-center">
       <div class="absolute inset-0 opacity-5" style="background-image: radial-gradient(#3b82f6 1px, transparent 1px); background-size: 20px 20px;"></div>
       
-      <svg v-if="pods.length > 0" viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
+      <svg v-show="pods.length > 0" viewBox="0 0 1000 500" class="w-full h-full max-w-4xl relative z-10">
         <g v-for="edge in filteredEdges" :key="'base-' + edge.source + edge.target">
           <path v-if="getEdgePath(edge)" :d="getEdgePath(edge)" fill="none" class="stroke-slate-800 stroke-[1]" />
         </g>
@@ -384,6 +387,10 @@ const runIsolationTest = async () => {
           </text>
         </g>
       </svg>
+
+      <div v-if="pods.length === 0 && !isLoading" class="text-slate-500 text-xs">
+        Aucune donnée topologique disponible.
+      </div>
     </div>
 
     <div v-if="currentViewMode === 'list'" class="space-y-6">
