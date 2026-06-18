@@ -1,247 +1,251 @@
-  <script setup lang="ts">
-    import { ref, computed, onActivated, onDeactivated, nextTick, onUnmounted } from 'vue';
-    import api from '@/services/api';
+<script setup lang="ts">
+  import { ref, computed, onActivated, onDeactivated, nextTick, onMounted, onUnmounted } from 'vue';
+  import api from '@/services/api';
 
-    // --- INTERFACES ---
-    interface PodNode {
-      id: string;
-      name: string;
-      namespace: string;
-      status: string;
-      ip: string;
-      role: string;
-      labels: Record<string, string>;
-      is_hardened: boolean;
-      image?: string; 
-    }
+  // --- INTERFACES ---
+  interface PodNode {
+    id: string;
+    name: string;
+    namespace: string;
+    status: string;
+    ip: string;
+    role: string;
+    labels: Record<string, string>;
+    is_hardened: boolean;
+    image?: string; 
+  }
 
-    interface NetworkEdge {
-      source: string;
-      target: string;
-      label: string;
-      sourceIp?: string;
-      targetIp?: string;
-    }
-
-    /**
-     * API Response structure for the Sentinel Map.
-     */
-    interface SentinelMapResponse {
-      nodes: PodNode[];
-      edges: NetworkEdge[];
-      namespaces: string[];
-    }
-
-    /**
-     * Generic interface for terminal/test outputs.
-     */
-    interface ActionResponse {
-      output: string;
-      status?: string;
-    }
-
-    // --- REACTIVE STATE ---
-    const pods = ref<PodNode[]>([]);
-    const edges = ref<NetworkEdge[]>([]);
-    const selectedNS = ref('all-protected');
-    const isLoading = ref(false);
-    const namespaces = ref(['all-protected']);
-
-    // --- UI STATES ---
-    const showRoleModal = ref(false);
-    const selectedPod = ref<PodNode | null>(null);
-    const currentViewMode = ref('list'); 
-    const showTestModal = ref(false);
-    const isTesting = ref(false);
-    const testTerminalOutput = ref('');
-    const activeAccordion = ref<string | null>(null);
-    const isHardened = ref(false); // Track the deployment status
-
-    // --- LOGIC: SECURITY ANALYSIS ---
-    const isVulnerable = (pod: PodNode) => {
-      if (!pod || !pod.role) return true; 
-      return !pod.is_hardened;
-    };
-
-    /**
-   * Fetches the current Sentinel status to update the UI buttons accordingly.
-   */
-    const fetchSentinelStatus = async () => {
-    try {
-      const response = await api.get('/sentinel/status');
-      console.log("DEBUG: Réponse brute:", response);
-      isHardened.value = response.data.deployed;
-      console.log("DEBUG: isHardened mis à jour à:", isHardened.value);
-    } catch (error) {
-      console.error("DEBUG: Erreur API:", error);
-    }
-  };
-
-    /**
-     * Computes the global security score based on hardened vs vulnerable pods.
-     */
-    const securityStats = computed(() => {
-      if (pods.value.length === 0) return { score: 100, vulnerableCount: 0 };
-      const vulnerable = pods.value.filter(p => isVulnerable(p)).length;
-      const score = Math.round(((pods.value.length - vulnerable) / pods.value.length) * 100);
-      return { score, vulnerableCount: vulnerable };
-    });
-
-    /**
-     * Filters and sorts pods based on the selected namespace.
-     * Vulnerable pods are prioritized in the list for visibility.
-     */
-    const filteredPods = computed(() => {
-      const list = selectedNS.value === 'all-protected' 
-        ? pods.value 
-        : pods.value.filter(pod => pod.namespace === selectedNS.value);
-      
-      return [...list].sort((a, b) => (isVulnerable(b) ? 1 : 0) - (isVulnerable(a) ? 1 : 0));
-    });
-
-    /**
-     * Groups filtered pods by their respective Kubernetes namespace.
-     */
-    const podsByNamespace = computed(() => {
-      return filteredPods.value.reduce((acc, pod) => {
-        if (!acc[pod.namespace]) acc[pod.namespace] = [];
-        acc[pod.namespace]!.push(pod); 
-        return acc;
-      }, {} as Record<string, PodNode[]>);
-    });
-
-    /**
-     * Filters network edges to only show connections relevant to the current namespace.
-     */
-    const filteredEdges = computed(() => {
-      if (selectedNS.value === 'all-protected') return edges.value;
-      const nsPodIds = filteredPods.value.map(p => p.id);
-      return edges.value.filter(edge => nsPodIds.includes(edge.source) && nsPodIds.includes(edge.target));
-    });
-
-    // --- DATA FETCHING ---
-
-    /**
-     * Synchronizes the network map from the Sentinel backend service.
-     */
-    /**
-     * Fetches the network topology for the Sentinel module.
-     * Includes a safety watchdog timer to detect hung requests.
-     */
-    let abortController: AbortController | null = null;
-
-    /**
-     * Synchronizes the network topology from the Sentinel backend.
-     * Implements robust error handling and concurrency control to ensure UI stability.
-     */
-  
-    const fetchNetworkData = async () => {
-
-      if (isLoading.value) return; 
-
-      if (abortController) abortController.abort();
-      abortController = new AbortController();
-      isLoading.value = true;
-
-      try {
-        // API call with AbortSignal for request cancellation
-        const response = await api.get<SentinelMapResponse>('/sentinel/map', {
-          signal: abortController.signal
-        });
-
-        const { data } = response;
-
-        // 3. Wait for DOM to be ready for incoming data
-        await nextTick();
-
-        // 4. Atomic state updates
-        pods.value = data.nodes || [];
-        namespaces.value = data.namespaces 
-          ? ['all-protected', ...data.namespaces] 
-          : ['all-protected'];
-
-        // 5. Edge mapping with safe lookup for associated IPs
-        edges.value = (data.edges || []).map(edge => ({
-          ...edge,
-          sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
-          targetIp: pods.value.find(p => p.id === edge.target)?.ip || '0.0.0.0'
-        }));
-
-        console.info("DEBUG: Network topology data successfully applied to state");
-
-      } catch (error: any) {
-        // 6. Fine-grained error handling
-        if (error.name === 'AbortError' || error.name === 'CanceledError') {
-          console.warn("DEBUG: Request aborted due to navigation.");
-          return; 
-        }
-        
-        console.error("DEBUG: Critical synchronization error:", error);
-        
-        // Reset state to prevent UI inconsistency in case of API failure
-        pods.value = [];
-        edges.value = [];
-        namespaces.value = ['all-protected'];
-        isLoading.value = false;
-        
-      } finally {
-        // 7. Final Cleanup: Ensure loading state is reset
-        if (abortController && !abortController.signal.aborted) {
-          isLoading.value = false;
-        }
-      }
-    };
-    
-
-    // --- TOPOLOGY HELPERS ---
-    const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
-      const x = side === 'left' ? 150 : 850;
-      const y = (index + 1) * (500 / (total + 1));
-      return { x, y };
-    };
-
-    // --- TOPOLOGY HELPERS ---
-    const getEdgePath = (edge: NetworkEdge) => {
-      
-      if (!pods.value || pods.value.length === 0) return "";
-      
-      const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
-      const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
-
-      if (sourceIdx === -1 || targetIdx === -1) return "";
-
-      const total = filteredPods.value.length;
-      const start = getNodePos(edge.source, sourceIdx, total, sourceIdx % 2 === 0 ? 'left' : 'right');
-      const end = getNodePos(edge.target, targetIdx, total, targetIdx % 2 === 0 ? 'left' : 'right');
-      
-      return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
-    };
-
-      // --- SENTINEL ACTIONS ---
-
-      const triggerHarden = async () => {
-      if (!confirm("🚨 Apply Network Sentinel hardening?")) return;
-      await api.post('/sentinel/activate', {});
-      await fetchSentinelStatus(); // Refresh status after action
-      fetchNetworkData();
-    };
-
-    const triggerDeactivate = async () => {
-    if (!confirm("⚠️ Deactivate Zero-Trust policies?")) return;
-    await api.post('/sentinel/deactivate', {});
-    await fetchSentinelStatus(); // Refresh status after action
-    fetchNetworkData();
-  };
-
-    /**
-     * Executes an automated network isolation audit using netshoot ephemeral pods.
-     */
-    // --- MODIFIED ACTION : Securing Isolation Test ---
+  interface NetworkEdge {
+    source: string;
+    target: string;
+    label: string;
+    sourceIp?: string;
+    targetIp?: string;
+  }
 
   /**
-   * Executes an automated network isolation audit.
-   * Implements failsafe fallback to mock data in case of API/infrastructure failure.
+   * API Response structure for the Sentinel Map.
    */
+  interface SentinelMapResponse {
+    nodes: PodNode[];
+    edges: NetworkEdge[];
+    namespaces: string[];
+  }
+
+  /**
+   * Generic interface for terminal/test outputs.
+   */
+  interface ActionResponse {
+    output: string;
+    status?: string;
+  }
+
+  // --- REACTIVE STATE ---
+  const pods = ref<PodNode[]>([]);
+  const edges = ref<NetworkEdge[]>([]);
+  const selectedNS = ref('all-protected');
+  const isLoading = ref(false);
+  const namespaces = ref(['all-protected']);
+
+  // --- UI STATES ---
+  const showRoleModal = ref(false);
+  const selectedPod = ref<PodNode | null>(null);
+  const currentViewMode = ref('list'); 
+  const showTestModal = ref(false);
+  const isTesting = ref(false);
+  const testTerminalOutput = ref('');
+  const activeAccordion = ref<string | null>(null);
+  const isHardened = ref(false); // Track the deployment status
+
+  // --- LOGIC: SECURITY ANALYSIS ---
+  const isVulnerable = (pod: PodNode) => {
+    if (!pod || !pod.role) return true; 
+    return !pod.is_hardened;
+  };
+
+  /**
+ * Fetches the current Sentinel status to update the UI buttons accordingly.
+ */
+  const fetchSentinelStatus = async () => {
+  try {
+    const response = await api.get('/sentinel/status');
+    console.log("DEBUG: Réponse brute:", response);
+    isHardened.value = response.data.deployed;
+    console.log("DEBUG: isHardened mis à jour à:", isHardened.value);
+  } catch (error) {
+    console.error("DEBUG: Erreur API:", error);
+  }
+};
+
+  /**
+   * Computes the global security score based on hardened vs vulnerable pods.
+   */
+  const securityStats = computed(() => {
+    if (pods.value.length === 0) return { score: 100, vulnerableCount: 0 };
+    const vulnerable = pods.value.filter(p => isVulnerable(p)).length;
+    const score = Math.round(((pods.value.length - vulnerable) / pods.value.length) * 100);
+    return { score, vulnerableCount: vulnerable };
+  });
+
+  /**
+   * Filters and sorts pods based on the selected namespace.
+   * Vulnerable pods are prioritized in the list for visibility.
+   */
+  const filteredPods = computed(() => {
+    const list = selectedNS.value === 'all-protected' 
+      ? pods.value 
+      : pods.value.filter(pod => pod.namespace === selectedNS.value);
+    
+    return [...list].sort((a, b) => (isVulnerable(b) ? 1 : 0) - (isVulnerable(a) ? 1 : 0));
+  });
+
+  /**
+   * Groups filtered pods by their respective Kubernetes namespace.
+   */
+  const podsByNamespace = computed(() => {
+    return filteredPods.value.reduce((acc, pod) => {
+      if (!acc[pod.namespace]) acc[pod.namespace] = [];
+      acc[pod.namespace]!.push(pod); 
+      return acc;
+    }, {} as Record<string, PodNode[]>);
+  });
+
+  /**
+   * Filters network edges to only show connections relevant to the current namespace.
+   */
+  const filteredEdges = computed(() => {
+    if (selectedNS.value === 'all-protected') return edges.value;
+    const nsPodIds = filteredPods.value.map(p => p.id);
+    return edges.value.filter(edge => nsPodIds.includes(edge.source) && nsPodIds.includes(edge.target));
+  });
+
+  // --- DATA FETCHING ---
+
+  /**
+   * Synchronizes the network map from the Sentinel backend service.
+   */
+  /**
+   * Fetches the network topology for the Sentinel module.
+   * Includes a safety watchdog timer to detect hung requests.
+   */
+  let abortController: AbortController | null = null;
+
+  /**
+   * Synchronizes the network topology from the Sentinel backend.
+   * Implements robust error handling and concurrency control to ensure UI stability.
+   */
+
+  const fetchNetworkData = async () => {
+
+    if (isLoading.value) return; 
+
+    if (abortController) abortController.abort();
+    abortController = new AbortController();
+    isLoading.value = true;
+
+    try {
+      // API call with AbortSignal for request cancellation
+      const response = await api.get<SentinelMapResponse>('/sentinel/map', {
+        signal: abortController.signal
+      });
+
+      const { data } = response;
+
+      // 3. Wait for DOM to be ready for incoming data
+      await nextTick();
+
+      // 4. Atomic state updates
+      pods.value = data.nodes || [];
+      namespaces.value = data.namespaces 
+        ? ['all-protected', ...data.namespaces] 
+        : ['all-protected'];
+
+      // 5. Edge mapping with safe lookup for associated IPs
+      edges.value = (data.edges || []).map(edge => ({
+        ...edge,
+        sourceIp: pods.value.find(p => p.id === edge.source)?.ip || '0.0.0.0',
+        targetIp: pods.value.find(p => p.id === edge.target)?.ip || '0.0.0.0'
+      }));
+
+      console.info("DEBUG: Network topology data successfully applied to state");
+
+    } catch (error: any) {
+      // 6. Fine-grained error handling
+      if (error.name === 'AbortError' || error.name === 'CanceledError') {
+        console.warn("DEBUG: Request aborted due to navigation.");
+        return; 
+      }
+      
+      console.error("DEBUG: Critical synchronization error:", error);
+      
+      // Reset state to prevent UI inconsistency in case of API failure
+      pods.value = [];
+      edges.value = [];
+      namespaces.value = ['all-protected'];
+      isLoading.value = false;
+      
+    } finally {
+      // 7. Final Cleanup: Ensure loading state is reset
+      if (abortController && !abortController.signal.aborted) {
+        isLoading.value = false;
+      }
+    }
+  };
+    
+
+  // --- TOPOLOGY HELPERS ---
+  const getNodePos = (_id: string, index: number, total: number, side: 'left' | 'right') => {
+    const x = side === 'left' ? 150 : 850;
+    const y = (index + 1) * (500 / (total + 1));
+    return { x, y };
+  };
+
+  // --- TOPOLOGY HELPERS ---
+  const getEdgePath = (edge: NetworkEdge) => {
+    
+    if (!pods.value || pods.value.length === 0) return "";
+    
+    const sourceIdx = filteredPods.value.findIndex(p => p.id === edge.source);
+    const targetIdx = filteredPods.value.findIndex(p => p.id === edge.target);
+
+    if (sourceIdx === -1 || targetIdx === -1) return "";
+
+    const total = filteredPods.value.length;
+    const start = getNodePos(edge.source, sourceIdx, total, sourceIdx % 2 === 0 ? 'left' : 'right');
+    const end = getNodePos(edge.target, targetIdx, total, targetIdx % 2 === 0 ? 'left' : 'right');
+    
+    return `M ${start.x} ${start.y} C ${(start.x + end.x)/2} ${start.y}, ${(start.x + end.x)/2} ${end.y}, ${end.x} ${end.y}`;
+  };
+
+  // --- SENTINEL ACTIONS ---
+
+  const triggerHarden = async () => {
+
+  if (!confirm("🚨 Apply Network Sentinel hardening?")) return;
+
+  await api.post('/sentinel/activate', {});
+  await fetchSentinelStatus(); // Refresh status after action
+  fetchNetworkData();
+};
+
+  const triggerDeactivate = async () => {
+
+  if (!confirm("⚠️ Deactivate Zero-Trust policies?")) return;
+
+  await api.post('/sentinel/deactivate', {});
+  await fetchSentinelStatus(); // Refresh status after action
+  fetchNetworkData();
+};
+
+  /**
+   * Executes an automated network isolation audit using netshoot ephemeral pods.
+   */
+  // --- MODIFIED ACTION : Securing Isolation Test ---
+
+/**
+ * Executes an automated network isolation audit.
+ * Implements failsafe fallback to mock data in case of API/infrastructure failure.
+ */
   const runIsolationTest = async () => {
     showTestModal.value = true;
     isTesting.value = true;
@@ -278,33 +282,36 @@
     }
   };
 
-    const toggleAccordion = (id: string) => {
-      activeAccordion.value = activeAccordion.value === id ? null : id;
-    };
+  const toggleAccordion = (id: string) => {
+    activeAccordion.value = activeAccordion.value === id ? null : id;
+  };
 
-    const openRoleDetails = (pod: PodNode) => {
-      selectedPod.value = pod;
-      showRoleModal.value = true;
-    };
+  const openRoleDetails = (pod: PodNode) => {
+    selectedPod.value = pod;
+    showRoleModal.value = true;
+  };
 
-    onActivated(async () => {
-    console.log("SentinelView: Activation via keep-alive");
-    await fetchNetworkData();
-    await fetchSentinelStatus();
+  const init = async () => {
+  console.log("DEBUG: Initialisation des données Sentinel...");
+  await Promise.all([fetchNetworkData(), fetchSentinelStatus()]);
+};
+
+  onMounted(init);
+  onActivated(init);
+
+  onDeactivated(() => {
+    console.log("DEBUG: SentinelView désactivé, annulation requête...");
+    if (abortController) {
+      abortController.abort();
+      isLoading.value = false;
+    }
   });
 
-    onDeactivated(() => {
-      console.log("SentinelView: Désactivation, nettoyage en cours...");
-      if (abortController) {
-        abortController.abort();
-        isLoading.value = false; 
-      }
-    });
+  onUnmounted(() => {
+    if (abortController) abortController.abort();
+  });
 
-    onUnmounted(() => {
-      if (abortController) abortController.abort();
-    });
-  </script>
+</script>
 
   <template>
     <div class="p-4 lg:p-6 space-y-4 relative max-w-[1600px] mx-auto">
