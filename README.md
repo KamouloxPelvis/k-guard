@@ -19,8 +19,7 @@
     * [⚠️ CNI Recommendation](#en-network-isolation-recommendation)
     * [2. Auto-check & Dependencies](#en-2-auto-check--dependencies)
     * [3. Quick Install](#en-3-quick-start-procedure)
-    * [4. K-Guard Management Console (SRE Ops)](#en-4-kguard-management-console)
-    * [5. Accessing the Dashboard](#en-accessing-dashboard)
+    * [4. Accessing the Dashboard](#en-accessing-dashboard)
 * [🛰️ Cisco Webex Integration](#en-cisco-webex-integration)
 * [🛡️ Network Policy (Network Sentinel)](#en-network-policy--network-sentinel)
 * [👤 Contact & Credits](#en-contact--credits)
@@ -101,7 +100,7 @@ The assistant launches a "Pre-flight check" script to validate the secure config
 # Clone the repository
 git clone [https://gitlab.com/portfolio-kamal-guidadou/k-guard.git](https://gitlab.com/portfolio-kamal-guidadou/k-guard.git)
 
-cd installer (k-guard/installer)
+cd installer (folder : k-guard/installer)
 
 # Grant execution rights
 chmod +x install-kguard
@@ -111,33 +110,11 @@ chmod +x install-kguard
 ```
 ---
 
-### 4. <a name="en-4-kguard-management-console"></a>K-Guard Management Console (SRE Ops)
+## 4. <a name="en-accessing-dashboard"></a>Accessing the Dashboard
+Once the deployment is finalized on your K3s cluster, the K-Guard interface is exposed through a secure endpoint within the cluster.
 
-To align with professional **SRE (Site Reliability Engineering)** standards, K-Guard deploys a global management command. This allows administrators to monitor and manage the infrastructure's health directly from the VPS terminal without navigating through complex directory structures.
-
-| Command | Description | Context |
-| :--- | :--- | :--- |
-| **`kguard`** | **Primary entry point: Launch or verify K-Guard services.** | **Global Access** |
-| `kguard status` | Displays the real-time status of the Systemd service and K3s connectivity. | Operational Health |
-| `sudo kguard logs` | Streams live backend logs, including security audits and API hits. | Troubleshooting |
-| `kguard k8s` | Fast access to Kubernetes resource diagnostics within the `k-guard` namespace. | Cluster Management |
-
-**Example: Live Monitoring & Control**
-
-```bash
-# Launch management shortcut
-kguard
-
-# Monitor security events in real-time
-sudo kguard logs
-```
-
----
-
-### <a name="en-accessing-dashboard"></a>5. Accessing the Dashboard
-Once the deployment is finalized on your K3s cluster, the K-Guard interface is exposed through a secure endpoint.
-
-1. **URL**: Open your browser and navigate to `http://VPS_IP:8445` (or the hostname configured in your local `/etc/hosts` with your VPS IP adress e.g : http://k-guard.local:8445) or any name you'd like to access to with.
+1. **URL**: Open your browser and navigate to `http://<VPS_IP>` (or the domain/hostname configured for your cluster, e.g k-guard.local). 
+   *Note: As K-Guard is now managed directly via Kubernetes Ingress, no additional port specification is required.*
 
 2. **Authentication**: Use the administrative credentials defined during the installation process to log in and access the real-time Sentinel topology and security scans.
 
@@ -183,7 +160,7 @@ Through the **"Deploy Hardening"** feature in the Settings panel, users can trig
 
 ## 👤 <a name="en-contact--credits"></a>Contact & Credits
 
-© 2026 - **Kamal Guidadou** *DevSecOps, SRE & Cloud Security*
+© 2026 - **Kamal Guidadou** *SysAdmin & DevSecOps*
 
 * 🌐 **Portfolio**: [https://portfolio.devopsnotes.org](https://portfolio.devopsnotes.org)
 * ✍️ **Tech Blog**: [https://blog.devopsnotes.org](https://blog.devopsnotes.org)

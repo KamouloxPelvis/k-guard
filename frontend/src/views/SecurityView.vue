@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onMounted, onUnmounted } from 'vue';
+  import { ref, onMounted, onUnmounted, onActivated } from 'vue';
   import api from '@/services/api'; 
 
   // --- INTERFACES ---
@@ -187,8 +187,16 @@
     return { text: 'SECURE', class: 'text-green-500 border-green-500/50 bg-green-500/5' };
   };
 
+  onActivated(() => {
+    
+  if (apps.value.length === 0) {
+    fetchApps();
+  }
+});
+
   onMounted(fetchApps);
   onUnmounted(() => { if (logInterval) clearInterval(logInterval); });
+  
 </script>
 
 <template>

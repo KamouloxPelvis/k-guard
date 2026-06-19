@@ -28,6 +28,7 @@ export default defineConfig(() => {
 
     define: {
       'global': 'window', 
-    }
+    __VUE_PROD_DEVTOOLS__: true,
+  },
   }
 })

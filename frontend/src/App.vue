@@ -6,11 +6,12 @@
 </script>
 
 <template>
-  <router-view />
+  <router-view>
+  </router-view>
 </template>
 
 <style>
-/* * Global styles are managed via style.css to prevent scoped conflicts 
+/* Global styles are managed via style.css to prevent scoped conflicts 
  * and maintain consistent branding across the SPA.
  */
 </style>
