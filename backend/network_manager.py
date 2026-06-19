@@ -3,11 +3,10 @@ import subprocess
 import logging
 import asyncio
 from fastapi import APIRouter, Query
+from fastapi.responses import FileResponse, JSONResponse
 from typing import Optional
 from kubernetes import client, config
 from typing import List, Dict, Any
-
-print(f"DEBUG: LOADING NETWORK_MANAGER FROM: {__file__}")
 
 router = APIRouter(tags=["Network Sentinel"])
 
@@ -19,11 +18,15 @@ def load_k8s_config():
     try:
         
         config.load_incluster_config()
-        print("DEBUG: Loaded IN-CLUSTER config successfully")
         return True
     except Exception as e:
-        print(f"CRITICAL: Failed to load IN-CLUSTER config: {e}")
-        return False
+
+        logging.exception("CRITICAL ERROR in get_network_map: %s", str(e))
+    
+        return JSONResponse(
+            status_code=500, 
+            content={"error": "An internal error occurred during infrastructure discovery."}
+        )
 
 @router.get("/sentinel/status")
 async def get_network_policy_status():
