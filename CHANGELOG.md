@@ -2,9 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.3.1] - 2026-06-18
+
+### Changed
+- **Infrastructure**: Complete migration from Systemd/VPS-bound services to Kubernetes-native architecture (K3s).
+- **Network Configuration**: Port changed from `8445` to `8000` to align with internal cluster networking.
+- **Installer**: Refactored `main.go` to handle K8s namespace initialization and secret management.
+- **Documentation**: Updated README to reflect K8s deployment procedures and removed obsolete Systemd management commands.
+- **Frontend**: Stabilized `SentinelView` component with `v-show` directives and improved lifecycle handling (`onActivated`).
+
 ## [1.2.1] - 2026-06-15
 
-Fixed
+### Fixed
 Port Migration: Resolved network conflicts by migrating the API/Frontend service from port 8443 to 8445.
 
 Auth Stability: Resolved internal 500 errors during authentication by optimizing middleware stack handling.

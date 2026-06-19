@@ -5,9 +5,9 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 from .auth import verify_token
-from database import DB_PATH, update_scan_status
-from security_manager import run_trivy_scan
-from services.cisco_notifier import CiscoWebexNotifier
+from backend.database import DB_PATH, update_scan_status
+from backend.security_manager import run_trivy_scan
+from backend.services.cisco_notifier import CiscoWebexNotifier
 
 # Standard SRE logging initialization
 # Ensuring traceability for background processes in K3s environment
@@ -22,8 +22,8 @@ class ScanRequest(BaseModel):
 # --- 0. Test internal API connectivity at startup ---
 import requests
 try:
-    response = requests.get("http://localhost:8445/api/health") # Vérifie si l'API répond
-    print(f"DEBUG: Internal API check on 8445: {response.status_code}")
+    response = requests.get("http://localhost:8000/api/health") # Vérifie si l'API répond
+    print(f"DEBUG: Internal API check on 8000: {response.status_code}")
 except Exception as e:
     print(f"DEBUG: Internal API check FAILED: {e}")
 

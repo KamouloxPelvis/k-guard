@@ -6,7 +6,7 @@ metadata:
 spec:
   replicas: 1
   strategy:
-    type: Recreate 
+    type: Recreate
   selector:
     matchLabels:
       app: k-guard
@@ -15,16 +15,14 @@ spec:
       labels:
         app: k-guard
     spec:
+      terminationGracePeriodSeconds: 60 
       serviceAccountName: k-guard-sa
       automountServiceAccountToken: true
-      
       imagePullSecrets:
         - name: ghcr-secret
-
       securityContext:
         fsGroup: 1000
         supplementalGroups: [988]
-
       volumes:
         - name: docker-socket
           hostPath:
@@ -33,49 +31,72 @@ spec:
         - name: trivy-cache
           persistentVolumeClaim:
             claimName: trivy-cache-pvc
-      
+        - name: temp-storage
+          emptyDir:
+            sizeLimit: 500Mi
       initContainers:
-      - name: init-permissions
-        image: busybox
-        command: ["sh", "-c", "chown -R 1000:1000 /data/trivy-cache && mkdir -p /data/trivy-cache/database && chown -R 1000:1000 /data/trivy-cache/database"]
-        volumeMounts:
-        - name: trivy-cache
-          mountPath: /data/trivy-cache
-
+        - name: init-permissions
+          image: busybox
+          command: ["sh", "-c", "chown -R 1000:1000 /data/trivy-cache && mkdir -p /data/trivy-cache/database && chown -R 1000:1000 /data/trivy-cache/database"]
+          volumeMounts:
+            - name: trivy-cache
+              mountPath: /data/trivy-cache
+            - name: temp-storage
+              mountPath: /temp-storage
       containers:
-      - name: kguard-app
-        image: ghcr.io/kamouloxpelvis/kguard-app:latest
-        imagePullPolicy: Always
-        securityContext:
-          runAsUser: 1000 
-          allowPrivilegeEscalation: false
-        ports:
-        - containerPort: 8000
-        volumeMounts:
-          - mountPath: /var/run/docker.sock
-            name: docker-socket
-          - mountPath: /data/trivy-cache
-            name: trivy-cache
-          - mountPath: /app/backend/data
-            name: trivy-cache
-            subPath: database 
-        env:
-          - name: DB_DIR
-            value: "/app/backend/data"
-        envFrom:
-          - secretRef:
-              name: k-guard-secrets
-        
-        livenessProbe:
-          httpGet:
-            path: /health
-            port: 8000
-          initialDelaySeconds: 45
-          periodSeconds: 30
-        resources:
-          limits:
-            cpu: "1.5"
-            memory: "2Gi"
-          requests:
-            cpu: "500m"
-            memory: "1Gi"
+        - name: kguard-app
+          image: ghcr.io/kamouloxpelvis/kguard-app:latest
+          imagePullPolicy: Always
+          securityContext:
+            runAsUser: 1000
+            allowPrivilegeEscalation: false
+            capabilities:
+              add: ["NET_ADMIN", "NET_RAW"]
+          ports:
+            - containerPort: 8000
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 15
+            periodSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 60
+            periodSeconds: 45
+            timeoutSeconds: 5
+            failureThreshold: 3
+          volumeMounts:
+            - mountPath: /var/run/docker.sock
+              name: docker-socket
+            - mountPath: /data/trivy-cache
+              name: trivy-cache
+            - mountPath: /app/backend/data
+              name: trivy-cache
+              subPath: database
+            - mountPath: /tmp
+              name: temp-storage
+          env:
+            - name: DB_DIR
+              value: "/app/backend/data"
+            - name: PROJECT_ROOT
+              value: /app
+            - name: TMPDIR
+              value: /data/trivy-cache/tmp
+            - name: K8S_MODE
+              value: "in-cluster"
+          envFrom:
+            - secretRef:
+                name: k-guard-secrets
+          resources:
+            requests:
+              cpu: 500m
+              memory: 1Gi
+              ephemeral-storage: "500Mi"
+            limits:
+              cpu: 1500m
+              memory: 2Gi
+              ephemeral-storage: "2Gi"

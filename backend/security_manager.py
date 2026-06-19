@@ -4,7 +4,7 @@ import shutil
 import os
 import threading
 import logging
-from services.cisco_notifier import CiscoWebexNotifier
+from backend.services.cisco_notifier import CiscoWebexNotifier
 
 # Configure logging for systematic debugging
 logging.basicConfig(level=logging.INFO)

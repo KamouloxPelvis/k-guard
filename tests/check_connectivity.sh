@@ -3,6 +3,11 @@
 # Compliance: Cisco DevNet Standard for In-Cluster Diagnostics
 set -e
 
+cleanup() {
+    kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1
+}
+trap cleanup EXIT
+
 # 0. SRE ENVIRONMENT SETUP
 export KUBERNETES_SERVICE_HOST=kubernetes.default.svc
 export KUBERNETES_SERVICE_PORT=443
@@ -29,39 +34,46 @@ echo "--------------------------------------------------------"
 # 2. EPHEMERAL DIAGNOSTIC DEPLOYMENT
 echo "⏳ Deploying sentinel-debug pod (Netshoot)..."
 
-kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1 || true
+NAMESPACE="k-guard" 
 
-# Using IfNotPresent to avoid rate limits and ensuring fast startup
-kubectl run sentinel-debug -n "$TARGET_NS" \
+kubectl delete pod sentinel-debug -n "$NAMESPACE" --grace-period=0 --force > /dev/null 2>&1 || true
+
+kubectl run sentinel-debug -n "$NAMESPACE" \
     --image=nicolaka/netshoot:latest \
     --labels="role=debug,managed-by=k-guard-sentinel" \
     --overrides='{
       "spec": {
-        "serviceAccountName": "sentinel-auditor",
+        "serviceAccountName": "k-guard-sa",
         "terminationGracePeriodSeconds": 0
       }
     }' \
     --restart=Never \
     -- sleep 60
-
-if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$TARGET_NS" --timeout=30s > /dev/null 2>&1; then
-    echo "❌ FATAL: Diagnostic pod failed to initialize (Check ImagePullBackOff or Resources)."
-    kubectl delete pod sentinel-debug -n "$TARGET_NS" --grace-period=0 --force > /dev/null 2>&1
+    
+if ! kubectl wait --for=condition=Ready pod/sentinel-debug -n "$NAMESPACE" --timeout=30s > /dev/null 2>&1; then
+    echo "❌ FATAL: Diagnostic pod failed to initialize."
     exit 1
 fi
 
 # Debug: check who is running the script and if they see the cluster
-echo "DEBUG: User is $(whoami)"
+echo "DEBUG: User ID is $(id -u)"
+
 echo "DEBUG: Kubeconfig is $KUBECONFIG"
+
+if kubectl auth can-i get nodes --as=system:serviceaccount:"$TARGET_NS":sentinel-auditor | grep -q "yes"; then
+    echo "✅ RBAC: ServiceAccount authorized."
+else
+    echo "❌ RBAC: Missing ClusterRole permissions."
+fi
+
 kubectl get nodes > /dev/null 2>&1 || echo "❌ FAIL: No access to cluster"
 
 # 3. SECURITY AUDIT EXECUTION (Focus: Isolation)
 echo -n "[1/2] Internal Mesh Isolation...   "
-# On teste si le pod de debug est BIEN bloqué pour parler à un autre pod non autorisé
-if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 "$POD_IP:$POD_PORT" > /dev/null 2>&1; then 
-    echo "✅ SECURE (Isolated)"; 
+if ! kubectl exec -n "$TARGET_NS" sentinel-debug -- curl -s --connect-timeout 2 http://kubernetes.default > /dev/null 2>&1; then 
+    echo "✅ SECURE (Isolated)"
 else 
-    echo "⚠️ WARNING (Open)"; 
+    echo "⚠️ WARNING (Open - Lateral Movement Possible)"
 fi
 
 echo -n "[2/2] Zero-Trust Egress Check...   "

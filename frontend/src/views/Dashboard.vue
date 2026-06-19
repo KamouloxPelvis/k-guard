@@ -67,17 +67,19 @@
   };
 
   onMounted(async () => {
-    // Initial data synchronization sequence
-    await fetchSystemInfo();
+  await fetchSystemInfo();
+  
+  // Recursive function to prevent call stacking
+  const pollStats = async () => {
     await updateSystemStats();
-    
-    // Establishing heartbeat interval (20-second cycles)
-    statsInterval = setInterval(updateSystemStats, 20000);
+    statsInterval = setTimeout(pollStats, 20000);
+  };
+  
+  pollStats();
   });
 
   onUnmounted(() => {
-    // Memory leak prevention by clearing the polling interval
-    if (statsInterval) clearInterval(statsInterval);
+    if (statsInterval) clearTimeout(statsInterval);
   });
 
   /**
@@ -201,10 +203,10 @@
         </div>
       </header>
 
-      <div class="flex-1 overflow-y-auto overflow-x-auto relative z-10 custom-scrollbar">
-        <router-view v-slot="{ Component }">
-          <transition name="page" mode="out-in">
-            <component :is="Component" />
+      <div class="flex-1 overflow-y-auto overflow-x-auto relative z-20 custom-scrollbar">
+        <router-view v-slot="{ Component, route }">
+          <transition name="page" mode="default">
+            <component :is="Component" :key="route.fullPath" />
           </transition>
         </router-view>
       </div>

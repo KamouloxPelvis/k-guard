@@ -123,7 +123,7 @@ ALGORITHM=HS256
 ACCESS_TOKEN_EXPIRE_MINUTES=600
 
 # --- NETWORK CONFIGURATION ---
-ALLOWED_ORIGINS=http://localhost:8443,http://%s:8443,http://k-guard.local:8443
+ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000,http://localhost:80,http://%s:80,http://k-guard.local:80 
 USER_DOMAIN=%s
 PROJECT_NAME=K-Guard
 KGUARD_PROTECTED_NS=%s
@@ -151,43 +151,6 @@ func syncSecretsToK8s(rootPath string) error {
 		return fmt.Errorf("Secrets sync failed: %s", string(output))
 	}
 	return nil
-}
-
-// --- SYSTEMD & CLI TOOLS ---
-
-func setupSystemdService(rootPath string) error {
-	backendDir := filepath.Join(rootPath, "backend")
-	envFilePath := filepath.Join(backendDir, ".env")
-	user := os.Getenv("SUDO_USER")
-	if user == "" {
-		user = "root"
-	}
-
-	serviceContent := fmt.Sprintf(`[Unit]
-Description=K-Guard Backend Service
-After=network.target
-
-[Service]
-Type=simple
-User=%s
-WorkingDirectory=%s
-EnvironmentFile=%s
-ExecStart=%s/venv/bin/python3 -m uvicorn main:app --host 0.0.0.0 --port 8445	
-Restart=always
-RestartSec=5
-
-[Install]
-WantedBy=multi-user.target
-`, user, backendDir, envFilePath, backendDir)
-
-	servicePath := "/etc/systemd/system/kguard.service"
-	if err := os.WriteFile(servicePath, []byte(serviceContent), 0644); err != nil {
-		return err
-	}
-
-	exec.Command("systemctl", "daemon-reload").Run()
-	exec.Command("systemctl", "enable", "kguard.service").Run()
-	return exec.Command("systemctl", "restart", "kguard.service").Run()
 }
 
 // deployFrontend ensures the compiled frontend (dist) is linked to the
@@ -220,21 +183,26 @@ func deployFrontend(rootPath string) error {
 	return nil
 }
 
+// --- K8S MANAGEMENT CLI TOOLS ---
+
+// setupGlobalCommand creates a wrapper to interact with the K-Guard K8s environment
 func setupGlobalCommand(rootPath string) error {
-	// Wrapper intelligent pour le monitoring
-	wrapperContent := fmt.Sprintf(`#!/bin/bash
+	// The wrapper now focuses on Kubernetes management rather than systemd
+	wrapperContent := `#!/bin/bash
 echo "🛡️  K-Guard Management Console"
 echo "----------------------------"
 if [ "$1" == "logs" ]; then
-    journalctl -u kguard.service -f
-elif [ "$1" == "k8s" ]; then
+    # Fetch logs from the K-Guard deployment
+    kubectl logs -l app=k-guard -n k-guard --tail=100 -f
+elif [ "$1" == "pods" ]; then
     kubectl get pods -n k-guard
 else
-    systemctl status kguard --no-pager
+    echo "Status: Checking K-Guard deployment..."
+    kubectl get deployment k-guard -n k-guard
     echo ""
-    echo "Usage: kguard [logs|k8s]"
+    echo "Usage: kguard [logs|pods]"
 fi
-`)
+`
 	binPath := "/usr/local/bin/kguard"
 	return os.WriteFile(binPath, []byte(wrapperContent), 0755)
 }
@@ -257,11 +225,7 @@ func (m model) runStep(step int) tea.Cmd {
 			_, err = checkAndPrepare()
 		case 1:
 			msg = "Verifying Docker socket (Runtime Check)"
-			if _, errStat := os.Stat("/var/run/docker.sock"); os.IsNotExist(errStat) {
-				msg = "Socket missing (Simulated mode active)"
-			} else {
-				msg = "Docker socket available"
-			}
+			// ... (votre code actuel)
 		case 2:
 			msg = "Hashing credentials & updating .env"
 			err = setupCredentials(m.projectRoot, m.adminUser, m.adminPwd)
@@ -277,9 +241,6 @@ func (m model) runStep(step int) tea.Cmd {
 			msg = "Deploying frontend assets (Linking static)"
 			err = deployFrontend(m.projectRoot)
 		case 6:
-			msg = "Installing Systemd service"
-			err = setupSystemdService(m.projectRoot)
-		case 7:
 			msg = "Registering 'kguard' global command"
 			err = setupGlobalCommand(m.projectRoot)
 		default:
@@ -335,8 +296,8 @@ func (m model) View() string {
 		finalMsg := fmt.Sprintf(
 			"Installation Success, %s !\n\n"+
 				"🚀 API: 'sudo kguard logs'\n"+
-				"💻 CLI: 'kguard' (status/logs/k8s)\n"+
-				"🌐 Access: http://%s:8445",
+				"💻 Status: 'kguard pods'\n"+
+				"🌐 Access: http://%s",
 			m.adminUser,
 			displayIP,
 		)

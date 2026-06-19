@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Body
 from .auth import verify_token
-from database import v1, apps_client
-from metrics_manager import scale_down_deployment
+from backend.database import v1, apps_client
+from backend.metrics_manager import scale_down_deployment
 from pydantic import BaseModel
 import datetime
 

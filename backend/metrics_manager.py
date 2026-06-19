@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from database import v1, apps_client, custom_client # <--- Custom client for Metrics API
+from backend.database import v1, apps_client, custom_client # <--- Custom client for Metrics API
 
 def parse_cpu(cpu_raw):
     """Converts K8s CPU units (nanocores, microcores, millicores) to millicores (m)"""
