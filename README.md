@@ -32,8 +32,7 @@
 * **Frontend**: Vue.js 3, Tailwind CSS, Fetch, JWT Auth.
 * **Installer**: Go (Bubble Tea / Lipgloss).
 
-* **Created with**: Ubuntu 24.04 LTS, K3s, Kamatera VPS.
-
+* **Environment**: Optimized for Debian-based distributions (Debian 12/13, Ubuntu 24.04+). Engineered specifically for stable performance on VPS environments.
 ---
 
 ## 🚀 <a name="en-key-features"></a>Key Features
@@ -79,6 +78,14 @@ K-Guard automatically generates interactive API documentation using **Swagger UI
 
 ![K-Guard System Overview](frontend/public/screenshots/install.png)
 
+### 📋 Prerequisites
+
+* **OS** : Debian or Ubuntu Server (Clean installation recommended).
+
+* **Privileges**: Root or sudo access required for K3s and Docker deployment.
+
+* **Architecture** : x86_64 compatible VPS.
+
 ### <a name="en-1-cli-installer-go"></a>1. CLI Installer (Go)
 Full stack deployment via a specialized **Go** installer:
 * Checks system dependencies and Docker socket accessibility.
@@ -89,9 +96,11 @@ Full stack deployment via a specialized **Go** installer:
 *To ensure strict micro-segmentation via Network Policies, implementing an advanced CNI (Calico, Cilium, Kube-router) is critical. Using the default Flannel CNI will keep the application functional, but East-West (inter-pod) filtering rules will be ignored by the cluster*.
 
 ### <a name="en-2-auto-check--dependencies"></a>2. Auto-check & Dependencies
-The assistant launches a "Pre-flight check" script to validate the secure configuration of Docker and the K3s API. Host prerequisites:
+The assistant launches a "Pre-flight check" script to validate the secure configuration of Docker and the K3s API. The installer automates the dependency lifecycle using native apt package management, ensuring full compatibility with Debian-based .deb ecosystems.
+
+Host prerequisites:
 * K3s (`curl -sfL https://get.k3s.io | sh -`).
-* Docker (`sudo apt install docker.io -y`).
+* Docker (`sudo apt install docker.io -y`).Debian-based .deb ecosystems
 * Python 3 & Pip.
 
 ### <a name="en-3-quick-start-procedure"></a>3. Quick Install procedure
