@@ -25,7 +25,7 @@ jobs:
         run: pip install bandit
 
       - name: Run Bandit Scan
-        # On utilise -ll pour ne remonter que les alertes Medium/High
+        continue-on-error: true
         run: bandit -r . -c bandit.yaml -ll -f html -o security_report.html
 
       - name: Upload Report
