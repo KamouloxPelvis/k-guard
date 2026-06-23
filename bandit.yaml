@@ -1,0 +1,6 @@
+exclude_dirs:
+  - '.venv'
+  - 'tests'
+  - 'infra'
+  - 'frontend/node_modules'
+skips: ['B101']

@@ -44,6 +44,12 @@ rules:
 
 ---
 # 3. ClusterRoleBinding (Linking Identity to Permissions)
+#
+# ------------------- !!! Warning !!! ------------------------
+#
+# SECURITY NOTE: Global ClusterRole required for cross-namespace observability
+# and remediation capabilities across the K3s infrastructure.
+#
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:

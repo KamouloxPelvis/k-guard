@@ -10,16 +10,40 @@ permissions:
   contents: read
 
 jobs:
-  build_images:
+  security_scan:
     runs-on: ubuntu-latest
-    # Override for specific job requiring registry push access
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Bandit
+        run: pip install bandit
+
+      - name: Run Bandit Scan
+        # On utilise -ll pour ne remonter que les alertes Medium/High
+        run: bandit -r . -c bandit.yaml -ll -f html -o security_report.html
+
+      - name: Upload Report
+        uses: actions/upload-artifact@v4
+        with:
+          name: bandit-security-report
+          path: security_report.html
+
+  build_images:
+    needs: security_scan # Depends on Security Scan
+    runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
     steps:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
-
+        
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
         with:

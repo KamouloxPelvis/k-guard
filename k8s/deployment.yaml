@@ -49,8 +49,11 @@ spec:
           imagePullPolicy: Always
           securityContext:
             runAsUser: 1000
+            runAsNonRoot: true
             allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
             capabilities:
+              drop: ["ALL"]
               add: ["NET_ADMIN", "NET_RAW"]
           ports:
             - containerPort: 8000

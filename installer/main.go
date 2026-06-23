@@ -145,12 +145,16 @@ TRIVY_CACHE_DIR=/data/trivy-cache
 
 func syncSecretsToK8s(rootPath string) error {
 	envPath := filepath.Join(rootPath, "backend", ".env")
+	
 	script := fmt.Sprintf("kubectl create secret generic k-guard-secrets --from-env-file=%s -n k-guard --dry-run=client -o yaml | kubectl apply -f -", envPath)
 	cmd := exec.Command("sh", "-c", script)
+	
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("Secrets sync failed: %s", string(output))
 	}
-	return nil
+	
+	fmt.Println("🧹 Cleaning up sensitive local configuration...")
+	return os.Remove(envPath)
 }
 
 // deployFrontend ensures the compiled frontend (dist) is linked to the
