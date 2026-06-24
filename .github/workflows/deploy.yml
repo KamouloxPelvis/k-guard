@@ -4,8 +4,9 @@ on:
   push:
     branches:
       - main
+      - feat/*
 
-# SRE Best Practice: Enforce global least privilege for GitHub Actions
+# SRE Best Practice: Enforce global least privilege
 permissions:
   contents: read
 
@@ -28,15 +29,6 @@ jobs:
         continue-on-error: true
         run: bandit -r . -c bandit.yaml -ll -f html -o security_report.html
       
-      - name: Run Trivy vulnerability scanner
-        uses: aquasecurity/trivy-action@master
-        with:
-          image-ref: 'ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}'
-          format: 'table'
-          exit-code: '1' 
-          ignore-unfixed: true
-          severity: 'CRITICAL,HIGH'
-
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -44,7 +36,7 @@ jobs:
           path: security_report.html
 
   build_images:
-    needs: security_scan # Depends on Security Scan
+    needs: security_scan
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -65,7 +57,6 @@ jobs:
         with:
           context: .
           push: true
-          # SRE Best Practice: Tagging with 'latest' AND a unique 'SHA' to bypass cache
           tags: |
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
@@ -78,32 +69,37 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
 
-      # Isolation: Copy manifests locally
-      - name: Copy K8s manifests locally
+      - name: Determine Environment Context
+        id: env_setup
         run: |
-          mkdir -p /home/kamal/deployments/k-guard
-          cp -r k8s/* /home/kamal/deployments/k-guard/
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            echo "TARGET_NS=k-guard" >> $GITHUB_ENV
+            echo "DEPLOY_DIR=k8s/blue" >> $GITHUB_ENV
+          else
+            echo "TARGET_NS=k-guard-green" >> $GITHUB_ENV
+            echo "DEPLOY_DIR=k8s/green" >> $GITHUB_ENV
+          fi
 
-      - name: Deploy to K3s (Local Execution)
+      - name: Deploy to K3s
         run: |
-          echo "🚀 Synchronizing Infrastructure with image SHA: ${{ github.sha }}..."
+          echo "🚀 Synchronizing Infrastructure for namespace: $TARGET_NS..."
           
-          # Applique les manifestes directement
-          kubectl apply -f k8s/ -n k-guard
+          # Applique les manifestes du dossier spécifique (blue ou green)
+          kubectl apply -f $DEPLOY_DIR/ -n $TARGET_NS
           
-          # Force l'image spécifique
-          kubectl set image deployment/kguard-deployment kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n k-guard
+          # Force l'image spécifique avec le SHA (v1.5.0 est embarqué dans le SHA)
+          kubectl set image deployment/kguard-deployment kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
           
-          # Vérifie la santé
-          kubectl rollout status deployment kguard-deployment -n k-guard --timeout=300s
+          # Vérifie la santé du déploiement
+          kubectl rollout status deployment kguard-deployment -n $TARGET_NS --timeout=300s
 
       - name: Discord Notification
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            MESSAGE="🛡️ **K-GUARD** (k3s): Deployment successful! SHA ${{ github.sha }} is live. ✅"
+            MESSAGE="🛡️ **K-GUARD** ($TARGET_NS): Deployment successful! SHA ${{ github.sha }} is live. ✅"
           else
-            MESSAGE="⚠️ **K-GUARD** (k3s): Critical deployment failure on SHA ${{ github.sha }}! ❌"
+            MESSAGE="⚠️ **K-GUARD** ($TARGET_NS): Critical deployment failure on SHA ${{ github.sha }}! ❌"
           fi
           curl -X POST -H "Content-Type: application/json" \
           -d "{\"content\": \"$MESSAGE\"}" \

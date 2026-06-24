@@ -1,5 +1,4 @@
 # --- STAGE 1: Frontend Build Process ---
-# Using a lightweight Alpine image to compile Vue.js assets
 FROM node:22-bullseye AS build-frontend
 WORKDIR /app/frontend
 COPY frontend/package*.json ./
@@ -12,53 +11,42 @@ RUN npm run build
 FROM python:3.11-slim-bookworm 
 WORKDIR /app
 
-RUN echo "deb http://deb.debian.org/debian bookworm main" > /etc/apt/sources.list
-
 # 1. System Dependencies
+# Minimalist approach: keep only what's necessary for runtime
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
-# 2. Install SRE Tools separately to ensure reliability
-RUN curl -sfL https://raw.githubusercontent.com/aquasecurity/trivy/main/contrib/install.sh | sh -s -- -b /usr/local/bin
-RUN K8S_VERSION=$(curl -L -s https://dl.k8s.io/release/stable.txt) && \
-    curl -LO "https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl" && \
-    chmod +x kubectl && mv kubectl /usr/local/bin/
-
-# 3. Dependency Management
-# Leveraging Docker layer caching by copying requirements first
+# 2. Dependency Management
 COPY backend/requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir -r requirements.txt
 
-# 4. Source Code Placement
-# Copying backend and infrastructure components to their expected paths
+# 3. Source Code Placement
 COPY backend/ ./backend/
 COPY tests/ ./tests/
 COPY infra/ ./infra/
 
-# 5. Frontend Integration
-# Importing compiled static assets from Stage 1
+# 4. Frontend Integration
 COPY --from=build-frontend /app/frontend/dist /app/static
 
-# 6. Runtime Configuration & Persistence
-# Transition to the backend directory for the application runtime
+# 5. Runtime Configuration
 WORKDIR /app/backend
 
 # Initialize SQLite database and set appropriate file permissions
-RUN touch kguard.db && chmod 777 kguard.db && chmod 777 .
+# SRE Best Practice: Use specific permissions rather than 777 in production
+RUN touch kguard.db && chown -R 1000:1000 /app/backend
 
-# SRE Fix: Add the root directory to PYTHONPATH to allow relative 'backend.' imports
-# This ensures uvicorn can locate modules correctly from within the /app/backend directory
+# SRE Fix: Add the root directory to PYTHONPATH
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1
 
 EXPOSE 8000
 
-# 7. Service Execution
-# Ensure all files are accessible with non-root compliant permissions
-RUN chmod -R 755 /app
+# 6. Service Execution
+# Drop privileges to non-root user (ID 1000 is standard for most images)
+USER 1000
 
-# 8. Launch Uvicorn, pointing to the main app module
 CMD ["uvicorn", "backend.main:app", "--host", "0.0.0.0", "--port", "8000"]
