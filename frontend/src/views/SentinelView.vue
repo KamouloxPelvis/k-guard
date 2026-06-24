@@ -18,6 +18,7 @@
   interface NetworkEdge {
     source: string;
     target: string;
+          # On utilise la même référence d'image que celle qui vient d'être buildée
     label: string;
     sourceIp?: string;
     targetIp?: string;
