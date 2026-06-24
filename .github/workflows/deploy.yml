@@ -78,7 +78,7 @@ jobs:
             echo "DEPLOY_DIR=k8s/blue" >> $GITHUB_ENV
           else
             echo "TARGET_NS=k-guard-green" >> $GITHUB_ENV
-            echo "DEPLOY_DIR=k8s/green" >> $GITHUB_ENV
+            echo "DEPLOY_DIR=green/k8s" >> $GITHUB_ENV
           fi
 
       - name: Deploy to K3s
