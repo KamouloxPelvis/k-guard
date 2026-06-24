@@ -1,35 +1,30 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: k-guard-ingress
-  namespace: k-guard
+  name: k-guard-ingress-green
+  namespace: k-guard-green
   annotations:
-    # Use nginx as the ingress class controller
     kubernetes.io/ingress.class: "nginx"
-    # Ensure traffic is correctly routed by defining the rewrite target if needed
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
-  # Route traffic specifically for the kguard.local domain
-  - host: kguard.local
+  - host: kguard-green.local # URL dédiée pour ne pas interférer avec la prod
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: k-guard-service
+            name: k-guard-service-green 
             port:
-              # Targets the port 80 of the service which maps to 8000 on the pod
               number: 80
-  # Fallback rule to handle traffic coming via IP address if necessary
   - http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: k-guard-service
+            name: k-guard-service-green
             port:
               number: 8000
