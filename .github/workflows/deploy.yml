@@ -85,14 +85,21 @@ jobs:
         run: |
           echo "🚀 Synchronizing Infrastructure for namespace: $TARGET_NS..."
           
-          # Applique les manifestes du dossier spécifique (blue ou green)
+          # Applique les manifestes
           kubectl apply -f $DEPLOY_DIR/ -n $TARGET_NS
           
-          # Force l'image spécifique avec le SHA (v1.5.0 est embarqué dans le SHA)
-          kubectl set image deployment/kguard-deployment kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
+          # Détermine le nom du déploiement selon l'environnement
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            DEPLOY_NAME="kguard-deployment"
+          else
+            DEPLOY_NAME="kguard-deployment-green"
+          fi
           
-          # Vérifie la santé du déploiement
-          kubectl rollout status deployment kguard-deployment -n $TARGET_NS --timeout=300s
+          # Force l'image spécifique avec le bon nom de déploiement
+          kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:v1.5.0 -n $TARGET_NS
+          
+          # Vérifie la santé
+          kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
 
       - name: Discord Notification
         if: always()
