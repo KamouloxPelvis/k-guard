@@ -25,7 +25,7 @@ app = FastAPI(
 # --- CORS CONFIGURATION ---
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
-    "http://localhost:8443,http://127.0.0.1:8443",
+    "http://localhost:8000,http://127.0.0.1:8000",
 )
 origins = [origin.strip() for origin in raw_origins.split(",")]
 
