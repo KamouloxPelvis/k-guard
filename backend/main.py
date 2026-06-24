@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 # --- Routers Imports ---
 from backend.network_manager import router as network_router
-from backend.routers import auth, k3s, integrations, webhook
+from backend.routers import auth, k3s, integrations
 
 # --- ENV LOADING ---
 base_dir = Path(__file__).resolve().parent
@@ -54,7 +54,6 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(k3s.router, prefix="/api")
 app.include_router(network_router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
-app.include_router(webhook.router, prefix="/api") # New endpoint for security alerts
 
 # --- GLOBAL API ROUTES ---
 @app.get("/api/health", tags=["Status"])

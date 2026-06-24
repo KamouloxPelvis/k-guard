@@ -31,6 +31,8 @@ spec:
         - name: temp-storage
           emptyDir:
             sizeLimit: 500Mi
+        - name: db-storage
+          emptyDir: {}
       containers:
         - name: kguard-app
           image: ghcr.io/kamouloxpelvis/kguard-app:v1.5.0
@@ -62,6 +64,8 @@ spec:
               name: docker-socket
             - mountPath: /tmp
               name: temp-storage
+            - name: db-storage
+              mountPath: /app/data
           env:
             - name: K8S_MODE
               value: "in-cluster"
