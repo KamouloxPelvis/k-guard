@@ -88,7 +88,7 @@ def get_pod_logs(namespace: str, pod_name: str):
         return f"CRITICAL ERROR: Unable to retrieve logs for {pod_name}. See K-Guard backend logs."
 
 def get_cluster_deployments():
-    """Retrieves deployments for security auditing (Trivy discovery)."""
+    """Retrieves deployments for security auditing."""
     if not apps_client:
         print("⚠️ K8s AppsClient not initialized")
         return []
@@ -116,7 +116,7 @@ def get_cluster_deployments():
 
 def get_storage_stats():
     """Checks disk space on critical mount points (PVC / Root)."""
-    paths = ["/", "/data/trivy-cache", "/app"]
+    paths = ["/", "/app"]
     stats = {}
     
     for path in paths:
@@ -129,24 +129,6 @@ def get_storage_stats():
                 "percent": round((used / total) * 100, 1)
             }
     return stats
-
-def purge_trivy_cache():
-    """Safely removes Trivy cache content on the Persistent Volume (PVC)."""
-    cache_path = "/data/trivy-cache"
-    try:
-        if os.path.exists(cache_path):
-            # Clear directory content without deleting the root folder (mount point)
-            for filename in os.listdir(cache_path):
-                file_path = os.path.join(cache_path, filename)
-                if os.path.isfile(file_path) or os.path.islink(file_path):
-                    os.unlink(file_path)
-                elif os.path.isdir(file_path):
-                    shutil.rmtree(file_path)
-            return True
-        return False
-    except Exception as e:
-        print(f"❌ Purge Error: {e}")
-        return False
 
 def get_node_capacity():
     """SRE Feature: Dynamically retrieves K3s node capacity for precise metrics UI."""

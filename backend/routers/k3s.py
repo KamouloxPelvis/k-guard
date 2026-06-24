@@ -5,7 +5,6 @@ from backend.k3s_manager import (
     get_k3s_status, 
     get_cluster_deployments, 
     get_storage_stats, 
-    purge_trivy_cache, 
     get_node_capacity,
     get_pod_logs
 )
@@ -60,8 +59,8 @@ async def get_vps_specs(user: dict = Depends(verify_token)):
             
         node = nodes.items[0]
         return {
-            "cluster_version": node.status.node_info.kubelet_version, # ex: v1.28.x+k3s
-            "vps_os": node.status.node_info.os_image,               # ex: Ubuntu 24.04 LTS
+            "cluster_version": node.status.node_info.kubelet_version,
+            "vps_os": node.status.node_info.os_image,
             "uptime": "Active",
             "status": "Online"
         }
@@ -71,39 +70,22 @@ async def get_vps_specs(user: dict = Depends(verify_token)):
 @router.get("/k3s/deployments/all")
 async def k3s_deployments(user: dict = Depends(verify_token)):
     """
-    Discovers all active deployments for automated Trivy security auditing.
+    Discovers all active deployments for security auditing and inventory purposes.
     """
     return get_cluster_deployments()
 
 @router.get("/k3s/debug/storage")
 async def k3s_storage(user: dict = Depends(verify_token)):
     """
-    Aggregates SRE storage statistics and K-Guard/Trivy database persistence status.
+    Aggregates SRE storage statistics. 
     Conforms to the 'DebugInfo' Frontend interface.
     """
-    # 1. Fetch filesystem usage statistics via SRE utility
+    # Fetch filesystem usage statistics via SRE utility
     disks = get_storage_stats()
     
-    # 2. Verify database persistence on the Persistent Volume (PVC)
-    cache_path = os.getenv("TRIVY_CACHE_DIR", "/data/trivy-cache")
-    db_exists = os.path.exists(os.path.join(cache_path, "db"))
-    
-    # 3. Return a standardized payload for the Settings dashboard
+    # Return a standardized payload for the Settings dashboard
     return {
         "status": "online",
         "disks": disks,
-        "database_present": db_exists,
         "timestamp": datetime.utcnow().isoformat()
     }
-
-@router.delete("/k3s/cache/purge")
-async def purge_cache(user: dict = Depends(verify_token)):
-    """
-    SRE Maintenance: Safely wipes the Trivy local databases from the Persistent Volume.
-    """
-    success = purge_trivy_cache()
-    if success:
-        return {"status": "success", "message": "Trivy cache purged successfully"}
-    
-    # Security best practice: Avoid revealing internal path details in the exception
-    raise HTTPException(status_code=500, detail="SRE Action Failed: Unable to purge persistent cache.")
