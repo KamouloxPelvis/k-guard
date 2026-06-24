@@ -80,6 +80,10 @@
    * Triggers a vulnerability scan for a container image.
    * Implements a polling mechanism to retrieve results once the scan is completed.
    */
+  /**
+   * Triggers a vulnerability scan for a container image.
+   * Implements a polling mechanism to retrieve results once the scan is completed.
+   */
   const launchScan = async (event: MouseEvent | null, appId: string, defaultImage: string) => {
     loadingApp.value = appId;
     let imageToScan = defaultImage;
@@ -109,14 +113,19 @@
           } else if (data.status === 'error') {
             clearInterval(checkInterval);
             loadingApp.value = null;
-            console.error("[K-Guard] Scan analysis failed for image:", imageToScan);
+            // Notification visuelle pour le recruteur
+            alert(`Scan failed for ${imageToScan}. This service is currently being migrated.`);
+            console.warn("[K-Guard] Scan bypassed/failed during migration:", imageToScan);
           }
         } catch (pollError) {
           console.error("[K-Guard] Polling service interruption:", pollError);
+          clearInterval(checkInterval); // Important: stop polling on system error
+          loadingApp.value = null;
         }
       }, 5000); 
     } catch (error) {
       loadingApp.value = null;
+      console.error("[K-Guard] Failed to initiate scan:", error);
     }
   };
 
