@@ -1,22 +1,22 @@
 from fastapi import HTTPException
-from backend.database import v1, apps_client, custom_client # <--- Custom client for Metrics API
+from backend.database import v1, apps_client, custom_client
 
 def parse_cpu(cpu_raw):
-    """Converts K8s CPU units (nanocores, microcores, millicores) to millicores (m)"""
+    """Converts K8s CPU units (nanocores, microcores, millicores) to millicores (m)."""
     cpu_str = str(cpu_raw)
     try:
         if cpu_str.endswith('n'):
             return int(cpu_str.replace('n', '')) // 1000000
-        if cpu_str.endswith('u'): # Handle microcores, common in lightweight K3s environments
+        if cpu_str.endswith('u'): # Handle microcores for lightweight K3s envs
             return int(cpu_str.replace('u', '')) // 1000
         if cpu_str.endswith('m'):
             return int(cpu_str.replace('m', ''))
-        return int(float(cpu_str)) # Handles decimal numbers
-    except:
+        return int(float(cpu_str)) # Handles decimal inputs
+    except ValueError:
         return 0
 
 def parse_memory(mem_raw):
-    """Converts K8s Memory units (Ki, Mi, Gi) to MegaBytes (MiB)"""
+    """Converts K8s Memory units (Ki, Mi, Gi) to MegaBytes (MiB)."""
     mem_str = str(mem_raw)
     if mem_str.endswith('Ki'):
         return int(mem_str.replace('Ki', '')) // 1024
@@ -24,11 +24,11 @@ def parse_memory(mem_raw):
         return int(mem_str.replace('Mi', ''))
     if mem_str.endswith('Gi'):
         return int(mem_str.replace('Gi', '')) * 1024
-    # If raw bytes
+    # Default fallback for raw bytes
     return int(mem_str) // (1024 * 1024)
 
 def get_pod_metrics(namespace: str = None):
-    """Fetches real-time CPU/RAM usage from the Metrics Server API"""
+    """Fetches real-time CPU/RAM usage from the Metrics Server API."""
     if not custom_client:
         return []
 
@@ -65,8 +65,8 @@ def get_pod_metrics(namespace: str = None):
                     total_mem += parse_memory(usage.get("memory", 0))
             
             parsed_metrics.append({
-                "pod_name": p_name,      # Full technical name
-                "namespace": p_ns,       # Valid namespace
+                "pod_name": p_name,
+                "namespace": p_ns,
                 "cpuUsage": total_cpu,
                 "memoryUsage": total_mem
             })
@@ -77,17 +77,20 @@ def get_pod_metrics(namespace: str = None):
         return []
 
 async def scale_down_deployment(namespace: str, pod_name: str):
-    """Triggers an SRE scaling action to remediate resource pressure or security risks"""
+    """
+    SRE Feature: Triggers an automated scaling action to remediate 
+    resource pressure or potential security risks identified by Falco/Wazuh.
+    """
     try:
         pod = v1.read_namespaced_pod(name=pod_name, namespace=namespace)
         if not pod.metadata.owner_references:
             raise Exception("Pod has no parent owner (standalone pod)")
             
         rs_name = pod.metadata.owner_references[0].name
-        # Robust logic to identify the parent Deployment from the ReplicaSet name
+        # Logic to identify the parent Deployment from the ReplicaSet name
         deployment_name = rs_name.rsplit('-', 1)[0]
         
-        # Scaling down to 1 replica (Stabilization mode)
+        # Scaling down to 1 replica (Stabilization/Quarantine mode)
         body = {"spec": {"replicas": 1}}
         apps_client.patch_namespaced_deployment_scale(
             name=deployment_name,
