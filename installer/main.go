@@ -127,7 +127,6 @@ ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000,h
 USER_DOMAIN=%s
 PROJECT_NAME=K-Guard
 KGUARD_PROTECTED_NS=%s
-TRIVY_CACHE_DIR=/data/trivy-cache
 `,
 		time.Now().Format("2006-01-02 15:04:05"), // ARG 1: Date
 		rootPath,                                 // ARG 2: PROJECT_ROOT
