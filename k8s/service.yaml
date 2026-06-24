@@ -5,11 +5,8 @@ metadata:
   namespace: k-guard-green
 spec:
   selector:
-    app: k-guard-green       
+    app: k-guard-green
   ports:
     - name: api
       port: 8000
-      targetPort: 8000
-    - name: http
-      port: 80
-      targetPort: 8000
+      targetPort: 8000  
