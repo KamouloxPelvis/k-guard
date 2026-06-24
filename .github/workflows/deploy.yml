@@ -60,6 +60,7 @@ jobs:
           tags: |
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
+            ghcr.io/kamouloxpelvis/kguard-app:v1.5.0
 
   deploy_to_k3s:
     needs: build_images
