@@ -2,6 +2,8 @@ package main
 
 import (
 	"bufio"
+	"crypto/rand"
+	"encoding/hex"
 	"fmt"
 	"os"
 	"os/exec"
@@ -62,21 +64,35 @@ type model struct {
 
 // --- CORE FUNCTIONS ---
 
+// checkAndPrepare performs environment sanity checks before deployment.
+// It validates the Operating System, the presence of critical binaries,
+// and ensures the Kubernetes namespace is properly initialized.
 func checkAndPrepare() (string, error) {
+	// K-Guard is strictly designed for Linux environments.
 	if runtime.GOOS != "linux" {
 		return "", fmt.Errorf("K-Guard is optimized for Linux systems")
 	}
-	// Vérification de K3s (Crucial pour ton architecture)
+
+	// Verify K3s configuration availability.
+	// K3s serves as the foundation for the K-Guard infrastructure.
 	if _, err := os.Stat("/etc/rancher/k3s/k3s.yaml"); os.IsNotExist(err) {
 		return "", fmt.Errorf("K3s not found. Please install K3s to host K-Guard infrastructure")
 	}
 
-	// Nettoyage intelligent du Namespace
+	// Ensure Helm is installed to handle security components deployment.
+	// This proactive check prevents runtime failures during the install phase.
+	if _, err := exec.LookPath("helm"); err != nil {
+		return "", fmt.Errorf("helm binary not found. Please install Helm to deploy security components")
+	}
+
+	// Check if the infrastructure namespace already exists.
+	// This enables idempotency for the installation process.
 	cmd := exec.Command("kubectl", "get", "ns", "k-guard")
 	if err := cmd.Run(); err == nil {
 		return "Infrastructure existing, ready for update", nil
 	}
 
+	// Create the namespace if it doesn't exist.
 	if err := exec.Command("kubectl", "create", "namespace", "k-guard").Run(); err != nil {
 		return "", fmt.Errorf("Namespace creation failed: %v", err)
 	}
@@ -93,65 +109,75 @@ func getPublicIP() string {
 	return strings.TrimSpace(string(out))
 }
 
+func generateSecureToken(length int) string {
+	b := make([]byte, length)
+	if _, err := rand.Read(b); err != nil {
+		return "fallback_token_secure"
+	}
+	return hex.EncodeToString(b)
+}
+
 func setupCredentials(rootPath, username, password string) error {
-	publicIP := getPublicIP() // Dynamic detection
+	publicIP := getPublicIP()
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %v", err)
 	}
 
+	// Generating random credentials for the internal Security SIEM
+	wazuhUser := "wazuh_admin"
+	wazuhPwd := generateSecureToken(16)
+
 	envPath := filepath.Join(rootPath, "backend", ".env")
 
-	protectedNamespaces := "k-guard"
+	// Constructing the configuration string cleanly
+	var sb strings.Builder
+	sb.WriteString("# K-GUARD SYSTEM CONFIGURATION\n")
+	sb.WriteString(fmt.Sprintf("# Generated on: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
 
-	// Fixed: Added publicIP and publicIP to the arguments of Sprintf
-	envContent := fmt.Sprintf(`# K-GUARD SYSTEM CONFIGURATION
-# Generated on: %s
-# Target Environment: Global/Portable
+	sb.WriteString("# --- PATH RESOLUTION ---\n")
+	sb.WriteString(fmt.Sprintf("PROJECT_ROOT=%s\n", rootPath))
+	sb.WriteString(fmt.Sprintf("DB_DIR=%s/backend/data\n", rootPath))
+	sb.WriteString(fmt.Sprintf("KGUARD_ANSIBLE_PATH=%s/infra/ansible/harden_network.yml\n\n", rootPath))
 
-# --- PATH RESOLUTION ---
-PROJECT_ROOT=%s
-DB_DIR=%s/backend/data
-KGUARD_ANSIBLE_PATH=%s/infra/ansible/harden_network.yml
+	sb.WriteString("# --- AUTHENTICATION & SECURITY ---\n")
+	sb.WriteString(fmt.Sprintf("ADMIN_USERNAME=%s\n", username))
+	sb.WriteString(fmt.Sprintf("ADMIN_PASSWORD_HASH=%s\n", string(hash)))
+	sb.WriteString(fmt.Sprintf("SECRET_KEY=kguard_%d\n", time.Now().Unix()))
+	sb.WriteString("ALGORITHM=HS256\n")
+	sb.WriteString("ACCESS_TOKEN_EXPIRE_MINUTES=600\n\n")
 
-# --- AUTHENTICATION & SECURITY ---
-ADMIN_USERNAME=%s
-ADMIN_PASSWORD_HASH=%s
-SECRET_KEY=kguard_%d
-ALGORITHM=HS256
-ACCESS_TOKEN_EXPIRE_MINUTES=600
+	sb.WriteString("# --- WAZUH INTEGRATION ---\n")
+	sb.WriteString(fmt.Sprintf("WAZUH_API_URL=https://wazuh-manager:55000\n"))
+	sb.WriteString(fmt.Sprintf("WAZUH_USERNAME=%s\n", wazuhUser))
+	sb.WriteString(fmt.Sprintf("WAZUH_PASSWORD=%s\n\n", wazuhPwd))
 
-# --- NETWORK CONFIGURATION ---
-ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000,http://localhost:80,http://%s:80,http://k-guard.local:80 
-USER_DOMAIN=%s
-PROJECT_NAME=K-Guard
-KGUARD_PROTECTED_NS=%s
-`,
-		time.Now().Format("2006-01-02 15:04:05"), // ARG 1: Date
-		rootPath,                                 // ARG 2: PROJECT_ROOT
-		rootPath,                                 // ARG 3: DB_DIR
-		rootPath,                                 // ARG 4: KGUARD_ANSIBLE_PATH
-		username,                                 // ARG 5: ADMIN_USERNAME
-		string(hash),                             // ARG 6: ADMIN_PASSWORD_HASH
-		time.Now().Unix(),                        // ARG 7: SECRET_KEY (%d)
-		publicIP,                                 // ARG 8: For ALLOWED_ORIGINS (%s)
-		publicIP,                                 // ARG 9: For USER_DOMAIN (%s)
-		protectedNamespaces)                      // ARG 10: For KGUARD_PROTECTED_NS (%s)
+	sb.WriteString("# --- NETWORK CONFIGURATION ---\n")
+	sb.WriteString(fmt.Sprintf("ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000\n", publicIP))
+	sb.WriteString(fmt.Sprintf("USER_DOMAIN=%s\n", publicIP))
+	sb.WriteString("PROJECT_NAME=K-Guard\n")
+	sb.WriteString("KGUARD_PROTECTED_NS=k-guard\n")
 
-	return os.WriteFile(envPath, []byte(envContent), 0600)
+	return os.WriteFile(envPath, []byte(sb.String()), 0600)
 }
 
 func syncSecretsToK8s(rootPath string) error {
 	envPath := filepath.Join(rootPath, "backend", ".env")
-	
-	script := fmt.Sprintf("kubectl create secret generic k-guard-secrets --from-env-file=%s -n k-guard --dry-run=client -o yaml | kubectl apply -f -", envPath)
+	kubeConfig := "/etc/rancher/k3s/k3s.yaml"
+
+	script := fmt.Sprintf(
+		"KUBECONFIG=%s kubectl create secret generic k-guard-secrets "+
+			"--from-env-file=%s -n k-guard --dry-run=client -o yaml | "+
+			"KUBECONFIG=%s kubectl apply -f -",
+		kubeConfig, envPath, kubeConfig,
+	)
+
 	cmd := exec.Command("sh", "-c", script)
-	
 	if output, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("Secrets sync failed: %s", string(output))
+		return fmt.Errorf("Secrets sync failed: %s | Error: %v", string(output), err)
 	}
-	
+
 	fmt.Println("🧹 Cleaning up sensitive local configuration...")
 	return os.Remove(envPath)
 }
@@ -216,44 +242,97 @@ func (m model) Init() tea.Cmd {
 	return tea.Batch(m.spinner.Tick, m.runStep(0))
 }
 
+// Step defines a single deployment action for the pipeline.
+type Step struct {
+	Name string
+	Run  func() error
+}
+
 func (m model) runStep(step int) tea.Cmd {
 	return func() tea.Msg {
-		var err error
-		var msg string
-		time.Sleep(600 * time.Millisecond)
+		// Define the pipeline of operations as an ordered slice of steps.
+		// This improves readability and maintainability.
+		pipeline := []Step{
+			{"Checking system architecture", func() error { _, err := checkAndPrepare(); return err }},
+			{"Hashing credentials & updating .env", func() error { return setupCredentials(m.projectRoot, m.adminUser, m.adminPwd) }},
+			{"Synchronizing Kubernetes secrets", func() error { return syncSecretsToK8s(m.projectRoot) }},
+			{"Applying K8s Manifests", func() error {
+				k8sPath := filepath.Join(m.projectRoot, "k8s")
+				kubeConfig := "/etc/rancher/k3s/k3s.yaml"
+				cmdStr := fmt.Sprintf("KUBECONFIG=%s kubectl apply -f %s", kubeConfig, k8sPath)
+				cmd := exec.Command("sh", "-c", cmdStr)
+				out, err := cmd.CombinedOutput()
+				if err != nil {
+					return fmt.Errorf("%s | Err: %v", string(out), err)
+				}
+				return nil
+			}},
+			{"Deploying frontend assets (Linking static)", func() error { return deployFrontend(m.projectRoot) }},
+			{"Registering 'kguard' global command", func() error { return setupGlobalCommand(m.projectRoot) }},
 
-		switch step {
-		case 0:
-			msg = "Checking system architecture"
-			_, err = checkAndPrepare()
-		case 1:
-			msg = "Verifying Docker socket (Runtime Check)"
-			// ... (votre code actuel)
-		case 2:
-			msg = "Hashing credentials & updating .env"
-			err = setupCredentials(m.projectRoot, m.adminUser, m.adminPwd)
-		case 3:
-			msg = "Synchronizing Kubernetes secrets"
-			err = syncSecretsToK8s(m.projectRoot)
-		case 4:
-			msg = "Applying K8s Manifests"
-			k8sPath := filepath.Join(m.projectRoot, "k8s")
-			cmd := exec.Command("kubectl", "apply", "-f", k8sPath, "-n", "k-guard")
-			err = cmd.Run()
-		case 5:
-			msg = "Deploying frontend assets (Linking static)"
-			err = deployFrontend(m.projectRoot)
-		case 6:
-			msg = "Registering 'kguard' global command"
-			err = setupGlobalCommand(m.projectRoot)
-		default:
+			// DeployWazuhStack handles the installation of the Wazuh server within the cluster.
+			// This provides a centralized security monitoring and incident response platform.
+			{"Installing Wazuh Security Stack", func() error {
+				kubeConfig := "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+				path, _ := exec.LookPath("helm")
+				
+				// Using the official stable repository endpoint
+				steps := []string{
+					fmt.Sprintf("%s %s repo add wazuh https://wazuh.github.io/wazuh-charts/", kubeConfig, path), // Note the trailing slash
+					fmt.Sprintf("%s %s repo update", kubeConfig, path),
+					fmt.Sprintf("%s %s upgrade --install wazuh wazuh/wazuh -n wazuh --create-namespace", kubeConfig, path),
+				}
+				
+				for _, s := range steps {
+					cmd := exec.Command("sh", "-c", s)
+					if out, err := cmd.CombinedOutput(); err != nil {
+						return fmt.Errorf("Wazuh installation failed: %s | Err: %v", string(out), err)
+					}
+				}
+				return nil
+			}},
+
+			{"Installing Security Stack (Falco + Sidekick)", func() error {
+				kubeConfig := "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
+				path, _ := exec.LookPath("helm")
+				wazuhManagerHost := "wazuh-manager.wazuh.svc.cluster.local"
+
+				// We consolidate into a single release named 'kguard-security'
+				// Falcosidekick is enabled as a dependency within the Falco chart
+				steps := []string{
+					fmt.Sprintf("%s %s repo add falcosecurity https://falcosecurity.github.io/charts", kubeConfig, path),
+					fmt.Sprintf("%s %s repo update", kubeConfig, path),
+					fmt.Sprintf("%s %s upgrade --install kguard-security falcosecurity/falco -n falco --create-namespace "+
+						"--set driver.kind=modern_ebpf "+
+						"--set controller.kind=daemonset "+
+						"--set falcosidekick.enabled=true "+
+						"--set falcosidekick.config.wazuh.enabled=true", // Virgule ici qui coupe la chaîne
+						"--set falcosidekick.config.wazuh.host=%s "+ // Ces arguments ne sont pas intégrés
+						"--set falcosidekick.config.wazuh.port=1514", 
+						kubeConfig, path, wazuhManagerHost),
+				}
+
+				for _, s := range steps {
+					cmd := exec.Command("sh", "-c", s)
+					if out, err := cmd.CombinedOutput(); err != nil {
+						return fmt.Errorf("Security stack installation failed: %s | Err: %v", string(out), err)
+					}
+				}
+				return nil
+			}},
+		}
+
+		if step >= len(pipeline) {
 			return successMsg(true)
 		}
 
-		if err != nil {
+		current := pipeline[step]
+		time.Sleep(600 * time.Millisecond) // Smooth UI pacing
+
+		if err := current.Run(); err != nil {
 			return errMsg(err)
 		}
-		return statusMsg(msg)
+		return statusMsg(current.Name)
 	}
 }
 

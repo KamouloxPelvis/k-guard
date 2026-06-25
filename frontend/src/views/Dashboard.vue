@@ -89,7 +89,7 @@
   const pageTitle = computed(() => {
     const titles: Record<string, string> = {
       '/': 'System Overview',
-      '/security': 'Vulnerabilities',
+      '/security': 'Runtime Observability & Security',
       '/sentinel': 'Network Sentinel',
       '/settings': 'Settings'
     };
@@ -128,15 +128,15 @@
           <span class="text-lg">📊</span>
           <div class="flex flex-col md:hidden lg:flex ml-3">
             <span class="text-[10px] font-bold uppercase tracking-widest">System Overview</span>
-            <span class="text-[7px] text-slate-500 font-mono mt-0.5 uppercase">K3s Status</span>
+            <span class="text-[7px] text-slate-500 font-mono mt-0.5 uppercase">K3s Status & Logs</span>
           </div>
         </router-link>
 
         <router-link to="/security" @click="isMenuOpen = false" class="nav-link py-2" :class="route.path === '/security' ? 'nav-active' : 'nav-inactive'">
           <span class="text-lg">🔒</span>
           <div class="flex flex-col md:hidden lg:flex ml-3">
-            <span class="text-[10px] font-bold uppercase tracking-widest">Vulnerabilities</span>
-            <span class="text-[7px] text-slate-500 font-mono mt-0.5 uppercase">Trivy Scan</span>
+            <span class="text-[10px] font-bold uppercase tracking-widest">Runtime Observability & Security</span>
+            <span class="text-[7px] text-slate-500 font-mono mt-0.5 uppercase">Falco Detection</span>
           </div>
         </router-link>
 
