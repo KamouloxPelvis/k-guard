@@ -6,7 +6,6 @@ on:
       - main
       - feat/*
 
-# SRE Best Practice: Enforce global least privilege
 permissions:
   contents: read
 
@@ -15,20 +14,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
-        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
-
+        uses: actions/checkout@v4
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-
       - name: Install Bandit
         run: pip install bandit
-
       - name: Run Bandit Scan
         continue-on-error: true
         run: bandit -r . -c bandit.yaml -ll -f html -o security_report.html
-      
       - name: Upload Report
         uses: actions/upload-artifact@v4
         with:
@@ -43,72 +38,61 @@ jobs:
       packages: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
-        
+        uses: actions/checkout@v4
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3
+        uses: docker/login-action@v3
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Build and push K-Guard image
-        uses: docker/build-push-action@ca052bb54ab0790a636c9b5f226502c73d547a25 # v5
+        uses: docker/build-push-action@v5
         with:
           context: .
           push: true
           tags: |
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
-            ghcr.io/kamouloxpelvis/kguard-app:v1.5.0
 
   deploy_to_k3s:
     needs: build_images
     runs-on: self-hosted
-    environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11 
+    # Using environment variables for environment selection
+    environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11
     steps:
       - name: Checkout code
-        uses: actions/checkout@a5ac7e51b41094c92402da3b24376905380afc29 # v4.1.6
+        uses: actions/checkout@v4
 
-      - name: Determine Environment Context
-        id: env_setup
+      - name: Deploy Infrastructure
         run: |
+          # Define deployment variables based on branch
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            echo "TARGET_NS=k-guard" >> $GITHUB_ENV
-            echo "DEPLOY_DIR=k8s" >> $GITHUB_ENV
-          else
-            echo "TARGET_NS=k-guard-green" >> $GITHUB_ENV
-            echo "DEPLOY_DIR=k8s" >> $GITHUB_ENV
-          fi
-
-      - name: Deploy to K3s
-        run: |
-          echo "🚀 Synchronizing Infrastructure for namespace: $TARGET_NS..."
-          
-          # Applique les manifestes
-          kubectl apply -f $DEPLOY_DIR/ -n $TARGET_NS
-          
-          # Détermine le nom du déploiement selon l'environnement
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            TARGET_NS="k-guard"
             DEPLOY_NAME="kguard-deployment"
           else
+            TARGET_NS="k-guard-green"
             DEPLOY_NAME="kguard-deployment-green"
           fi
           
-          # Force l'image spécifique avec le bon nom de déploiement
-          kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:v1.5.0 -n $TARGET_NS
+          echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
-          # Vérifie la santé
+          # Run the installer for the specific namespace
+          sudo ./kguard-install --namespace "$TARGET_NS"
+          
+          # Update the deployment with the latest image SHA
+          kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
+          
+          # Verify deployment status
           kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
+        env:
+          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
       - name: Discord Notification
         if: always()
         run: |
           if [ "${{ job.status }}" == "success" ]; then
-            MESSAGE="🛡️ **K-GUARD** ($TARGET_NS): Deployment successful! SHA ${{ github.sha }} is live. ✅"
+            MESSAGE="🛡️ **K-GUARD**: Deployment successful! SHA ${{ github.sha }} is live. ✅"
           else
-            MESSAGE="⚠️ **K-GUARD** ($TARGET_NS): Critical deployment failure on SHA ${{ github.sha }}! ❌"
+            MESSAGE="⚠️ **K-GUARD**: Critical deployment failure on SHA ${{ github.sha }}! ❌"
           fi
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"$MESSAGE\"}" \
-          ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
