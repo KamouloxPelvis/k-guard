@@ -69,7 +69,7 @@ jobs:
 
       - name: Deploy Infrastructure
         run: |
-          # Define deployment variables based on branch
+          # 1. Définition des variables de déploiement
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             TARGET_NS="k-guard"
             DEPLOY_NAME="kguard-deployment"
@@ -77,10 +77,10 @@ jobs:
             TARGET_NS="k-guard-green"
             DEPLOY_NAME="kguard-deployment-green"
           fi
-          
+
           echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
-          echo "🚀 Localisation de l'installateur..."
+          # 2. Localisation dynamique de l'installateur
           INSTALLER_PATH=$(find $GITHUB_WORKSPACE -name "kguard-install" | head -n 1)
           
           if [ -z "$INSTALLER_PATH" ]; then
@@ -89,15 +89,16 @@ jobs:
           fi
           
           echo "✅ Installateur trouvé à : $INSTALLER_PATH"
-          
-          # Exécution dynamique
           chmod +x "$INSTALLER_PATH"
-          sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
-          # Update the deployment with the latest image SHA
+          # 3. Exécution avec les entrées forcées (via printf)
+          # On utilise printf pour fournir admin + password en une seule fois
+          printf "admin\npassword_secret\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
+          
+          # 4. Mise à jour du déploiement
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
           
-          # Verify deployment status
+          # 5. Vérification
           kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
         env:
           KUBECONFIG: /etc/rancher/k3s/k3s.yaml
