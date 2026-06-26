@@ -54,10 +54,23 @@ jobs:
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
 
+  deploy_to_k3s:
+    needs: build_images
+    runs-on: self-hosted
+    environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
       - name: Deploy Infrastructure
         env:
-            KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+          KUBECONFIG: /home/kamal/k3s.yaml
         run: |
+          # Préparation du contexte Kubeconfig sécurisé
+          sudo cp /etc/rancher/k3s/k3s.yaml /home/kamal/k3s.yaml
+          sudo chown kamal:kamal /home/kamal/k3s.yaml
+          chmod 600 /home/kamal/k3s.yaml
+          
           # 1. Définition des variables
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             TARGET_NS="k-guard"
@@ -69,12 +82,11 @@ jobs:
 
           echo "🚀 Preparing environment for: $TARGET_NS..."
           
-          # 2. Vérification de la présence de l'installateur (sans exécution)
+          # 2. Vérification de la présence de l'installateur
           INSTALLER_PATH=$(find $GITHUB_WORKSPACE -name "kguard-install" | head -n 1)
           
           if [ -f "$INSTALLER_PATH" ]; then
             echo "✅ Installateur vérifié et prêt pour distribution : $INSTALLER_PATH"
-            # S'assurer qu'il est exécutable pour l'utilisateur final
             chmod +x "$INSTALLER_PATH"
           else
             echo "❌ Erreur : installateur non trouvé, aborting deployment!"
