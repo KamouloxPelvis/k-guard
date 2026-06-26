@@ -54,24 +54,9 @@ jobs:
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
 
-  deploy_to_k3s:
-    env:
-      KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-    needs: build_images
-    runs-on: self-hosted
-    # Using environment variables for environment selection
-    environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-      
-      - name: Run K-Guard Installer
+  - name: Deploy Infrastructure
         run: |
-          sudo -n KGUARD_ENV=docker /usr/local/bin/kguard --verbose  
-
-      - name: Deploy Infrastructure
-        run: |
-          # 1. Définition des variables de déploiement
+          # 1. Définition des variables
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             TARGET_NS="k-guard"
             DEPLOY_NAME="kguard-deployment"
@@ -80,27 +65,25 @@ jobs:
             DEPLOY_NAME="kguard-deployment-green"
           fi
 
-          echo "🚀 Executing automated provisioning for: $TARGET_NS..."
+          echo "🚀 Preparing environment for: $TARGET_NS..."
           
-          # 2. Localisation dynamique de l'installateur
+          # 2. Vérification de la présence de l'installateur (sans exécution)
           INSTALLER_PATH=$(find $GITHUB_WORKSPACE -name "kguard-install" | head -n 1)
           
-          if [ -z "$INSTALLER_PATH" ]; then
-            echo "❌ Erreur : kguard-install introuvable !"
+          if [ -f "$INSTALLER_PATH" ]; then
+            echo "✅ Installateur vérifié et prêt pour distribution : $INSTALLER_PATH"
+            # S'assurer qu'il est exécutable pour l'utilisateur final
+            chmod +x "$INSTALLER_PATH"
+          else
+            echo "❌ Erreur : installateur non trouvé, aborting deployment!"
             exit 1
           fi
           
-          echo "✅ Installateur trouvé à : $INSTALLER_PATH"
-          chmod +x "$INSTALLER_PATH"
-          
-          # 3. Exécution avec les entrées forcées (via printf)
-          # On utilise printf pour fournir admin + password en une seule fois
-          printf "admin_kguard\nS3cureP4ssw0rd!2026\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
-          
-          # 4. Mise à jour du déploiement
+          # 3. Mise à jour de l'image Kubernetes
+          echo "🚀 Deploying latest version: ${{ github.sha }}..."
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
           
-          # 5. Vérification
+          # 4. Vérification du déploiement
           kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
 
       - name: Discord Notification
