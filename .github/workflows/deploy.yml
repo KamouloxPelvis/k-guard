@@ -80,8 +80,19 @@ jobs:
           
           echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
-          # Run the installer for the specific namespace
-          ./green/installer/kguard-install --namespace "$TARGET_NS"
+          echo "🚀 Localisation de l'installateur..."
+          INSTALLER_PATH=$(find $GITHUB_WORKSPACE -name "kguard-install" | head -n 1)
+          
+          if [ -z "$INSTALLER_PATH" ]; then
+            echo "❌ Erreur : kguard-install introuvable !"
+            exit 1
+          fi
+          
+          echo "✅ Installateur trouvé à : $INSTALLER_PATH"
+          
+          # Exécution dynamique
+          chmod +x "$INSTALLER_PATH"
+          "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
           # Update the deployment with the latest image SHA
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
