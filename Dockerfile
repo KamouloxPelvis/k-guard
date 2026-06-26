@@ -35,10 +35,6 @@ COPY --from=build-frontend /app/frontend/dist /app/static
 # 5. Runtime Configuration
 WORKDIR /app/backend
 
-# Initialize SQLite database and set appropriate file permissions
-# SRE Best Practice: Use specific permissions rather than 777 in production
-RUN touch kguard.db && chown -R 1000:1000 /app/backend
-
 # SRE Fix: Add the root directory to PYTHONPATH
 ENV PYTHONPATH=/app
 ENV PYTHONUNBUFFERED=1

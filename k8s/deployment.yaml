@@ -32,7 +32,9 @@ spec:
           emptyDir:
             sizeLimit: 500Mi
         - name: db-storage
-          emptyDir: {}
+          hostPath:
+            path: /var/lib/kguard/db
+            type: DirectoryOrCreate
       containers:
         - name: kguard-app
           image: ghcr.io/kamouloxpelvis/kguard-app:v1.5.0
@@ -69,6 +71,8 @@ spec:
           env:
             - name: K8S_MODE
               value: "in-cluster"
+            - name: DB_DIR
+              value: "/app/data"
           envFrom:
             - secretRef:
                 name: k-guard-secrets

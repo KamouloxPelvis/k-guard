@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: falcosidekick
+  namespace: falco
+spec:
+  selector:
+    app: falcosidekick
+  ports:
+    - protocol: TCP
+      port: 2801
+      targetPort: 2801

@@ -77,7 +77,7 @@ jobs:
           echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
           # Run the installer for the specific namespace
-          sudo ./kguard-install --namespace "$TARGET_NS"
+          sudo ./green/installer/kguard-install --namespace "$TARGET_NS"
           
           # Update the deployment with the latest image SHA
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
