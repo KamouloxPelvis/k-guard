@@ -65,7 +65,7 @@ jobs:
       
       - name: Run K-Guard Installer
         run: |
-          sudo -n KGUARD_ENV=docker /usr/local/bin/kguard --verbose  
+          sudo -n K-GUARD_ENV=docker /usr/local/bin/kguard --verbose  
 
       - name: Deploy Infrastructure
         run: |
@@ -81,7 +81,7 @@ jobs:
           echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
           # Run the installer for the specific namespace
-          $GITHUB_WORKSPACE/green/installer/kguard-install --namespace "$TARGET_NS"
+          ./green/installer/kguard-install --namespace "$TARGET_NS"
           
           # Update the deployment with the latest image SHA
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
