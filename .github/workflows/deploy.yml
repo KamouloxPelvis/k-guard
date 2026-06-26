@@ -65,7 +65,7 @@ jobs:
       
       - name: Run K-Guard Installer
         run: |
-          sudo -n K-GUARD_ENV=docker /usr/local/bin/kguard --verbose  
+          sudo -n KGUARD_ENV=docker /usr/local/bin/kguard --verbose  
 
       - name: Deploy Infrastructure
         run: |
