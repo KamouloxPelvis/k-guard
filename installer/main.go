@@ -275,14 +275,14 @@ func (m model) runStep(step int) tea.Cmd {
 			{"Installing Wazuh Security Stack", func() error {
 				kubeConfig := "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
 				path, _ := exec.LookPath("helm")
-				
+
 				// Using the official stable repository endpoint
 				steps := []string{
 					fmt.Sprintf("%s %s repo add wazuh https://wazuh.github.io/wazuh-charts/", kubeConfig, path), // Note the trailing slash
 					fmt.Sprintf("%s %s repo update", kubeConfig, path),
 					fmt.Sprintf("%s %s upgrade --install wazuh wazuh/wazuh -n wazuh --create-namespace", kubeConfig, path),
 				}
-				
+
 				for _, s := range steps {
 					cmd := exec.Command("sh", "-c", s)
 					if out, err := cmd.CombinedOutput(); err != nil {
@@ -306,9 +306,9 @@ func (m model) runStep(step int) tea.Cmd {
 						"--set driver.kind=modern_ebpf "+
 						"--set controller.kind=daemonset "+
 						"--set falcosidekick.enabled=true "+
-						"--set falcosidekick.config.wazuh.enabled=true", // Virgule ici qui coupe la chaîne
-						"--set falcosidekick.config.wazuh.host=%s "+ // Ces arguments ne sont pas intégrés
-						"--set falcosidekick.config.wazuh.port=1514", 
+						"--set falcosidekick.config.wazuh.enabled=true "+
+						"--set falcosidekick.config.wazuh.host=%s "+
+						"--set falcosidekick.config.wazuh.port=1514",
 						kubeConfig, path, wazuhManagerHost),
 				}
 

@@ -5,12 +5,13 @@ from dotenv import load_dotenv
 import sqlite3
 
 # --- PATH CONFIGURATION ---
+APP_ROOT = Path("/app").resolve()
 base_dir = Path(__file__).resolve().parent
 env_path = Path.cwd() / ".env"
 if env_path.exists():
     load_dotenv(dotenv_path=env_path)
 
-DB_DIR = os.getenv("DB_DIR", os.path.join(base_dir, "data"))
+DB_DIR = os.getenv("DB_DIR", str(APP_ROOT / "data"))
 DB_PATH = os.path.join(DB_DIR, "kguard.db")
 
 # Global variables initialization for K8s clients
