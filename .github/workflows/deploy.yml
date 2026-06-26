@@ -55,6 +55,10 @@ jobs:
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
 
   deploy_to_k3s:
+    env:
+      KUBECONFIG: /etc/rancher/k3s/k3s.yaml
+      KGUARD_ADMIN_USER: ${{ secrets.KGUARD_ADMIN_USER }}
+      KGUARD_ADMIN_PWD: ${{ secrets.KGUARD_ADMIN_PWD }}
     needs: build_images
     runs-on: self-hosted
     # Using environment variables for environment selection
@@ -93,15 +97,13 @@ jobs:
           
           # 3. Exécution avec les entrées forcées (via printf)
           # On utilise printf pour fournir admin + password en une seule fois
-          printf "admin\npassword_secret\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
+          printf "${{ secrets.KGUARD_ADMIN_USER }}\n${{ secrets.KGUARD_ADMIN_PWD }}\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
           # 4. Mise à jour du déploiement
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
           
           # 5. Vérification
           kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
-        env:
-          KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
       - name: Discord Notification
         if: always()
