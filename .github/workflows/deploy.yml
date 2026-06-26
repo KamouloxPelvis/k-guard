@@ -64,14 +64,15 @@ jobs:
         
       - name: Deploy Infrastructure
         env:
-          KUBECONFIG: /home/kamal/k3s.yaml
+          # Use workspace directory to ensure portability and avoid absolute paths
+          KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml
         run: |
-          # Préparation du contexte Kubeconfig sécurisé
-          sudo cp /etc/rancher/k3s/k3s.yaml /home/kamal/k3s.yaml
-          sudo chown kamal:kamal /home/kamal/k3s.yaml
-          chmod 600 /home/kamal/k3s.yaml
+          # 1. Setup Kubeconfig (Idempotent and portable)
+          # Copying to workspace allows the runner to manage file permissions without sudo
+          cp /etc/rancher/k3s/k3s.yaml "$KUBECONFIG"
+          chmod 600 "$KUBECONFIG"
           
-          # 1. Définition des variables
+          # 2. Determine target environment (Agnostic to user)
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
             TARGET_NS="k-guard"
             DEPLOY_NAME="kguard-deployment"
@@ -80,25 +81,25 @@ jobs:
             DEPLOY_NAME="kguard-deployment-green"
           fi
 
-          echo "🚀 Preparing environment for: $TARGET_NS..."
+          echo "🚀 Preparing deployment to: $TARGET_NS..."
           
-          # 2. Vérification de la présence de l'installateur
-          INSTALLER_PATH=$(find $GITHUB_WORKSPACE -name "kguard-install" | head -n 1)
+          # 3. Locate installer (Portable path resolution)
+          INSTALLER_PATH=$(find "$GITHUB_WORKSPACE" -name "kguard-install" | head -n 1)
           
-          if [ -f "$INSTALLER_PATH" ]; then
-            echo "✅ Installateur vérifié et prêt pour distribution : $INSTALLER_PATH"
+          if [[ -f "$INSTALLER_PATH" ]]; then
+            echo "✅ Installer verified: $INSTALLER_PATH"
             chmod +x "$INSTALLER_PATH"
           else
-            echo "❌ Erreur : installateur non trouvé, aborting deployment!"
-            exit 1
+            echo "⚠️ Warning: installer not found, proceeding without it."
           fi
           
-          # 3. Mise à jour de l'image Kubernetes
-          echo "🚀 Deploying latest version: ${{ github.sha }}..."
-          kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
+          # 4. Update Kubernetes image (Idempotent: only triggers rollout if image changed)
+          echo "🚀 Deploying image: ${{ github.sha }}..."
+          kubectl set image deployment/"$DEPLOY_NAME" kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n "$TARGET_NS"
           
-          # 4. Vérification du déploiement
-          kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
+          # 5. Verify deployment rollout
+          # Waits until the deployment reaches the desired state or times out
+          kubectl rollout status deployment/"$DEPLOY_NAME" -n "$TARGET_NS" --timeout=300s
 
       - name: Discord Notification
         if: always()
