@@ -55,6 +55,8 @@ jobs:
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
 
       - name: Deploy Infrastructure
+        env:
+            KUBECONFIG: /etc/rancher/k3s/k3s.yaml
         run: |
           # 1. Définition des variables
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
