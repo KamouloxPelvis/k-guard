@@ -97,7 +97,7 @@ jobs:
           
           # 3. Exécution avec les entrées forcées (via printf)
           # On utilise printf pour fournir admin + password en une seule fois
-          printf "${{ secrets.KGUARD_ADMIN_USER }}\n${{ secrets.KGUARD_ADMIN_PWD }}\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
+          printf "%s\n%s\n" "$KGUARD_ADMIN_USER" "$KGUARD_ADMIN_PWD" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
           # 4. Mise à jour du déploiement
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
