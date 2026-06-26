@@ -62,6 +62,10 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+      
+      - name: Run K-Guard Installer
+        run: |
+          sudo -n /usr/local/bin/kguard --verbose  
 
       - name: Deploy Infrastructure
         run: |
@@ -77,13 +81,13 @@ jobs:
           echo "🚀 Executing automated provisioning for: $TARGET_NS..."
           
           # Run the installer for the specific namespace
-          sudo ./green/installer/kguard-install --namespace "$TARGET_NS"
+          sudo -n ./green/installer/kguard-install --namespace "$TARGET_NS"
           
           # Update the deployment with the latest image SHA
-          kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
+          sudo -n kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
           
           # Verify deployment status
-          kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
+          sudo -n kubectl rollout status deployment/$DEPLOY_NAME -n $TARGET_NS --timeout=300s
         env:
           KUBECONFIG: /etc/rancher/k3s/k3s.yaml
 
