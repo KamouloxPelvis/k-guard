@@ -54,7 +54,7 @@ jobs:
             ghcr.io/kamouloxpelvis/kguard-app:latest
             ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }}
 
-  - name: Deploy Infrastructure
+      - name: Deploy Infrastructure
         run: |
           # 1. Définition des variables
           if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
