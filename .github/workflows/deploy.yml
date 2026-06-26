@@ -57,8 +57,6 @@ jobs:
   deploy_to_k3s:
     env:
       KUBECONFIG: /etc/rancher/k3s/k3s.yaml
-      KGUARD_ADMIN_USER: ${{ secrets.KGUARD_ADMIN_USER }}
-      KGUARD_ADMIN_PWD: ${{ secrets.KGUARD_ADMIN_PWD }}
     needs: build_images
     runs-on: self-hosted
     # Using environment variables for environment selection
@@ -97,7 +95,7 @@ jobs:
           
           # 3. Exécution avec les entrées forcées (via printf)
           # On utilise printf pour fournir admin + password en une seule fois
-          printf "%s\n%s\n" "$KGUARD_ADMIN_USER" "$KGUARD_ADMIN_PWD" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
+          printf "admin_kguard\nStrongPassword123!\n" | sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
           # 4. Mise à jour du déploiement
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
