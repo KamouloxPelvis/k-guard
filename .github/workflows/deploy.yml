@@ -92,7 +92,7 @@ jobs:
           
           # Exécution dynamique
           chmod +x "$INSTALLER_PATH"
-          sudo -n K-GUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
+          sudo -n KGUARD_ENV=docker "$INSTALLER_PATH" --namespace "$TARGET_NS"
           
           # Update the deployment with the latest image SHA
           kubectl set image deployment/$DEPLOY_NAME kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n $TARGET_NS
