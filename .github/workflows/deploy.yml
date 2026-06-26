@@ -56,7 +56,7 @@ jobs:
 
   deploy_to_k3s:
     needs: build_images
-    runs-on: [self-hosted, devopsnotes]
+    runs-on: [self-hosted]
     environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11
     steps:
       - name: Checkout code
