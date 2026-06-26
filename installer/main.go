@@ -87,7 +87,7 @@ func checkAndPrepare() (string, error) {
 
 	// Check if the infrastructure namespace already exists.
 	// This enables idempotency for the installation process.
-	cmd := exec.Command("kubectl", "get", "ns", "k-guard")
+	cmd := exec.Command("sudo", "-n","kubectl", "get", "ns", "k-guard")
 	if err := cmd.Run(); err == nil {
 		return "Infrastructure existing, ready for update", nil
 	}
