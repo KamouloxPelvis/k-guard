@@ -56,7 +56,7 @@ jobs:
 
   deploy_to_k3s:
     needs: build_images
-    runs-on: self-hosted
+    runs-on: [self-hosted, devopsnotes]
     environment: VPS_KAMATERA_UBUNTU_THINKPAD_e11
     steps:
       - name: Checkout code
@@ -108,4 +108,4 @@ jobs:
           else
             MESSAGE="⚠️ **K-GUARD**: Critical deployment failure on SHA ${{ github.sha }}! ❌"
           fi
-          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}
+          curl -X POST -H "Content-Type: application/json" -d "{\"content\": \"$MESSAGE\"}" ${{ secrets.DISCORD_WEBHOOK_URL }}ù
