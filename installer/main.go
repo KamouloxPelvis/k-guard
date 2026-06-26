@@ -138,7 +138,14 @@ func setupCredentials(rootPath, username, password string) error {
 
 	sb.WriteString("# --- PATH RESOLUTION ---\n")
 	sb.WriteString(fmt.Sprintf("PROJECT_ROOT=%s\n", rootPath))
-	sb.WriteString(fmt.Sprintf("DB_DIR=%s/backend/data\n", rootPath))
+	var dbDir string
+	if os.Getenv("KGUARD_ENV") == "docker" {
+		dbDir = "/app/data"
+	} else {
+		// Chemin local pour ton installation sur ton VPS
+		dbDir = filepath.Join(rootPath, "backend", "data")
+	}
+	sb.WriteString(fmt.Sprintf("DB_DIR=%s\n", dbDir))
 	sb.WriteString(fmt.Sprintf("KGUARD_ANSIBLE_PATH=%s/infra/ansible/harden_network.yml\n\n", rootPath))
 
 	sb.WriteString("# --- AUTHENTICATION & SECURITY ---\n")
