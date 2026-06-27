@@ -62,18 +62,31 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Deploy Infrastructure & Security Stack
+      - name: Deploy Application
         env:
           KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml
         run: |
           # 1. Setup Kubeconfig
-
           cp /etc/rancher/k3s/k3s.yaml "$KUBECONFIG"
           chmod 600 "$KUBECONFIG"
           
-          # 2. Update K-Guard Application Image
-
+          # 2. Determine target environment variables
+          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
+            TARGET_NS="k-guard"
+            DEPLOY_NAME="kguard-deployment"
+          else
+            TARGET_NS="k-guard-green"
+            DEPLOY_NAME="kguard-deployment-green"
+          fi
+          
+          # Debugging (optional, useful for first runs)
+          echo "Deploying to namespace: $TARGET_NS with deployment name: $DEPLOY_NAME"
+          
+          # 3. Update Kubernetes image
+          # Using the variables defined just above in this shell session
           kubectl set image deployment/"$DEPLOY_NAME" kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n "$TARGET_NS"
+          
+          # 4. Verify deployment rollout
           kubectl rollout status deployment/"$DEPLOY_NAME" -n "$TARGET_NS" --timeout=300s
 
       - name: Discord Notification
