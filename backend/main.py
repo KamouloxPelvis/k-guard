@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, JSONResponse
 
 # --- Routers Imports ---
 from backend.network_manager import router as network_router
-from backend.routers import auth, k3s, integrations
+from backend.routers import auth, k3s, integrations, security
 
 # --- ENV LOADING ---
 base_dir = Path(__file__).resolve().parent
@@ -18,8 +18,8 @@ load_dotenv(dotenv_path=base_dir / ".env")
 
 app = FastAPI(
     title="🛡️ K-Guard API", 
-    version="1.0.0",
-    description="Backend API for K-Guard: Operational Infrastructure Security & Automation"
+    version="1.5.0",
+    description="Backend API for K-Guard: Operational Infrastructure Security & Observability Platform",
 )
 
 # --- CORS CONFIGURATION ---
@@ -52,8 +52,10 @@ async def liveness_probe():
 # --- ROUTER INCLUSION ---
 app.include_router(auth.router, prefix="/api")
 app.include_router(k3s.router, prefix="/api")
+app.include_router(security.router, prefix="/api")
 app.include_router(network_router, prefix="/api")
 app.include_router(integrations.router, prefix="/api")
+
 
 # --- GLOBAL API ROUTES ---
 @app.get("/api/health", tags=["Status"])

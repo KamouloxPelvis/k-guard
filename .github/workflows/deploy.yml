@@ -62,43 +62,18 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         
-      - name: Deploy Infrastructure
+      - name: Deploy Infrastructure & Security Stack
         env:
-          # Use workspace directory to ensure portability and avoid absolute paths
           KUBECONFIG: ${{ github.workspace }}/kubeconfig.yaml
         run: |
-          # 1. Setup Kubeconfig (Idempotent and portable)
-          # Copying to workspace allows the runner to manage file permissions without sudo
+          # 1. Setup Kubeconfig
+
           cp /etc/rancher/k3s/k3s.yaml "$KUBECONFIG"
           chmod 600 "$KUBECONFIG"
           
-          # 2. Determine target environment (Agnostic to user)
-          if [[ "${{ github.ref }}" == "refs/heads/main" ]]; then
-            TARGET_NS="k-guard"
-            DEPLOY_NAME="kguard-deployment"
-          else
-            TARGET_NS="k-guard-green"
-            DEPLOY_NAME="kguard-deployment-green"
-          fi
+          # 2. Update K-Guard Application Image
 
-          echo "🚀 Preparing deployment to: $TARGET_NS..."
-          
-          # 3. Locate installer (Portable path resolution)
-          INSTALLER_PATH=$(find "$GITHUB_WORKSPACE" -name "kguard-install" | head -n 1)
-          
-          if [[ -f "$INSTALLER_PATH" ]]; then
-            echo "✅ Installer verified: $INSTALLER_PATH"
-            chmod +x "$INSTALLER_PATH"
-          else
-            echo "⚠️ Warning: installer not found, proceeding without it."
-          fi
-          
-          # 4. Update Kubernetes image (Idempotent: only triggers rollout if image changed)
-          echo "🚀 Deploying image: ${{ github.sha }}..."
           kubectl set image deployment/"$DEPLOY_NAME" kguard-app=ghcr.io/kamouloxpelvis/kguard-app:${{ github.sha }} -n "$TARGET_NS"
-          
-          # 5. Verify deployment rollout
-          # Waits until the deployment reaches the desired state or times out
           kubectl rollout status deployment/"$DEPLOY_NAME" -n "$TARGET_NS" --timeout=300s
 
       - name: Discord Notification
