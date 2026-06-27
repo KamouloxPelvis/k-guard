@@ -125,10 +125,6 @@ func setupCredentials(rootPath, username, password string) error {
 		return fmt.Errorf("failed to hash password: %v", err)
 	}
 
-	// Generating random credentials for the internal Security SIEM
-	wazuhUser := "wazuh_admin"
-	wazuhPwd := generateSecureToken(16)
-
 	envPath := filepath.Join(rootPath, "backend", ".env")
 
 	// Constructing the configuration string cleanly
@@ -154,11 +150,6 @@ func setupCredentials(rootPath, username, password string) error {
 	sb.WriteString(fmt.Sprintf("SECRET_KEY=kguard_%d\n", time.Now().Unix()))
 	sb.WriteString("ALGORITHM=HS256\n")
 	sb.WriteString("ACCESS_TOKEN_EXPIRE_MINUTES=600\n\n")
-
-	sb.WriteString("# --- WAZUH INTEGRATION ---\n")
-	sb.WriteString(fmt.Sprintf("WAZUH_API_URL=https://wazuh-manager:55000\n"))
-	sb.WriteString(fmt.Sprintf("WAZUH_USERNAME=%s\n", wazuhUser))
-	sb.WriteString(fmt.Sprintf("WAZUH_PASSWORD=%s\n\n", wazuhPwd))
 
 	sb.WriteString("# --- NETWORK CONFIGURATION ---\n")
 	sb.WriteString(fmt.Sprintf("ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000\n", publicIP))
@@ -277,55 +268,21 @@ func (m model) runStep(step int) tea.Cmd {
 			{"Deploying frontend assets (Linking static)", func() error { return deployFrontend(m.projectRoot) }},
 			{"Registering 'kguard' global command", func() error { return setupGlobalCommand(m.projectRoot) }},
 
-			// DeployWazuhStack handles the installation of the Wazuh server within the cluster.
-			// This provides a centralized security monitoring and incident response platform.
-			{"Installing Wazuh Security Stack", func() error {
-				kubeConfig := "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
-				path, _ := exec.LookPath("helm")
 
-				// Using the official stable repository endpoint
-				steps := []string{
-					fmt.Sprintf("%s %s repo add wazuh https://wazuh.github.io/wazuh-charts/", kubeConfig, path), // Note the trailing slash
-					fmt.Sprintf("%s %s repo update", kubeConfig, path),
-					fmt.Sprintf("%s %s upgrade --install wazuh wazuh/wazuh -n wazuh --create-namespace", kubeConfig, path),
-				}
-
-				for _, s := range steps {
-					cmd := exec.Command("sh", "-c", s)
-					if out, err := cmd.CombinedOutput(); err != nil {
-						return fmt.Errorf("Wazuh installation failed: %s | Err: %v", string(out), err)
-					}
-				}
-				return nil
+			{"Deploying ELK Stack", func() error {
+				// Elasticsearch & Kibana deployment
+				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/elk/")
+				return cmd.Run()
 			}},
-
-			{"Installing Security Stack (Falco + Sidekick)", func() error {
-				kubeConfig := "KUBECONFIG=/etc/rancher/k3s/k3s.yaml"
-				path, _ := exec.LookPath("helm")
-				wazuhManagerHost := "wazuh-manager.wazuh.svc.cluster.local"
-
-				// We consolidate into a single release named 'kguard-security'
-				// Falcosidekick is enabled as a dependency within the Falco chart
-				steps := []string{
-					fmt.Sprintf("%s %s repo add falcosecurity https://falcosecurity.github.io/charts", kubeConfig, path),
-					fmt.Sprintf("%s %s repo update", kubeConfig, path),
-					fmt.Sprintf("%s %s upgrade --install kguard-security falcosecurity/falco -n falco --create-namespace "+
-						"--set driver.kind=modern_ebpf "+
-						"--set controller.kind=daemonset "+
-						"--set falcosidekick.enabled=true "+
-						"--set falcosidekick.config.wazuh.enabled=true "+
-						"--set falcosidekick.config.wazuh.host=%s "+
-						"--set falcosidekick.config.wazuh.port=1514",
-						kubeConfig, path, wazuhManagerHost),
-				}
-
-				for _, s := range steps {
-					cmd := exec.Command("sh", "-c", s)
-					if out, err := cmd.CombinedOutput(); err != nil {
-						return fmt.Errorf("Security stack installation failed: %s | Err: %v", string(out), err)
-					}
-				}
-				return nil
+			{"Deploying Fluent-bit", func() error {
+				// Fluent-bit for log collection
+				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/fluentbit/")
+				return cmd.Run()
+			}},
+			{"Deploying Falco (Runtime Security)", func() error {
+				// Falco runtime detection
+				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/falco/")
+				return cmd.Run()
 			}},
 		}
 
@@ -335,6 +292,7 @@ func (m model) runStep(step int) tea.Cmd {
 
 		current := pipeline[step]
 		time.Sleep(600 * time.Millisecond) // Smooth UI pacing
+
 
 		if err := current.Run(); err != nil {
 			return errMsg(err)

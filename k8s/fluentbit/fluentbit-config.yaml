@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: fluent-bit-config
+  namespace: logging
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         1
+        Log_Level     debug
+        Parsers_File  parsers.conf
+
+    [INPUT]
+        Name          tail
+        Path          /var/log/containers/*falco*.log
+        Parser        falco_json
+        Tag           falco.alerts
+        DB            /var/log/flb_falco.db
+
+    [FILTER]
+        Name          grep
+        Match         falco.alerts
+        Regex         log .*
+
+    [OUTPUT]
+        Name          es
+        Match         falco.alerts
+        Host          elasticsearch-es-http.logging
+        Port          9200
+        Index         falco-alerts
+        HTTP_User     elastic
+        HTTP_Passwd   CtWWmg5wkdQr8l8yUnI6jYw8
+        tls           On
+        tls.verify    Off
+        Type          _doc
+        Suppress_Type_Name On
+
+  parsers.conf: |
+    [PARSER]
+        Name        falco_json
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L

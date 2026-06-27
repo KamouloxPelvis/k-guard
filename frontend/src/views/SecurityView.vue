@@ -4,7 +4,7 @@
 
   // --- INTERFACES ---
   interface SecurityAlert {
-    id: number;
+    id: string;
     source: string;
     severity: string;
     message: string;
@@ -16,14 +16,21 @@
   const isLoading = ref(true);
 
   /**
-   * Fetches the latest security alerts from the database.
-   * This replaces the old Trivy scan polling.
+   * Fetches the latest security alerts from the Elasticsearch cluster.
+   * Maps raw ES hits to the SecurityAlert interface for the UI.
    */
   const fetchAlerts = async () => {
     try {
-      // Tu créeras bientôt cette route pour récupérer les alertes stockées
-      const response = await api.get<SecurityAlert[]>('/api/security/alerts');
-      alerts.value = response.data;
+      const response = await api.get('/api/security/alerts');
+      
+      // Mapping raw Elasticsearch hits to the SecurityAlert structure
+      alerts.value = response.data.map((hit: any) => ({
+        id: hit._id,
+        source: hit._source.container?.name || 'unknown',
+        severity: hit._source.priority || 'INFO',
+        message: hit._source.output || 'No description available',
+        created_at: hit._source['@timestamp']
+      }));
     } catch (error) {
       console.error("[K-Guard] Alert Fetch Error:", error);
     } finally {
@@ -38,7 +45,7 @@
   <div class="p-4 lg:p-6 relative z-10 font-sans text-slate-300">
     <header class="mb-6 border-b border-slate-800 pb-4">
       <h1 class="text-xl font-bold tracking-widest uppercase">Security Operations Center</h1>
-      <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Real-time Falco & Wazuh Monitoring</p>
+      <p class="text-[10px] text-slate-500 uppercase tracking-[0.2em]">Real-time Falco & ELK Monitoring</p>
     </header>
 
     <div class="grid gap-3">
