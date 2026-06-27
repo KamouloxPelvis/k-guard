@@ -13,6 +13,7 @@ from backend.network_manager import router as network_router
 from backend.routers import auth, k3s, integrations, security
 
 # --- ENV LOADING ---
+# Resolve the base directory for environment configuration loading
 base_dir = Path(__file__).resolve().parent
 load_dotenv(dotenv_path=base_dir / ".env")
 
@@ -23,6 +24,7 @@ app = FastAPI(
 )
 
 # --- CORS CONFIGURATION ---
+# Define allowed origins based on environment variables for security compliance
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
     "http://localhost:8000,http://127.0.0.1:8000",
@@ -70,18 +72,23 @@ BASE_STATIC_DIR = Path("/app/static").resolve()
 async def serve_frontend(rest_of_path: str):
     """
     Serves the Single Page Application (SPA) index.html.
-    Implements path traversal security checks.
+    Implements path traversal security checks to prevent unauthorized file access.
     """
-    if not rest_of_path:
-        rest_of_path = "index.html"
+    # Normalize path to prevent directory traversal attacks (e.g., ../../etc/passwd)
+    requested_path = os.path.normpath(rest_of_path)
     
-    candidate_path = (BASE_STATIC_DIR / rest_of_path).resolve()
-    
-    try:
-        candidate_path.relative_to(BASE_STATIC_DIR)
-    except ValueError:
-        return JSONResponse(status_code=403, content={"error": "Security Violation"})
+    # Explicitly block paths attempting to escape the base directory
+    if requested_path.startswith("..") or requested_path.startswith("/"):
+        return JSONResponse(status_code=403, content={"error": "Security Violation: Invalid Path"})
 
+    # Construct and resolve the full candidate path
+    candidate_path = (BASE_STATIC_DIR / requested_path).resolve()
+    
+    # Security check: Ensure the resolved path remains within the defined static directory
+    if not str(candidate_path).startswith(str(BASE_STATIC_DIR)):
+        return JSONResponse(status_code=403, content={"error": "Security Violation: Access Denied"})
+
+    # Return the file if it exists, otherwise serve SPA index.html
     if candidate_path.is_file():
         return FileResponse(path=candidate_path)
 
