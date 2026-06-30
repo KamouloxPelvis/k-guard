@@ -8,14 +8,14 @@ logger = logging.getLogger("K-Guard.SecurityManager")
 class SecurityEngine:
     """
     K-Guard Security Engine: 
-    Unified gateway for security alerts (Falco, Wazuh, and System events).
+    Unified gateway for security alerts (Falco, ELK, and System events).
     """
     def __init__(self):
-        logger.info("🛡️ [K-GUARD ENGINE] Security Engine initialized for Falco/Wazuh integration.")
+        logger.info("🛡️ [K-GUARD ENGINE] Security Engine initialized for Falco/ELK integration.")
 
     def dispatch_alert(self, source: str, event_data: dict):
         """
-        Receives an alert from Falco or Wazuh and processes it for notification.
+        Receives an alert from Falco or ELK and processes it for notification.
         """
         logger.info(f"🚨 [K-GUARD ENGINE] Alert received from {source}")
         
@@ -36,7 +36,7 @@ class SecurityEngine:
 
 def process_security_event(source: str, event_data: dict):
     """
-    Primary entry point for security webhooks (e.g., Falco/Wazuh).
+    Primary entry point for security webhooks (e.g., Falco/ELK).
     """
     engine = SecurityEngine()
     return engine.dispatch_alert(source, event_data)

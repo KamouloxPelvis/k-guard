@@ -27,7 +27,14 @@ app = FastAPI(
 # Define allowed origins based on environment variables for security compliance
 raw_origins = os.getenv(
     "ALLOWED_ORIGINS", 
-    "http://localhost:8000,http://127.0.0.1:8000",
+    "http://localhost:8000," \
+    "http://127.0.0.1:8000",
+    "http://kguard-green.local:8000"
+    "http://kguard-green.local",
+    "http://k-guard.local:8000"
+    "http://k-guard.local",
+    "http://113.30.191.17:8000",
+    "http://113.30.191.17",
 )
 origins = [origin.strip() for origin in raw_origins.split(",")]
 

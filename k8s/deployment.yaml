@@ -1,19 +1,19 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: kguard-deployment-green
-  namespace: k-guard-green
+  name: kguard-deployment
+  namespace: k-guard
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: k-guard-green
+      app: k-guard
   template:
     metadata:
       labels:
-        app: k-guard-green
+        app: k-guard
     spec:
       terminationGracePeriodSeconds: 60 
       serviceAccountName: k-guard-sa
@@ -24,6 +24,7 @@ spec:
         fsGroup: 1000
         supplementalGroups: [988]
       volumes:
+        # Docker socket required for Falco/Container monitoring
         - name: docker-socket
           hostPath:
             path: /var/run/docker.sock
@@ -31,6 +32,7 @@ spec:
         - name: temp-storage
           emptyDir:
             sizeLimit: 500Mi
+        # Persistent storage for application database
         - name: db-storage
           hostPath:
             path: /var/lib/kguard/db
@@ -73,6 +75,14 @@ spec:
               value: "in-cluster"
             - name: DB_DIR
               value: "/app/data"
+            # Updated to point to the new local namespace service
+            - name: ELASTICSEARCH_URL
+              value: "http://elasticsearch-es-http.k-guard.svc.cluster.local:9200"
+            - name: ELASTICSEARCH_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: elasticsearch-es-elastic-user 
+                  key: elastic
           envFrom:
             - secretRef:
                 name: k-guard-secrets
@@ -85,4 +95,3 @@ spec:
               cpu: 1500m
               memory: 2Gi
               ephemeral-storage: "2Gi"
-              

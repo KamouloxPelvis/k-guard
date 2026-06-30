@@ -101,12 +101,19 @@ func checkAndPrepare() (string, error) {
 
 // Helper to get the public IP of the VPS
 func getPublicIP() string {
-	cmd := exec.Command("curl", "-s", "ifconfig.me")
-	out, err := cmd.Output()
-	if err != nil {
-		return "127.0.0.1" // Fallback to localhost if no internet
-	}
-	return strings.TrimSpace(string(out))
+    // Adding a 5-second timeout for the network check
+    cmd := exec.Command("curl", "-s", "--max-time", "5", "ifconfig.me")
+    out, err := cmd.Output()
+    if err != nil {
+        // Log warning for infrastructure debugging
+        return "127.0.0.1" 
+    }
+    ip := strings.TrimSpace(string(out))
+    // Validate that it looks like an IP
+    if strings.Contains(ip, ".") {
+        return ip
+    }
+    return "127.0.0.1"
 }
 
 func generateSecureToken(length int) string {
@@ -120,6 +127,7 @@ func generateSecureToken(length int) string {
 func setupCredentials(rootPath, username, password string) error {
 	publicIP := getPublicIP()
 
+	// Hash the password for security
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), 12)
 	if err != nil {
 		return fmt.Errorf("failed to hash password: %v", err)
@@ -127,18 +135,19 @@ func setupCredentials(rootPath, username, password string) error {
 
 	envPath := filepath.Join(rootPath, "backend", ".env")
 
-	// Constructing the configuration string cleanly
+	// --- Construction of the configuration string ---
 	var sb strings.Builder
 	sb.WriteString("# K-GUARD SYSTEM CONFIGURATION\n")
 	sb.WriteString(fmt.Sprintf("# Generated on: %s\n\n", time.Now().Format("2006-01-02 15:04:05")))
 
 	sb.WriteString("# --- PATH RESOLUTION ---\n")
 	sb.WriteString(fmt.Sprintf("PROJECT_ROOT=%s\n", rootPath))
+	
+	// Determine database directory based on environment
 	var dbDir string
 	if os.Getenv("KGUARD_ENV") == "docker" {
 		dbDir = "/app/data"
 	} else {
-		// Chemin local pour ton installation sur ton VPS
 		dbDir = filepath.Join(rootPath, "backend", "data")
 	}
 	sb.WriteString(fmt.Sprintf("DB_DIR=%s\n", dbDir))
@@ -152,12 +161,24 @@ func setupCredentials(rootPath, username, password string) error {
 	sb.WriteString("ACCESS_TOKEN_EXPIRE_MINUTES=600\n\n")
 
 	sb.WriteString("# --- NETWORK CONFIGURATION ---\n")
+	// Using the dynamically retrieved publicIP here
 	sb.WriteString(fmt.Sprintf("ALLOWED_ORIGINS=http://localhost:8000,http://%s:8000,http://k-guard.local:8000\n", publicIP))
 	sb.WriteString(fmt.Sprintf("USER_DOMAIN=%s\n", publicIP))
 	sb.WriteString("PROJECT_NAME=K-Guard\n")
 	sb.WriteString("KGUARD_PROTECTED_NS=k-guard\n")
 
-	return os.WriteFile(envPath, []byte(sb.String()), 0600)
+	// Write the configuration to the file with restricted permissions (0600)
+	err = os.WriteFile(envPath, []byte(sb.String()), 0600)
+	if err != nil {
+		return fmt.Errorf("failed to write .env: %v", err)
+	}
+
+	// Verify the file was actually created
+	if _, err := os.Stat(envPath); os.IsNotExist(err) {
+		return fmt.Errorf("critical failure: .env file creation failed")
+	}
+
+	return nil
 }
 
 func syncSecretsToK8s(rootPath string) error {

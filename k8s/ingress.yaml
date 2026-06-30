@@ -1,21 +1,21 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: k-guard-ingress-green
-  namespace: k-guard-green
+  name: k-guard-ingress
+  namespace: k-guard
   annotations:
     kubernetes.io/ingress.class: "nginx"
     nginx.ingress.kubernetes.io/rewrite-target: /
 spec:
   ingressClassName: nginx
   rules:
-  - host: kguard-green.local
+  - host: kguard.local
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: k-guard-service-green
+            name: k-guard-service
             port:
               number: 8000

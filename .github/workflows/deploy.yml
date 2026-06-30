@@ -75,8 +75,8 @@ jobs:
             TARGET_NS="k-guard"
             DEPLOY_NAME="kguard-deployment"
           else
-            TARGET_NS="k-guard-green"
-            DEPLOY_NAME="kguard-deployment-green"
+            TARGET_NS="k-guard"
+            DEPLOY_NAME="kguard-deployment"
           fi
           
           # Debugging (optional, useful for first runs)

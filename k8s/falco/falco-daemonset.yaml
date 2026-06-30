@@ -1,0 +1,70 @@
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: falco
+  namespace: k-guard
+  labels:
+    app: falco
+spec:
+  selector:
+    matchLabels:
+      app: falco
+  template:
+    metadata:
+      labels:
+        app: falco
+    spec:
+      serviceAccountName: k-guard-sa
+      containers:
+        - name: falco
+          image: docker.io/falcosecurity/falco:0.39.0 
+          command: ["/usr/bin/falco"]
+          args:
+            - "-c"
+            - "/etc/falco/falco.yaml"
+            - "-r"
+            - "/etc/falco/falco_rules.yaml"
+            - "-r"
+            - "/etc/falco/falco_rules.local.yaml"
+          securityContext:
+            privileged: true
+            capabilities:
+              add:
+                - SYS_ADMIN
+                - SYS_RESOURCE
+                - SYS_PTRACE
+          env:
+            # "modern_bpf" is way more stable on the 6.x kernel
+            - name: FALCO_DRIVER_CHOICE
+              value: "modern_bpf"
+            - name: FALCO_SYSCALL_BUF_SIZE
+              value: "1048576"
+          volumeMounts:
+            - mountPath: /host/var/run/docker.sock
+              name: docker-sock
+            - mountPath: /etc/falco/falco.yaml
+              name: falco-config
+              subPath: falco.yaml
+            - mountPath: /host/proc
+              name: proc-fs
+              readOnly: true
+            - mountPath: /sys/kernel/debug
+              name: sys-kernel-debug
+            - mountPath: /sys/fs/bpf
+              name: bpffs
+      volumes:
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+        - name: falco-config
+          configMap:
+            name: falco-config
+        - name: proc-fs
+          hostPath:
+            path: /proc
+        - name: sys-kernel-debug
+          hostPath:
+            path: /sys/kernel/debug
+        - name: bpffs
+          hostPath:
+            path: /sys/fs/bpf

@@ -2,10 +2,27 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: falco-config
-  namespace: falco
-#data:
- # falco.yaml: |
-  #  json_output: true
-   # http_output:
-    #  enabled: true
-     # url: "http://falcosidekick:2801"
+  namespace: k-guard
+data:
+  falco.yaml: |
+    # Utilisation du moteur moderne par défaut pour 0.39.0+
+    engine:
+      kind: modern_bpf
+
+    stdout_output:
+      enabled: true
+    
+    json_output: true
+    json_include_output_property: true
+    
+    log_stderr: true
+    log_level: info
+
+    # Désactivation explicite de l'ancien moteur ebpf pour éviter tout conflit
+    ebpf:
+      enabled: false
+
+    rules_files:
+      - /etc/falco/falco_rules.yaml
+      - /etc/falco/falco_rules.local.yaml
+      - /etc/falco/k8s_audit_rules.yaml
