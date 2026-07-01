@@ -312,7 +312,8 @@ func (m model) runStep(step int) tea.Cmd {
 
 			// 3. Deploy Security Agents (Falco & Fluent-bit)
 			{"Deploying Runtime Security (Falco)", func() error {
-				return runKubeCommand("Falco", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/falco/"))
+				cmd := "helm upgrade --install falco falcosecurity/falco -n k-guard -f " + filepath.Join(m.projectRoot, "k8s/falco/values-falco.yaml")
+				return runKubeCommand("Falco", cmd) 
 			}},
 			{"Deploying Fluent-bit (Log Collector)", func() error {
 				return runKubeCommand("Fluent-bit", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/fluentbit/"))
@@ -320,7 +321,7 @@ func (m model) runStep(step int) tea.Cmd {
 
 			// 4. Deploy K-Guard Application
 			{"Deploying K-Guard App", func() error {
-				return runKubeCommand("App", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/app/"))
+				return runKubeCommand("App", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s", "core"))
 			}},
 
 			// 5. Post-deployment configuration
