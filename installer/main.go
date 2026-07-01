@@ -65,8 +65,7 @@ type model struct {
 // --- CORE FUNCTIONS ---
 
 // checkAndPrepare performs environment sanity checks before deployment.
-// It validates the Operating System, the presence of critical binaries,
-// and ensures the Kubernetes namespace is properly initialized.
+// It validates the OS, ensures K3s is present, and verifies Kubernetes cluster readiness.
 func checkAndPrepare() (string, error) {
 	// K-Guard is strictly designed for Linux environments.
 	if runtime.GOOS != "linux" {
@@ -74,46 +73,55 @@ func checkAndPrepare() (string, error) {
 	}
 
 	// Verify K3s configuration availability.
-	// K3s serves as the foundation for the K-Guard infrastructure.
 	if _, err := os.Stat("/etc/rancher/k3s/k3s.yaml"); os.IsNotExist(err) {
 		return "", fmt.Errorf("K3s not found. Please install K3s to host K-Guard infrastructure")
 	}
 
-	// Ensure Helm is installed to handle security components deployment.
-	// This proactive check prevents runtime failures during the install phase.
+	// Ensure Helm is installed to handle security components.
 	if _, err := exec.LookPath("helm"); err != nil {
 		return "", fmt.Errorf("helm binary not found. Please install Helm to deploy security components")
 	}
 
-	// Check if the infrastructure namespace already exists.
-	// This enables idempotency for the installation process.
-	cmd := exec.Command("sudo", "-n","kubectl", "get", "ns", "k-guard")
-	if err := cmd.Run(); err == nil {
-		return "Infrastructure existing, ready for update", nil
+	// Verify Kubernetes cluster readiness by checking node status.
+	// This proactive check ensures that the K8s API is responsive before proceeding.
+	cmd := exec.Command("kubectl", "get", "nodes", "--no-headers")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("failed to communicate with K8s cluster: %v", err)
 	}
 
-	// Create the namespace if it doesn't exist.
-	if err := exec.Command("kubectl", "create", "namespace", "k-guard").Run(); err != nil {
-		return "", fmt.Errorf("Namespace creation failed: %v", err)
+	// Ensure at least one node is in the 'Ready' state.
+	if !strings.Contains(string(out), "Ready") {
+		return "", fmt.Errorf("Kubernetes cluster is not ready. All nodes are currently offline or unresponsive")
 	}
-	return "Infrastructure namespace initialized", nil
+
+	// Check if the infrastructure namespace exists, or create it if missing.
+	checkNs := exec.Command("kubectl", "get", "ns", "k-guard")
+	if err := checkNs.Run(); err != nil {
+		if err := exec.Command("kubectl", "create", "namespace", "k-guard").Run(); err != nil {
+			return "", fmt.Errorf("namespace creation failed: %v", err)
+		}
+		return "Infrastructure namespace initialized", nil
+	}
+
+	return "Infrastructure existing, ready for update", nil
 }
 
 // Helper to get the public IP of the VPS
 func getPublicIP() string {
-    // Adding a 5-second timeout for the network check
-    cmd := exec.Command("curl", "-s", "--max-time", "5", "ifconfig.me")
-    out, err := cmd.Output()
-    if err != nil {
-        // Log warning for infrastructure debugging
-        return "127.0.0.1" 
-    }
-    ip := strings.TrimSpace(string(out))
-    // Validate that it looks like an IP
-    if strings.Contains(ip, ".") {
-        return ip
-    }
-    return "127.0.0.1"
+	// Adding a 5-second timeout for the network check
+	cmd := exec.Command("curl", "-s", "--max-time", "5", "ifconfig.me")
+	out, err := cmd.Output()
+	if err != nil {
+		// Log warning for infrastructure debugging
+		return "127.0.0.1"
+	}
+	ip := strings.TrimSpace(string(out))
+	// Validate that it looks like an IP
+	if strings.Contains(ip, ".") {
+		return ip
+	}
+	return "127.0.0.1"
 }
 
 func generateSecureToken(length int) string {
@@ -142,7 +150,7 @@ func setupCredentials(rootPath, username, password string) error {
 
 	sb.WriteString("# --- PATH RESOLUTION ---\n")
 	sb.WriteString(fmt.Sprintf("PROJECT_ROOT=%s\n", rootPath))
-	
+
 	// Determine database directory based on environment
 	var dbDir string
 	if os.Getenv("KGUARD_ENV") == "docker" {
@@ -267,44 +275,57 @@ type Step struct {
 	Run  func() error
 }
 
+// runKubeCommand executes shell commands and captures standard error for professional debugging.
+// This ensures that deployment failures are transparent and actionable.
+func runKubeCommand(name, cmdStr string) error {
+	cmd := exec.Command("sh", "-c", cmdStr)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		return fmt.Errorf("Step '%s' failed: %s | Error: %v", name, string(out), err)
+	}
+	return nil
+}
+
+// runStep manages the deployment pipeline sequence.
+// It enforces order-of-operations to prevent dependency mismatches in the K8s cluster.
 func (m model) runStep(step int) tea.Cmd {
 	return func() tea.Msg {
+		kubeConfig := "/etc/rancher/k3s/k3s.yaml"
+		os.Setenv("KUBECONFIG", kubeConfig)
+
 		// Define the pipeline of operations as an ordered slice of steps.
-		// This improves readability and maintainability.
+		// Each step is validated sequentially to ensure infrastructure integrity.
 		pipeline := []Step{
 			{"Checking system architecture", func() error { _, err := checkAndPrepare(); return err }},
 			{"Hashing credentials & updating .env", func() error { return setupCredentials(m.projectRoot, m.adminUser, m.adminPwd) }},
 			{"Synchronizing Kubernetes secrets", func() error { return syncSecretsToK8s(m.projectRoot) }},
-			{"Applying K8s Manifests", func() error {
-				k8sPath := filepath.Join(m.projectRoot, "k8s")
-				kubeConfig := "/etc/rancher/k3s/k3s.yaml"
-				cmdStr := fmt.Sprintf("KUBECONFIG=%s kubectl apply -f %s", kubeConfig, k8sPath)
-				cmd := exec.Command("sh", "-c", cmdStr)
-				out, err := cmd.CombinedOutput()
-				if err != nil {
-					return fmt.Errorf("%s | Err: %v", string(out), err)
-				}
-				return nil
-			}},
-			{"Deploying frontend assets (Linking static)", func() error { return deployFrontend(m.projectRoot) }},
-			{"Registering 'kguard' global command", func() error { return setupGlobalCommand(m.projectRoot) }},
 
+			// 1. Deploy Core Infrastructure (RBAC, Namespaces, Services)
+			{"Applying Core K8s Manifests", func() error {
+				return runKubeCommand("Core", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/core/"))
+			}},
 
-			{"Deploying ELK Stack", func() error {
-				// Elasticsearch & Kibana deployment
-				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/elk/")
-				return cmd.Run()
+			// 2. Deploy Data Layer (Elasticsearch)
+			{"Deploying ELK Stack (Data Layer)", func() error {
+				return runKubeCommand("ELK", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/elk/"))
 			}},
-			{"Deploying Fluent-bit", func() error {
-				// Fluent-bit for log collection
-				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/fluentbit/")
-				return cmd.Run()
+
+			// 3. Deploy Security Agents (Falco & Fluent-bit)
+			{"Deploying Runtime Security (Falco)", func() error {
+				return runKubeCommand("Falco", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/falco/"))
 			}},
-			{"Deploying Falco (Runtime Security)", func() error {
-				// Falco runtime detection
-				cmd := exec.Command("sh", "-c", "KUBECONFIG=/etc/rancher/k3s/k3s.yaml kubectl apply -f k8s/falco/")
-				return cmd.Run()
+			{"Deploying Fluent-bit (Log Collector)", func() error {
+				return runKubeCommand("Fluent-bit", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/fluentbit/"))
 			}},
+
+			// 4. Deploy K-Guard Application
+			{"Deploying K-Guard App", func() error {
+				return runKubeCommand("App", "kubectl apply -f "+filepath.Join(m.projectRoot, "k8s/app/"))
+			}},
+
+			// 5. Post-deployment configuration
+			{"Deploying frontend assets", func() error { return deployFrontend(m.projectRoot) }},
+			{"Registering 'kguard' command", func() error { return setupGlobalCommand(m.projectRoot) }},
 		}
 
 		if step >= len(pipeline) {
@@ -312,8 +333,7 @@ func (m model) runStep(step int) tea.Cmd {
 		}
 
 		current := pipeline[step]
-		time.Sleep(600 * time.Millisecond) // Smooth UI pacing
-
+		time.Sleep(500 * time.Millisecond) // Ensure UI pacing for the installer feedback
 
 		if err := current.Run(); err != nil {
 			return errMsg(err)
