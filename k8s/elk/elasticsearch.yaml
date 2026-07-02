@@ -2,14 +2,14 @@ apiVersion: elasticsearch.k8s.elastic.co/v1
 kind: Elasticsearch
 metadata:
   name: elasticsearch
-  namespace: logging
+  namespace: k-guard
 spec:
-  version: 8.17.0 # Utilise une version stable récente
+  version: 8.17.0
   nodeSets:
   - name: default
     count: 1
     config:
-      node.store.allow_mmap: false # Important pour certains VPS
+      node.store.allow_mmap: false
     podTemplate:
       spec:
         containers:
@@ -21,3 +21,13 @@ spec:
             requests:
               memory: 1Gi
               cpu: 0.5
+    volumeClaimTemplates:
+    - metadata:
+        name: elasticsearch-data
+      spec:
+        accessModes:
+        - ReadWriteOnce
+        resources:
+          requests:
+            storage: 10Gi
+        storageClassName: local-path

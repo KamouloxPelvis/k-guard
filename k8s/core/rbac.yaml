@@ -1,0 +1,60 @@
+# 1. ServiceAccount for K-Guard
+# This identity will be used by our application and observability stack.
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: k-guard-sa
+  namespace: k-guard
+
+---
+# 2. ClusterRole providing necessary observability permissions
+# Adheres to the principle of least privilege while allowing monitoring of the cluster.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: k-guard-cluster-role
+rules:
+  # Permissions to discover cluster resources (pods, services, nodes)
+  - apiGroups: [""]
+    resources: ["pods", "services", "endpoints", "nodes"]
+    verbs: ["get", "list", "watch"]
+  
+  # Permission to access pod logs (required for Fluentbit log collection)
+  - apiGroups: [""]
+    resources: ["pods/log"]
+    verbs: ["get", "list"]
+  
+  # Permission to monitor cluster-wide events (required for Falco security alerts)
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch"]
+  
+  # Permission to interact with secrets for secure backend configuration injection
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+
+  # Permission to access network policies for security monitoring
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+
+  # Permission to access namespaces for cluster-wide observability
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
+---
+# 3. ClusterRoleBinding
+# Binding the ServiceAccount to the ClusterRole for the k-guard namespace.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: k-guard-cluster-rb
+subjects:
+  - kind: ServiceAccount
+    name: k-guard-sa
+    namespace: k-guard
+roleRef:
+  kind: ClusterRole
+  name: k-guard-cluster-role
+  apiGroup: rbac.authorization.k8s.io

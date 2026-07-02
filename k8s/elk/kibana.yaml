@@ -2,12 +2,12 @@ apiVersion: kibana.k8s.elastic.co/v1
 kind: Kibana
 metadata:
   name: kibana
-  namespace: logging
+  namespace: k-guard
 spec:
   version: 8.17.0
   count: 1
   elasticsearchRef:
-    name: elasticsearch
+    name: elasticsearch 
   http:
     tls:
       selfSignedCertificate:
@@ -18,6 +18,6 @@ spec:
       - name: kibana
         resources:
           limits:
-            memory: 1Gi  # Passe à 1Go au lieu de 512Mo
+            memory: 1Gi
           requests:
             memory: 512Mi

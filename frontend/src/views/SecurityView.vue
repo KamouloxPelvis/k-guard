@@ -1,5 +1,5 @@
 <script setup lang="ts">
-  import { ref, onMounted } from 'vue';
+  import { ref, onMounted, onUnmounted } from 'vue';
   import api from '@/services/api';
 
   // --- INTERFACES ---
@@ -38,7 +38,17 @@
     }
   };
 
-  onMounted(fetchAlerts);
+  let interval: ReturnType<typeof setInterval>;
+
+  onMounted(() => {
+    fetchAlerts();
+    // Rafraîchissement toutes les 30 secondes
+    interval = setInterval(fetchAlerts, 30000);
+  });
+
+  onUnmounted(() => {
+    clearInterval(interval);
+  });
 </script>
 
 <template>

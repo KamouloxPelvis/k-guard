@@ -1,0 +1,29 @@
+# Configuration globale
+falco:
+  json_output: true
+  file_output:
+    enabled: true
+
+# On force l'injection via les variables standard du Chart
+extraVolumes:
+  - name: falco-local-config
+    configMap:
+      name: falco-local-config
+
+extraVolumeMounts:
+  - name: falco-local-config
+    mountPath: /etc/falco/falco.local.yaml
+    subPath: falco.local.yaml
+
+# On garde ton volume de logs
+mounts:
+  volumes:
+    - name: falco-logs
+      hostPath:
+        path: /var/log/falco  # Doit correspondre exactement au hostPath de fluent-bit
+  volumeMounts:
+    - name: falco-logs
+      mountPath: /var/log/falco
+
+driver:
+  kind: modern_ebpf
