@@ -6,6 +6,8 @@ metadata:
 spec:
   version: 8.17.0
   count: 1
+  config:
+    csp.frameAncestors: ["*"]
   elasticsearchRef:
     name: elasticsearch 
   http:
