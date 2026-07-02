@@ -7,7 +7,11 @@ spec:
   version: 8.17.0
   count: 1
   config:
-    csp.frameAncestors: ["*"]
+    server.publicBaseUrl: "http://113.30.191.17:5601"
+    csp.frame_ancestors: ["*"]
+    xpack.security.session.idleTimeout: 30m
+    xpack.security.session.lifespan: 1d
+    server.xsrf.disableCookies: true
   elasticsearchRef:
     name: elasticsearch 
   http:

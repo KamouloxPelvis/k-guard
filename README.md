@@ -5,7 +5,7 @@
 
 *While security is a core priority, this software is provided as a personal and experimental Minimum Viable Product (MVP). It is designed as a research tool for exploring DevSecOps security architectures. As an evolving Open Source project, K-Guard is subject to continuous improvement and community-driven hardening.*
 
-**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Auditing (**Trivy**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
+**K-Guard** is a security governance and observability platform for K3s clusters. It automates the full security lifecycle: Runtime Security alterts & monitoring (**Falco**, **Fluent Bit**, **ElasticSearch**, **Kibana**), Network Remediation (**Network Sentinel/Ansible**), and ChatOps Alerting (**Cisco Webex**).
 
 ---
 
@@ -28,20 +28,27 @@
 
 ## 🧪 <a name="en-tech-stack"></a>Tech Stack
 
-* **Backend**: FastAPI (Python), Ansible Core, Trivy.
+* **Backend**: FastAPI (Python).
 * **Frontend**: Vue.js 3, Tailwind CSS, Fetch, JWT Auth.
 * **Installer**: Go (Bubble Tea / Lipgloss).
 
+* **Integrations**: Falco, Fluentbit, ElasticSearch, Kibana, Webex Webhook.
+
 * **Environment**: Optimized for Debian-based distributions (Debian 12/13, Ubuntu 24.04+). Engineered specifically for stable performance on VPS environments.
+
 ---
 
 ## 🚀 <a name="en-key-features"></a>Key Features
 
-* **Trivy Security Engine**: Scans container images for vulnerabilities directly from the UI.
+## 🛡️ Runtime Security: ELK Stack
 
-![K-Guard System Overview](frontend/public/screenshots/kguard-3.png)
+K-Guard integrates a dedicated **Runtime Security Operations Center (SOC)** powered by the Elastic Stack (Elasticsearch & Kibana). This module provides deep observability into system calls and container behavior, detecting anomalies in real-time.
 
-![K-Guard System Overview](frontend/public/screenshots/kguard-4.png)
+* **Falco Integration**: Capture and stream runtime security events directly into the Elastic index.
+* **Security Dashboarding**: Visualize threat activity heatmaps, container security audits, and severity distributions.
+* **Live Alert Feed**: Real-time monitoring of security violations, with automated persistence in the cluster.
+
+![K-Guard Runtime SOC](frontend/public/screenshots/kguard-soc-dashboard.png)
 
 * **Network Sentinel**: Implements idempotent Zero-Trust NetworkPolicies via Ansible playbooks.
 
@@ -65,12 +72,10 @@
 
 K-Guard automatically generates interactive API documentation using **Swagger UI (OpenAPI 3.1)**. This allows developers and security auditors to explore and test all endpoints directly from the browser.
 
-- **Interactive UI:** `https://<your-domain-or-ip>/docs`
+- **Interactive UI:** `http://<your-domain-or-ip>/docs`
 - **Features documented:** - 🔍 K3s Infrastructure Metrics
   - 🔐 Authentication & Token management
   - 💓 System Health Checks (Liveness Probes)
-
-> **Note:** Accessing the documentation via HTTPS is required. If using a self-signed certificate, you may need to bypass the browser security warning.
 
 ---
 
@@ -119,13 +124,22 @@ chmod +x install-kguard
 ```
 ---
 
-## 4. <a name="en-accessing-dashboard"></a>Accessing the Dashboard
-Once the deployment is finalized on your K3s cluster, the K-Guard interface is exposed through a secure endpoint within the cluster.
+## 4. <a name="en-accessing-dashboard"></a>Accessing the Dashboard & ELK
 
-1. **URL**: Open your browser and navigate to `http://<VPS_IP>` (or the domain/hostname configured for your cluster, e.g k-guard.local). 
-   *Note: As K-Guard is now managed directly via Kubernetes Ingress, no additional port specification is required.*
+Once the deployment is finalized, K-Guard and the ELK stack are exposed via your cluster Ingress.
 
-2. **Authentication**: Use the administrative credentials defined during the installation process to log in and access the real-time Sentinel topology and security scans.
+* K-Guard Dashboard: Navigate to http://<VPS_IP> (or your configured hostname).
+
+### Elasticsearch/Kibana Admin:
+
+To access the full SOC dashboard, log in with the elastic user.
+
+* Retrieve your password: Execute the following command on your node:
+
+```bash
+kubectl get secret elasticsearch-es-elastic-user -n k-guard -o go-template='{{.data.elastic | base64decode}}'
+```
+* Store this password securely. For security best practices, do not commit it to any repository. 
 
 ---
 
