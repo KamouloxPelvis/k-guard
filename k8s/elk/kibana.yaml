@@ -8,10 +8,17 @@ spec:
   count: 1
   config:
     server.publicBaseUrl: "http://113.30.191.17:5601"
+
+    server.cors: true
+    server.cors.allowOrigin: ["*"]
+
+    server.xsrf.disableCookies: true
+
     csp.frame_ancestors: ["*"]
+
     xpack.security.session.idleTimeout: 30m
     xpack.security.session.lifespan: 1d
-    server.xsrf.disableCookies: true
+
   elasticsearchRef:
     name: elasticsearch 
   http:

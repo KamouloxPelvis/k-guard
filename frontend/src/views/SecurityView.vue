@@ -18,7 +18,7 @@
 
   // --- CONFIGURATION ---
   // Base URL from your Share/Embed code (removing the hardcoded time parameters)
-  const kibanaBaseUrl = "http://113.30.191.17:5601/app/dashboards#/view/ea2db5ff-ddd9-41c7-9715-865cfe0a5d35";
+  const kibanaBaseUrl = "/kibana/app/dashboards#/view/ea2db5ff-ddd9-41c7-9715-865cfe0a5d35";
 
   // Computed source that dynamically injects the chosen time range
   const dashboardSrc = computed(() => {
@@ -100,7 +100,7 @@
         </div>
         <iframe 
           :src="dashboardSrc" 
-          class="w-full h-[calc(100%-40px)] border-0"
+          class="w-full h-full border-0"
           title="Runtime Security Dashboard">
         </iframe>
       </div>
