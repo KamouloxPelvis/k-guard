@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k-guard
+  labels:
+    name: k-guard
+    environment: development

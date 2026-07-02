@@ -23,13 +23,11 @@ app = FastAPI(
     description="Backend API for K-Guard: Operational Infrastructure Security & Observability Platform",
 )
 
+import os
+
 # --- CORS CONFIGURATION ---
-# Define allowed origins based on environment variables for security compliance
-raw_origins = os.getenv(
-    "ALLOWED_ORIGINS", 
-    "http://localhost:8000,http://127.0.0.1:8000",
-)
-origins = [origin.strip() for origin in raw_origins.split(",")]
+raw_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:8000")
+origins = [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
 
 app.add_middleware(
     CORSMiddleware,

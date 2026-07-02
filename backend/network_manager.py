@@ -101,5 +101,5 @@ async def get_network_map():
                     
         return {"nodes": nodes, "edges": edges, "namespaces": target_ns}
     except Exception as e:
-        logging.error("Critical error in network map discovery: %s", str(e))
-        return {"error": "SRE Discovery failed"}
+        logging.error("CRITICAL: Network Map failed due to: %s", str(e), exc_info=True)
+        return JSONResponse(status_code=500, content={"error": "SRE Discovery failed", "details": str(e)})

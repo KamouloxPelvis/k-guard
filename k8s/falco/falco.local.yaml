@@ -1,0 +1,7 @@
+json_output: true
+json_include_output_property: true
+outputs:
+  file:
+    enabled: true
+    keepAlive: true
+    filename: /var/log/falco/alerts.json
