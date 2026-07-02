@@ -34,6 +34,15 @@ rules:
     resources: ["secrets"]
     verbs: ["get", "list"]
 
+  # Permission to access network policies for security monitoring
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["networkpolicies"]
+    verbs: ["get", "list", "watch"]
+
+  # Permission to access namespaces for cluster-wide observability
+  - apiGroups: [""]
+    resources: ["namespaces"]
+    verbs: ["get", "list", "watch"]
 ---
 # 3. ClusterRoleBinding
 # Binding the ServiceAccount to the ClusterRole for the k-guard namespace.
